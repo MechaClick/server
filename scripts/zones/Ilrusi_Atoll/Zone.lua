@@ -1,19 +1,23 @@
 -----------------------------------
--- Zone: Ilrusi_Atoll
---  zone 55
+-- Zone: Ilrusi_Atoll (55)
 -----------------------------------
-local ID = require("scripts/zones/Ilrusi_Atoll/IDs")
+local ID = require('scripts/zones/Ilrusi_Atoll/IDs')
 -----------------------------------
-local zone_object = {}
+local zoneObject = {}
 
-zone_object.onInitialize = function(zone)
+zoneObject.onInitialize = function(zone)
 end
 
-zone_object.onInstanceZoneIn = function(player, instance)
+zoneObject.onInstanceZoneIn = function(player, instance)
     local cs = -1
 
+    if player:getInstance() == nil then
+        player:setPos(0, 0, 0, 0, 79)
+        return cs
+    end
+
     local pos = player:getPos()
-    if (pos.x == 0 and pos.y == 0 and pos.z == 0) then
+    if pos.x == 0 and pos.y == 0 and pos.z == 0 then
         local entrypos = instance:getEntryPos()
         player:setPos(entrypos.x, entrypos.y, entrypos.z, entrypos.rot)
     end
@@ -23,20 +27,20 @@ zone_object.onInstanceZoneIn = function(player, instance)
     return cs
 end
 
-zone_object.onRegionEnter = function(player, region)
+zoneObject.onTriggerAreaEnter = function(player, triggerArea)
 end
 
-zone_object.onEventUpdate = function(player, csid, option)
+zoneObject.onEventUpdate = function(player, csid, option)
 end
 
-zone_object.onEventFinish = function(player, csid, option)
+zoneObject.onEventFinish = function(player, csid, option)
     if csid == 102 then
         player:setPos(0, 0, 0, 0, 54)
     end
 end
 
-zone_object.onInstanceLoadFailed = function()
+zoneObject.onInstanceLoadFailed = function()
     return 79
 end
 
-return zone_object
+return zoneObject

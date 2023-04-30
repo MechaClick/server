@@ -22,11 +22,8 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #ifndef _CINSTANCELOADER_H
 #define _CINSTANCELOADER_H
 
-#include <future>
-
-#include "../common/cbasetypes.h"
-#include "../common/socket.h"
-#include "../common/sql.h"
+#include "common/cbasetypes.h"
+#include "common/socket.h"
 
 class CCharEntity;
 class CInstance;
@@ -35,19 +32,15 @@ class CZone;
 class CInstanceLoader
 {
 public:
-    CInstanceLoader(uint8 instanceid, CZone* PZone, CCharEntity* PRequester);
+    CInstanceLoader(uint16 instanceid, CCharEntity* PRequester);
     ~CInstanceLoader();
 
-    CInstance* GetInstance();
-    bool       Check();
+    CInstance* LoadInstance();
 
 private:
-    CZone*                  zone;
-    CCharEntity*            requester;
-    Sql_t*                  SqlInstanceHandle;
-    std::future<CInstance*> task;
-
-    CInstance* LoadInstance(CInstance* instance);
+    CInstance*   instance;
+    CZone*       zone;
+    CCharEntity* requester;
 };
 
 #endif

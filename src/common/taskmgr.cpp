@@ -21,15 +21,17 @@
 
 #include <utility>
 
-#include "../common/showmsg.h"
-#include "../common/taskmgr.h"
-#include "../common/timer.h"
-#include "../common/utils.h"
+#include "common/logging.h"
+#include "common/taskmgr.h"
+#include "common/timer.h"
+#include "common/tracy.h"
+#include "common/utils.h"
 
 CTaskMgr* CTaskMgr::_instance = nullptr;
 
 CTaskMgr* CTaskMgr::getInstance()
 {
+    TracyZoneScoped;
     if (_instance == nullptr)
     {
         _instance = new CTaskMgr();
@@ -41,36 +43,69 @@ void CTaskMgr::delInstance()
 {
     if (_instance)
     {
-        delete _instance;
-        _instance = nullptr;
+        destroy(_instance);
     }
 }
 
 CTaskMgr::CTask* CTaskMgr::AddTask(std::string InitName, time_point InitTick, std::any InitData, TASKTYPE InitType, TaskFunc_t InitFunc, duration InitInterval)
 {
+    TracyZoneScoped;
     return AddTask(new CTask(std::move(InitName), InitTick, std::move(InitData), InitType, InitFunc, InitInterval));
 }
 
 CTaskMgr::CTask* CTaskMgr::AddTask(CTask* PTask)
 {
+    TracyZoneScoped;
     m_TaskList.push(PTask);
     return PTask;
 }
 
-void CTaskMgr::RemoveTask(const std::string& TaskName)
+void CTaskMgr::RemoveTask(std::string const& TaskName)
 {
-    // empty method
+    TracyZoneScoped;
+    // m_TaskList is a priority_queue, so we can't directly pull members out of it.
+    //
+    // Tasks are compared using their m_tick values, so we can safely remove all the tasks
+    // and re-insert them, sans the one we're trying to remove.
+
+    std::size_t tasksRemoved = 0;
+    TaskList_t  newPq;
+    while (!m_TaskList.empty())
+    {
+        CTask* PTask = m_TaskList.top();
+        m_TaskList.pop();
+
+        // Don't add tasks we're trying to remove to the new pq
+        if (PTask->m_name != TaskName)
+        {
+            newPq.push(PTask);
+        }
+        else
+        {
+            ++tasksRemoved;
+        }
+    }
+
+    if (tasksRemoved == 0)
+    {
+        ShowWarning("Tried to remove task: %s, but didn't find it!", TaskName);
+    }
+
+    // Replace the old queue with the new queue
+    m_TaskList = newPq;
 }
 
 duration CTaskMgr::DoTimer(time_point tick)
 {
+    TracyZoneScoped;
     duration diff = 1s;
 
     while (!m_TaskList.empty())
     {
         CTask* PTask = m_TaskList.top();
-        diff         = PTask->m_tick - tick;
+        TracyZoneString(PTask->m_name);
 
+        diff = PTask->m_tick - tick;
         if (diff > 0s)
         {
             break; // no more expired timers to process
@@ -95,11 +130,10 @@ duration CTaskMgr::DoTimer(time_point tick)
             case TASK_REMOVE:
             default:
             {
-                delete PTask; // suppose that all tasks were allocated by new
+                destroy(PTask); // suppose that all tasks were allocated by new
             }
             break;
         }
-        diff = std::clamp<duration>(diff, 50ms, 1000ms);
     }
-    return diff;
+    return std::clamp<duration>(diff, 50ms, 1000ms);
 }

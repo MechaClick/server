@@ -19,21 +19,21 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include "../entities/charentity.h"
 #include "release.h"
 
 CReleasePacket::CReleasePacket(CCharEntity* PChar, RELEASE_TYPE releaseType)
 {
-    this->type = 0x52;
-    this->size = 0x04;
+    this->setType(0x52);
+    this->setSize(0x08);
 
     ref<uint8>(0x04) = static_cast<uint8>(releaseType);
 
     if (releaseType == RELEASE_TYPE::SKIPPING)
     {
-        ref<uint16>(0x05) = PChar->m_event.EventID;
+        ref<uint16>(0x05) = PChar->currentEvent->eventId;
     }
 
     PChar->m_Substate = CHAR_SUBSTATE::SUBSTATE_NONE;

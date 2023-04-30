@@ -24,8 +24,8 @@ require('scripts/globals/settings')
 require('scripts/globals/interaction/mission')
 require('scripts/globals/zone')
 -----------------------------------
-local laTheinePlateauID  = require("scripts/zones/La_Theine_Plateau/IDs")
-local ordellesCavesID    = require("scripts/zones/Ordelles_Caves/IDs")
+local laTheinePlateauID  = require('scripts/zones/La_Theine_Plateau/IDs')
+local ordellesCavesID    = require('scripts/zones/Ordelles_Caves/IDs')
 local southernSandoriaID = require('scripts/zones/Southern_San_dOria/IDs')
 local northernSandoriaID = require('scripts/zones/Northern_San_dOria/IDs')
 -----------------------------------
@@ -171,7 +171,7 @@ mission.sections =
                         return mission:messageText(laTheinePlateauID.text.RESCUE_DRILL + 4)
                     elseif missionStatus == 8 then
                         if mission:getVar(player, 'Option') == 3 then
-                            player:startEvent(113)
+                            return mission:progressEvent(113)
                         else
                             return mission:messageText(laTheinePlateauID.text.RESCUE_DRILL + 21)
                         end
@@ -394,7 +394,10 @@ mission.sections =
 
                     if missionStatus >= 2 and missionStatus <= 7 then
                         return mission:progressEvent(1)
-                    elseif missionStatus >= 10 or player:hasCompletedMission(mission.areaId, mission.missionId) then
+                    elseif
+                        missionStatus >= 10 or
+                        player:hasCompletedMission(mission.areaId, mission.missionId)
+                    then
                         return mission:messageText(ordellesCavesID.text.RUILLONT_INITIAL_DIALOG + 9)
                     elseif missionStatus >= 8 then
                         return mission:messageText(ordellesCavesID.text.RUILLONT_INITIAL_DIALOG)

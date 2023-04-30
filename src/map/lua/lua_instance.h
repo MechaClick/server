@@ -22,7 +22,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #ifndef _LUAINSTANCE_H
 #define _LUAINSTANCE_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 #include "luautils.h"
 
 class CLuaBaseEntity;
@@ -41,9 +41,12 @@ public:
         return m_PLuaInstance;
     }
 
-    uint8  getID();
-    auto   getName() -> std::string;
+    friend std::ostream& operator<<(std::ostream& out, const CLuaInstance& instance);
+
+    uint16 getID();
+    auto   getName() -> const std::string&;
     auto   getZone() -> CLuaZone;
+    uint32 getEntranceZoneID();
     auto   getAllies() -> sol::table;
     auto   getChars() -> sol::table;
     auto   getMobs() -> sol::table;
@@ -51,19 +54,21 @@ public:
     auto   getPets() -> sol::table;
     uint32 getTimeLimit();
     auto   getEntryPos() -> sol::table;
+    uint8  getLevelCap();
     uint32 getLastTimeUpdate();
     uint32 getProgress();
     uint32 getWipeTime();
     auto   getEntity(uint16 targid, sol::object const& filterObj) -> std::optional<CLuaBaseEntity>;
     uint32 getStage();
-    auto   getLocalVar(std::string name) -> uint64_t;
+    auto   getLocalVar(std::string const& name) -> uint64_t;
 
     void setLevelCap(uint8 cap);
     void setLastTimeUpdate(uint32 ms);
+    void setTimeLimit(uint32 seconds);
     void setProgress(uint32 progress);
     void setWipeTime(uint32 ms);
     void setStage(uint32 stage);
-    void setLocalVar(std::string name, uint64_t value);
+    void setLocalVar(std::string const& name, uint64_t value);
 
     void fail();
     bool failed();

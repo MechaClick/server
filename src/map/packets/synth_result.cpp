@@ -19,7 +19,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include "../entities/charentity.h"
 #include "../trade_container.h"
@@ -28,30 +28,33 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 
 CSynthResultMessagePacket::CSynthResultMessagePacket(CCharEntity* PChar, SYNTH_MESSAGE messageID, uint16 itemID, uint8 quantity)
 {
-    this->type = 0x70;
-    this->size = 0x30;
+    this->setType(0x70);
+    this->setSize(0x60);
 
     ref<uint8>(0x04) = messageID;
 
     ref<uint16>(0x1a) = PChar->id;
+
     if (itemID != 0)
     {
         ref<uint8>(0x06)  = quantity;
         ref<uint16>(0x08) = itemID;
     }
+
     if (messageID == SYNTH_FAIL)
     {
         uint8 count = 0;
         for (uint8 slotID = 1; slotID <= 8; ++slotID)
         {
-            uint32 quantity = PChar->CraftContainer->getQuantity(slotID);
-            if (quantity == 0)
+            uint32 slotQuantity = PChar->CraftContainer->getQuantity(slotID);
+            if (slotQuantity == 0)
             {
-                uint16 itemID                   = PChar->CraftContainer->getItemID(slotID);
-                ref<uint16>(0x0A + (count * 2)) = itemID;
+                uint16 failedItemID             = PChar->CraftContainer->getItemID(slotID);
+                ref<uint16>(0x0A + (count * 2)) = failedItemID;
                 count++;
             }
         }
     }
-    memcpy(data + (0x1E), PChar->GetName(), PChar->name.size());
+
+    memcpy(data + (0x1E), PChar->GetName().c_str(), PChar->GetName().size());
 }

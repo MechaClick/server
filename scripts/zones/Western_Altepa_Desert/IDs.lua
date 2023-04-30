@@ -10,40 +10,51 @@ zones[xi.zone.WESTERN_ALTEPA_DESERT] =
 {
     text =
     {
-        ITEM_CANNOT_BE_OBTAINED    = 6383,  -- You cannot obtain the <item>. Come back after sorting your inventory.
-        FULL_INVENTORY_AFTER_TRADE = 6387,  -- You cannot obtain the <item>. Try trading again after sorting your inventory.
-        ITEM_OBTAINED              = 6389,  -- Obtained: <item>.
-        GIL_OBTAINED               = 6390,  -- Obtained <number> gil.
-        KEYITEM_OBTAINED           = 6392,  -- Obtained key item: <keyitem>.
-        ITEMS_OBTAINED             = 6398,  -- You obtain <number> <item>!
-        NOTHING_OUT_OF_ORDINARY    = 6403,  -- There is nothing out of the ordinary here.
-        FELLOW_MESSAGE_OFFSET      = 6418,  -- I'm ready. I suppose.
-        CARRIED_OVER_POINTS        = 7000, -- You have carried over <number> login point[/s].
-        LOGIN_CAMPAIGN_UNDERWAY    = 7001, -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!<space>
-        LOGIN_NUMBER               = 7002, -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
-        CONQUEST_BASE              = 7050,  -- Tallying conquest results...
-        FISHING_MESSAGE_OFFSET     = 7209,  -- You can't fish here.
-        DIG_THROW_AWAY             = 7222,  -- You dig up <item>, but your inventory is full. You regretfully throw the <item> away.
-        FIND_NOTHING               = 7224,  -- You dig and you dig, but find nothing.
-        THE_DOOR_IS_LOCKED         = 7329,  -- The door is locked.
-        DOES_NOT_RESPOND           = 7330,  -- It does not respond.
-        CANNOT_REMOVE_FRAG         = 7346,  -- It is an oddly shaped stone monument. A shining stone is embedded in it, but cannot be removed...
-        ALREADY_OBTAINED_FRAG      = 7347,  -- You have already obtained this monument's <keyitem>. Try searching for another.
-        ALREADY_HAVE_ALL_FRAGS     = 7348,  -- You have obtained all of the fragments. You must hurry to the ruins of the ancient shrine!
-        FOUND_ALL_FRAGS            = 7349,  -- You have obtained <keyitem>! You now have all 8 fragments of light!
-        ZILART_MONUMENT            = 7350,  -- It is an ancient Zilart monument.
-        SENSE_OMINOUS_PRESENCE     = 7409,  -- You sense an ominous presence...
-        SOMETHING_IS_BURIED_HERE   = 7427,  -- It looks like something is buried here. If you had <item> you could dig it up.
-        PLAYER_OBTAINS_ITEM        = 7640,  -- <name> obtains <item>!
-        UNABLE_TO_OBTAIN_ITEM      = 7641,  -- You were unable to obtain the item.
-        PLAYER_OBTAINS_TEMP_ITEM   = 7642,  -- <name> obtains the temporary item: <item>!
-        ALREADY_POSSESS_TEMP       = 7643,  -- You already possess that temporary item.
-        NO_COMBINATION             = 7648,  -- You were unable to enter a combination.
-        REGIME_REGISTERED          = 9826,  -- New training regime registered!
-        COMMON_SENSE_SURVIVAL      = 11815, -- It appears that you have arrived at a new survival guide provided by the Adventurers' Mutual Aid Network. Common sense dictates that you should now be able to teleport here from similar tomes throughout the world.
+        ITEM_CANNOT_BE_OBTAINED       = 6384,  -- You cannot obtain the <item>. Come back after sorting your inventory.
+        FULL_INVENTORY_AFTER_TRADE    = 6388,  -- You cannot obtain the <item>. Try trading again after sorting your inventory.
+        ITEM_OBTAINED                 = 6390,  -- Obtained: <item>.
+        GIL_OBTAINED                  = 6391,  -- Obtained <number> gil.
+        KEYITEM_OBTAINED              = 6393,  -- Obtained key item: <keyitem>.
+        ITEMS_OBTAINED                = 6399,  -- You obtain <number> <item>!
+        NOTHING_OUT_OF_ORDINARY       = 6404,  -- There is nothing out of the ordinary here.
+        FELLOW_MESSAGE_OFFSET         = 6419,  -- I'm ready. I suppose.
+        CARRIED_OVER_POINTS           = 7001,  -- You have carried over <number> login point[/s].
+        LOGIN_CAMPAIGN_UNDERWAY       = 7002,  -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
+        LOGIN_NUMBER                  = 7003,  -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
+        MEMBERS_LEVELS_ARE_RESTRICTED = 7023,  -- Your party is unable to participate because certain members' levels are restricted.
+        CONQUEST_BASE                 = 7060,  -- Tallying conquest results...
+        FISHING_MESSAGE_OFFSET        = 7219,  -- You can't fish here.
+        DIG_THROW_AWAY                = 7232,  -- You dig up <item>, but your inventory is full. You regretfully throw the <item> away.
+        FIND_NOTHING                  = 7234,  -- You dig and you dig, but find nothing.
+        AMK_DIGGING_OFFSET            = 7300,  -- You spot some familiar footprints. You are convinced that your moogle friend has been digging in the immediate vicinity.
+        THE_DOOR_IS_LOCKED            = 7339,  -- The door is locked.
+        DOES_NOT_RESPOND              = 7340,  -- It does not respond.
+        CANNOT_REMOVE_FRAG            = 7356,  -- It is an oddly shaped stone monument. A shining stone is embedded in it, but cannot be removed...
+        ALREADY_OBTAINED_FRAG         = 7357,  -- You have already obtained this monument's <keyitem>. Try searching for another.
+        ALREADY_HAVE_ALL_FRAGS        = 7358,  -- You have obtained all of the fragments. You must hurry to the ruins of the ancient shrine!
+        FOUND_ALL_FRAGS               = 7359,  -- You have obtained <keyitem>! You now have all 8 fragments of light!
+        ZILART_MONUMENT               = 7360,  -- It is an ancient Zilart monument.
+        FEEL_SOMETHING_PRICKLY        = 7378,  -- You feel something prickly...
+        MANY_STONES_LITTER_AREA       = 7379,  -- Many stones litter the area.
+        EVIL_LOOMING_ABOVE_YOU        = 7380,  -- You sense something evil looming above you.
+        SENSE_OMINOUS_PRESENCE        = 7400,  -- You sense an ominous presence...
+        SOMETHING_IS_BURIED_HERE      = 7418,  -- It looks like something is buried here. If you had <item> you could dig it up.
+        PLAYER_OBTAINS_ITEM           = 7638,  -- <name> obtains <item>!
+        UNABLE_TO_OBTAIN_ITEM         = 7639,  -- You were unable to obtain the item.
+        PLAYER_OBTAINS_TEMP_ITEM      = 7640,  -- <name> obtains the temporary item: <item>!
+        ALREADY_POSSESS_TEMP          = 7641,  -- You already possess that temporary item.
+        NO_COMBINATION                = 7646,  -- You were unable to enter a combination.
+        UNITY_WANTED_BATTLE_INTERACT  = 7708,  -- Those who have accepted % must pay # Unity accolades to participate. The content for this Wanted battle is #. [Ready to begin?/You do not have the appropriate object set, so your rewards will be limited.]
+        REGIME_REGISTERED             = 9824,  -- New training regime registered!
+        COMMON_SENSE_SURVIVAL         = 11813, -- It appears that you have arrived at a new survival guide provided by the Adventurers' Mutual Aid Network. Common sense dictates that you should now be able to teleport here from similar tomes throughout the world.
     },
     mob =
     {
+        PICOLATON_PH =
+        {
+            [17289637] = 17289638,
+        },
+
         CACTUAR_CANTAUTOR_PH =
         {
             [17289559] = 17289560, -- -458.944 0.018 -557.266
@@ -73,19 +84,18 @@ zones[xi.zone.WESTERN_ALTEPA_DESERT] =
     },
     npc =
     {
-        CASKET_BASE       = 17289720,
-        ALTEPA_GATE       = 17289744,
-        PEDDLESTOX        = 17289769,
+        ALTEPA_GATE       = 17289747,
+        PEDDLESTOX        = 17289772,
         BEASTMEN_TREASURE =
         {
-            17289772, -- qm3
-            17289773, -- qm4
-            17289774, -- qm5
-            17289775, -- qm6
-            17289776, -- qm7
-            17289777, -- qm8
-            17289778, -- qm9
-            17289779, -- qm10
+            17289775, -- qm3
+            17289776, -- qm4
+            17289777, -- qm5
+            17289778, -- qm6
+            17289779, -- qm7
+            17289780, -- qm8
+            17289781, -- qm9
+            17289782, -- qm10
         },
     },
 }

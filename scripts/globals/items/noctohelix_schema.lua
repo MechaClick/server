@@ -3,14 +3,16 @@
 -- Noctohelix Schema
 -- Teaches the black magic Noctohelix
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(284)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.NOCTOHELIX)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(284)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.NOCTOHELIX)
 end
 
-return item_object
+return itemObject

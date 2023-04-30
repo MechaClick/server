@@ -16,14 +16,17 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local Stash = player:getQuestStatus(xi.quest.log_id.OUTLANDS, xi.quest.id.outlands.THE_SAHAGINS_STASH)
+    local stash = player:getQuestStatus(xi.quest.log_id.OUTLANDS, xi.quest.id.outlands.THE_SAHAGINS_STASH)
     local mLvl = player:getMainLvl()
-    local SeaStatue = player:hasKeyItem(xi.ki.SEA_SERPENT_STATUE)
 
-    if Stash == QUEST_AVAILABLE and player:getFameLevel(NORG) >= 4 and mLvl >= 5 then
+    if
+        stash == QUEST_AVAILABLE and
+        player:getFameLevel(xi.quest.fame_area.NORG) >= 4 and
+        mLvl >= 5
+    then
         player:startEvent(33) -- Start quest
-    elseif Stash == QUEST_ACCEPTED then
-        if SeaStatue == true then
+    elseif stash == QUEST_ACCEPTED then
+        if player:hasKeyItem(xi.ki.SEA_SERPENT_STATUE) then
             player:startEvent(35, xi.ki.SEA_SERPENT_STATUE) -- Finish quest
         else
             player:startEvent(34) -- Reminder Dialogue
@@ -46,12 +49,11 @@ entity.onEventFinish = function(player, csid, option)
             player:delKeyItem(xi.ki.SEA_SERPENT_STATUE)
             player:addItem(4946) -- Scroll of Utsusemi: Ichi
             player:messageSpecial(ID.text.ITEM_OBTAINED, 4946)
-            player:addTitle(xi.title.TREASUREHOUSE_RANSACKER)
-            player:addFame(NORG, 75)
+            player:addTitle(xi.title.TREASURE_HOUSE_RANSACKER)
+            player:addFame(xi.quest.fame_area.NORG, 75)
             player:completeQuest(xi.quest.log_id.OUTLANDS, xi.quest.id.outlands.THE_SAHAGINS_STASH)
         end
     end
-
 end
 
 return entity

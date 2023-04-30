@@ -18,11 +18,12 @@
 
 ===========================================================================
 */
-#include "../common/mmo.h"
-#include "../common/showmsg.h"
-#include "../common/timer.h"
-#include "../common/utils.h"
-#include "../common/version.h"
+#include "common/logging.h"
+#include "common/mmo.h"
+#include "common/socket.h"
+#include "common/timer.h"
+#include "common/utils.h"
+#include "common/version.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -35,239 +36,204 @@
 #include <vector>
 
 #ifdef WIN32
+#include "../ext/wepoll/wepoll.h"
 #include <io.h>
 #define isatty _isatty
 #else
 #include <unistd.h>
+
+// MacOS has no epoll
+#ifdef __APPLE__
+#include <sys/ioctl.h>
+#else
+#include <sys/epoll.h>
+#include <sys/resource.h>
+#endif
+
+typedef int HANDLE;
+#endif
+
+#ifndef __APPLE__
+struct epoll_event events[MAX_FD] = {};
+HANDLE             epollHandle    = 0;
+
+struct epoll_event loginEpollEvent           = { EPOLLIN };
+struct epoll_event login_lobbydataEpollEvent = { EPOLLIN };
+struct epoll_event login_lobbyviewEpollEvent = { EPOLLIN };
 #endif
 
 #include "lobby.h"
 #include "login.h"
 #include "login_auth.h"
-#include "message_server.h"
+#include "login_conf.h"
 
-const char* LOGIN_CONF_FILENAME   = nullptr;
-const char* VERSION_INFO_FILENAME = nullptr;
-const char* MAINT_CONF_FILENAME   = nullptr;
+std::unique_ptr<SqlConnection> sql;
 
-volatile bool consoleThreadRun = true;
+uint8 ver_lock   = 0;
+uint8 maint_mode = 0;
 
-login_config_t login_config; // main settings
-version_info_t version_info;
-maint_config_t maint_config;
-
-Sql_t*      SqlHandle = nullptr;
-std::thread messageThread;
-std::thread consoleInputThread;
+bool requestExit = false;
 
 int32 do_init(int32 argc, char** argv)
 {
-    int32 i;
-    LOGIN_CONF_FILENAME   = "conf/login.conf";
-    VERSION_INFO_FILENAME = "conf/version.conf";
-    MAINT_CONF_FILENAME   = "conf/maint.conf";
+    login_fd = makeListenBind_tcp(settings::get<std::string>("network.LOGIN_AUTH_IP").c_str(), settings::get<uint16>("network.LOGIN_AUTH_PORT"), connect_client_login);
+    ShowInfo(fmt::format("The login-server-auth is ready (Server is listening on the port {}).", settings::get<uint16>("network.LOGIN_AUTH_PORT")));
 
-    // srand(gettick());
+    login_lobbydata_fd = makeListenBind_tcp(settings::get<std::string>("network.LOGIN_DATA_IP").c_str(), settings::get<uint16>("network.LOGIN_DATA_PORT"), connect_client_lobbydata);
+    ShowInfo(fmt::format("The login-server-lobbydata is ready (Server is listening on the port {}).", settings::get<uint16>("network.LOGIN_DATA_PORT")));
 
-    for (i = 1; i < argc; i++)
+    login_lobbyview_fd = makeListenBind_tcp(settings::get<std::string>("network.LOGIN_VIEW_IP").c_str(), settings::get<uint16>("network.LOGIN_VIEW_PORT"), connect_client_lobbyview);
+    ShowInfo(fmt::format("The login-server-lobbyview is ready (Server is listening on the port {}).", settings::get<uint16>("network.LOGIN_VIEW_PORT")));
+
+#ifndef __APPLE__
+    epollHandle = epoll_create1(0);
+
+    loginEpollEvent.data.fd           = login_fd;
+    login_lobbydataEpollEvent.data.fd = login_lobbydata_fd;
+    login_lobbyviewEpollEvent.data.fd = login_lobbyview_fd;
+#ifdef WIN32
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, sock_arr[login_fd], &loginEpollEvent);
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, sock_arr[login_lobbydata_fd], &login_lobbydataEpollEvent);
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, sock_arr[login_lobbyview_fd], &login_lobbyviewEpollEvent);
+#else
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, login_fd, &loginEpollEvent);
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, login_lobbydata_fd, &login_lobbydataEpollEvent);
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, login_lobbyview_fd, &login_lobbyviewEpollEvent);
+
+    struct rlimit limits;
+
+    // Get old limits
+    if (getrlimit(RLIMIT_NOFILE, &limits) == 0)
     {
-        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--?") == 0 || strcmp(argv[i], "/?") == 0)
+        // Increase open file limit, which includes sockets, to MAX_FD. This only effects the current process and child processes
+        limits.rlim_cur = MAX_FD;
+        if (setrlimit(RLIMIT_NOFILE, &limits) == -1)
         {
-            login_helpscreen(1);
-        }
-        else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "--v") == 0 || strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "/v") == 0)
-        {
-            login_versionscreen(1);
-        }
-        else if (strcmp(argv[i], "--login_config") == 0 || strcmp(argv[i], "--login-config") == 0)
-        {
-            LOGIN_CONF_FILENAME = argv[i + 1];
-        }
-        else if (strcmp(argv[i], "--run_once") == 0)
-        { // close the map-server as soon as its done.. for testing [Celest]
-            runflag = 0;
+            ShowError("Failed to increase rlim_cur to %d", MAX_FD);
         }
     }
+#endif
+#endif
 
-    login_config_default();
-    config_read(LOGIN_CONF_FILENAME, "login", login_config_read);
-    login_config_read_from_env();
+    // NOTE: See login_conf.h for more information about what happens on this port
+    // login_lobbyconf_fd = makeListenBind_tcp(settings::get<std::string>("network.LOGIN_CONF_IP").c_str(), settings::get<uint16>("network.LOGIN_CONF_PORT"), connect_client_lobbyconf);
+    // ShowInfo("The login-server-lobbyconf is ready (Server is listening on the port %u).", settings::get<uint16>("network.LOGIN_CONF_PORT"));
 
-    version_info_default();
-    config_read(VERSION_INFO_FILENAME, "version info", version_info_read);
-
-    maint_config_default();
-    config_read(MAINT_CONF_FILENAME, "maint", maint_config_read);
-
-    login_fd = makeListenBind_tcp(login_config.login_auth_ip.c_str(), login_config.login_auth_port, connect_client_login);
-    ShowStatus("The login-server-auth is " CL_GREEN "ready" CL_RESET " (Server is listening on the port %u).\n\n", login_config.login_auth_port);
-
-    login_lobbydata_fd = makeListenBind_tcp(login_config.login_data_ip.c_str(), login_config.login_data_port, connect_client_lobbydata);
-    ShowStatus("The login-server-lobbydata is " CL_GREEN "ready" CL_RESET " (Server is listening on the port %u).\n\n", login_config.login_data_port);
-
-    login_lobbyview_fd = makeListenBind_tcp(login_config.login_view_ip.c_str(), login_config.login_view_port, connect_client_lobbyview);
-    ShowStatus("The login-server-lobbyview is " CL_GREEN "ready" CL_RESET " (Server is listening on the port %u).\n\n", login_config.login_view_port);
-
-    SqlHandle = Sql_Malloc();
-    if (Sql_Connect(SqlHandle, login_config.mysql_login.c_str(), login_config.mysql_password.c_str(), login_config.mysql_host.c_str(), login_config.mysql_port,
-                    login_config.mysql_database.c_str()) == SQL_ERROR)
-    {
-        exit(EXIT_FAILURE);
-    }
-    Sql_Keepalive(SqlHandle);
+    sql = std::make_unique<SqlConnection>();
 
     const char* fmtQuery = "OPTIMIZE TABLE `accounts`,`accounts_banned`, `accounts_sessions`, `chars`,`char_equip`, \
                            `char_inventory`, `char_jobs`,`char_look`,`char_stats`, `char_vars`, `char_bazaar_msg`, \
                            `char_skills`, `char_titles`, `char_effects`, `char_exp`;";
 
-    if (Sql_Query(SqlHandle, fmtQuery) == SQL_ERROR)
+    if (sql->Query(fmtQuery) == SQL_ERROR)
     {
-        ShowError("do_init: Impossible to optimise tables\n");
+        ShowError("do_init: Impossible to optimise tables");
     }
 
-    messageThread = std::thread(message_server_init);
-    ShowStatus("The login-server is " CL_GREEN "ready" CL_RESET " to work...\n");
-
-    if (!login_config.account_creation)
+    if (!settings::get<bool>("login.ACCOUNT_CREATION"))
     {
-        ShowStatus("New account creation is " CL_RED "disabled" CL_RESET " in login_config.\n");
+        ShowInfo("New account creation is currently disabled.");
     }
 
-    bool attached = isatty(0);
-
-    if (attached)
+    if (!settings::get<bool>("login.CHARACTER_DELETION"))
     {
-        consoleInputThread = std::thread([&]() {
-            ShowStatus("Console input thread is ready..\r\n");
-            // ctrl c apparently causes log spam
-            auto lastInputTime = server_clock::now();
-            while (consoleThreadRun)
-            {
-                if ((server_clock::now() - lastInputTime) > 1s)
-                {
-                    std::string line;
-                    std::getline(std::cin, line);
-                    std::istringstream       stream(line);
-                    std::string              input;
-                    std::vector<std::string> inputs;
-                    while (stream >> input)
-                    {
-                        inputs.push_back(input);
-                    }
-
-                    if (!inputs.empty())
-                    {
-                        if (inputs[0] == "verlock")
-                        {
-                            // handle wrap around from 2->3 as 0
-                            auto temp             = (++version_info.ver_lock) % 3;
-                            version_info.ver_lock = temp;
-
-                            const char* value = "";
-                            switch (version_info.ver_lock)
-                            {
-                                case 0:
-                                    value = "disabled";
-                                    break;
-                                case 1:
-                                    value = "enabled - strict";
-                                    break;
-                                case 2:
-                                    value = "enabled - greater than or equal";
-                                    break;
-                            }
-                            ShowStatus("Version lock %i - %s\r\n", version_info.ver_lock, value);
-                        }
-                        else if (inputs[0] == "maint_mode")
-                        {
-                            if (inputs.size() >= 2)
-                            {
-                                uint8 mode = 0;
-                                try
-                                {
-                                    mode = std::stoi(inputs[1]);
-                                }
-                                catch (...)
-                                {
-                                    // set to invalid if string -> uint8 fails
-                                    mode = 0;
-                                }
-
-                                if (mode < 0 || mode > 2)
-                                {
-                                    ShowStatus("Maintenance mode %i not supported\r\n", maint_config.maint_mode);
-                                }
-                                else
-                                {
-                                    maint_config.maint_mode = mode;
-                                    config_write(MAINT_CONF_FILENAME, "maint", maint_config_write);
-
-                                    ShowStatus("Maintenance mode changed to %i\r\n", maint_config.maint_mode);
-                                }
-                            }
-                            else
-                            {
-                                ShowStatus("Maintenance mode requires 1 argument (mode - 0-1)\r\n");
-                            }
-                        }
-                        else
-                        {
-                            ShowStatus("Unknown console input command\r\n");
-                        }
-                    }
-
-                    lastInputTime = server_clock::now();
-                }
-            };
-            ShowStatus("Console input thread exiting..\r\n");
-        });
+        ShowInfo("Character deletion is currently disabled.");
     }
+
+    // clang-format off
+    gConsoleService = std::make_unique<ConsoleService>();
+
+    // TODO: Writing back to settings files
+    gConsoleService->RegisterCommand(
+    "verlock", "Cycle between version lock acceptance modes.",
+    [&](std::vector<std::string> inputs)
+    {
+        // handle wrap around from 2 -> 3 as 0
+        auto temp = (ver_lock + 1) % 3;
+        ver_lock  = temp;
+
+        const char* value = "";
+        switch (ver_lock)
+        {
+            case 0:
+                value = "disabled";
+                break;
+            case 1:
+                value = "enabled - strict";
+                break;
+            case 2:
+                value = "enabled - greater than or equal";
+                break;
+        }
+        fmt::printf("Version lock mode: %i - %s\n", ver_lock, value);
+    });
+
+    gConsoleService->RegisterCommand(
+    "maint_mode", "Cycle between maintenance modes.",
+    [&](std::vector<std::string> inputs)
+    {
+        maint_mode = (maint_mode + 1) % 2;
+        fmt::printf("Maintenance mode changed to %i\n", maint_mode);
+    });
+
+    gConsoleService->RegisterCommand(
+    "show_fds", "Print current amount of File Descriptors in use.",
+    [&](std::vector<std::string> inputs)
+    {
+        fmt::printf("Total fds in use: %i (4 are reserved for login itself)\n", fd_max);
+    });
+
+    gConsoleService->RegisterCommand("exit", "Terminate the program.",
+    [&](std::vector<std::string> inputs)
+    {
+        fmt::print("> Goodbye!\n");
+        // gConsoleService->stop(); // Kernel calls this, uncomment when decoupled from kernel
+        gRunFlag = false;
+        //do_final(EXIT_SUCCESS); // Kernel calls this, uncomment or replace when decoupled from kernel
+    });
+    // clang-format on
+
+    ShowInfo("The login-server is ready to work!");
+    ShowInfo("=======================================================================");
+
     return 0;
 }
 
 void do_final(int code)
 {
-    consoleThreadRun = false;
-    message_server_close();
-    if (messageThread.joinable())
-    {
-        messageThread.join();
-    }
-    if (consoleInputThread.joinable())
-    {
-        consoleInputThread.join();
-    }
-    if (SqlHandle)
-    {
-        Sql_Free(SqlHandle);
-        SqlHandle = nullptr;
-    }
+    requestExit = true;
 
     timer_final();
     socket_final();
 
-    exit(code);
+    sql = nullptr;
+    logging::ShutDown();
+
+    if (code != EXIT_SUCCESS)
+    {
+        exit(code);
+    }
 }
 
 void do_abort()
 {
     do_final(EXIT_FAILURE);
 }
-void set_server_type()
+
+void set_socket_type()
 {
-    SERVER_TYPE = XI_SERVER_LOGIN;
     SOCKET_TYPE = socket_type::TCP;
 }
 
 int do_sockets(fd_set* rfd, duration next)
 {
-    struct timeval timeout;
-    int            ret;
-    int            i;
+    int ret = 0;
 
+#ifdef __APPLE__
+    struct timeval timeout;
     // can timeout until the next tick
-    timeout.tv_sec  = (long)std::chrono::duration_cast<std::chrono::seconds>(next).count();
-    timeout.tv_usec = (long)std::chrono::duration_cast<std::chrono::microseconds>(next - std::chrono::duration_cast<std::chrono::seconds>(next)).count();
+    timeout.tv_sec  = std::chrono::duration_cast<std::chrono::seconds>(next).count();
+    timeout.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(next - std::chrono::duration_cast<std::chrono::seconds>(next)).count();
 
     memcpy(rfd, &readfds, sizeof(*rfd));
     ret = sSelect(fd_max, rfd, nullptr, nullptr, &timeout);
@@ -276,428 +242,129 @@ int do_sockets(fd_set* rfd, duration next)
     {
         if (sErrno != S_EINTR)
         {
-            ShowFatalError("do_sockets: select() failed, error code %d!\n", sErrno);
+            ShowCritical(fmt::format("do_sockets: select() failed, error code {}!", sErrno));
             exit(EXIT_FAILURE);
         }
         return 0; // interrupted by a signal, just loop and try again
     }
-
+#else
+    ret = epoll_wait(epollHandle, events, fd_max, std::chrono::duration_cast<std::chrono::milliseconds>(next).count());
+    if (ret == SOCKET_ERROR)
+    {
+        if (sErrno != S_EINTR)
+        {
+            ShowCritical("do_sockets: epoll_wait() failed, error code %d!", sErrno);
+            exit(EXIT_FAILURE);
+        }
+        return 0; // interrupted by a signal, just loop and try again
+    }
+    else if (ret == 0)
+    {
+        return 0;
+    }
+#endif
     last_tick = time(nullptr);
 
-#if defined(WIN32)
-    // on windows, enumerating all members of the fd_set is way faster if we access the internals
-    for (i = 0; i < (int)rfd->fd_count; ++i)
-    {
-        int fd = sock2fd(rfd->fd_array[i]);
-        if (session[fd])
-        {
-            session[fd]->func_recv(fd);
-
-            if (fd != login_fd && fd != login_lobbydata_fd && fd != login_lobbyview_fd)
-            {
-                session[fd]->func_parse(fd);
-
-                if (!session[fd])
-                    continue;
-
-                //              RFIFOFLUSH(fd);
-            }
-        }
-    }
-#else
+#if __APPLE__
     // otherwise assume that the fd_set is a bit-array and enumerate it in a standard way
-    for (i = 1; ret && i < fd_max; ++i)
+    for (int fd = 1; ret && fd < fd_max; ++fd)
     {
-        if (sFD_ISSET(i, rfd) && session[i])
+        if (sFD_ISSET(fd, rfd) && sessions[fd])
         {
-            session[i]->func_recv(i);
+            sessions[fd]->func_recv(fd);
 
-            if (session[i])
+            if (sessions[fd])
             {
-                if (i != login_fd && i != login_lobbydata_fd && i != login_lobbyview_fd)
+                if (fd != login_fd && fd != login_lobbydata_fd && fd != login_lobbyview_fd)
                 {
-                    session[i]->func_parse(i);
+                    sessions[fd]->func_parse(fd);
 
-                    if (!session[i])
+                    if (!sessions[fd])
                     {
                         continue;
                     }
-
-                    //                          RFIFOFLUSH(fd);
                 }
                 --ret;
             }
         }
     }
+#else
+    for (int i = 0; ret > 0 && i < fd_max; i++)
+    {
+        int  fd        = events[i].data.fd;
+        auto thisEvent = events[i].events;
+
+        // https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
+        // Handle all "always reported" error events
+        // EPOLLHUP is an "unexpected" socket shutdown from client, but seems normal when disconnecting
+        // EPOLLERR has not been witnessed, but is probably good to try to handle.
+        if (thisEvent & EPOLLHUP || thisEvent & EPOLLERR)
+        {
+            do_close_tcp(fd);
+            ret--;
+            continue;
+        }
+
+        // Input recieved
+        // EPOLLIN is normal input
+        // EPOLLPRI appears to be "out of band" extra data from the socket. Needed to read data from sockets >1024(?)
+        if (sessions[fd] && (thisEvent & EPOLLIN || thisEvent & EPOLLPRI))
+        {
+            ret--;
+
+            // new session
+            if (fd == login_fd || fd == login_lobbydata_fd || fd == login_lobbyview_fd)
+            {
+                struct epoll_event newEvent;
+                newEvent.events  = EPOLLIN;
+                newEvent.data.fd = sessions[fd]->func_recv(fd);
+#ifdef WIN32
+                epoll_ctl(epollHandle, EPOLL_CTL_ADD, sock_arr[newEvent.data.fd], &newEvent);
+#else
+                epoll_ctl(epollHandle, EPOLL_CTL_ADD, newEvent.data.fd, &newEvent);
 #endif
+            }
+            else
+            {
+                sessions[fd]->func_recv(fd);
+            }
 
-    /*
-        // parse input data on each socket
-    for(i = 1; i < fd_max; i++)
-    {
-        if(!session[i])
-            continue;
+            if (sessions[fd])
+            {
+                if (fd != login_fd && fd != login_lobbydata_fd && fd != login_lobbyview_fd)
+                {
+                    sessions[fd]->func_parse(fd);
 
-        if (session[i]->rdata_tick && DIFF_TICK(last_tick, session[i]->rdata_tick) > stall_time) {
-            ShowInfo("Session #%d timed out\n", i);
-            set_eof(i);
-        }
-
-        session[i]->func_parse(i);
-
-        if(!session[i])
-            continue;
-
-        // after parse, check client's RFIFO size to know if there is an invalid packet (too big and not parsed)
-        if (session[i]->rdata_size == RFIFO_SIZE && session[i]->max_rdata == RFIFO_SIZE) {
-            set_eof(i);
-            continue;
-        }
-        RFIFOFLUSH(i);
-    }*/
-
-    for (i = 1; i < fd_max; i++)
-    {
-        if (!session[i])
-        {
-            continue;
-        }
-
-        if (!session[i]->wdata.empty())
-        {
-            session[i]->func_send(i);
+                    if (!sessions[fd])
+                    {
+                        continue;
+                    }
+                }
+            }
         }
     }
+#endif
+    for (int fd = 1; fd < fd_max; fd++)
+    {
+        if (!sessions[fd])
+        {
+            continue;
+        }
+
+        if (!sessions[fd]->wdata.empty())
+        {
+            sessions[fd]->func_send(fd);
+        }
+    }
+
+    sql->TryPing();
     return 0;
-}
-
-int parse_console(char* buf)
-{
-    return 0;
-}
-
-void login_config_read(const char* key, const char* value)
-{
-    if (strcmpi(key, "timestamp_format") == 0)
-    {
-        strncpy(timestamp_format, value, 19);
-    }
-    else if (strcmpi(key, "stdout_with_ansisequence") == 0)
-    {
-        stdout_with_ansisequence = config_switch(value);
-    }
-    else if (strcmpi(key, "console_silent") == 0)
-    {
-        ShowInfo("Console Silent Setting: %d\n", atoi(value));
-        msg_silent = atoi(value);
-    }
-    else if (strcmp(key, "login_data_ip") == 0)
-    {
-        login_config.login_data_ip = std::string(value);
-    }
-    else if (strcmp(key, "login_data_port") == 0)
-    {
-        login_config.login_data_port = atoi(value);
-    }
-    else if (strcmp(key, "login_view_ip") == 0)
-    {
-        login_config.login_view_ip = std::string(value);
-    }
-    else if (strcmp(key, "login_view_port") == 0)
-    {
-        login_config.login_view_port = atoi(value);
-    }
-    else if (strcmp(key, "login_auth_ip") == 0)
-    {
-        login_config.login_auth_ip = std::string(value);
-    }
-    else if (strcmp(key, "login_auth_port") == 0)
-    {
-        login_config.login_auth_port = atoi(value);
-    }
-    else if (strcmp(key, "mysql_host") == 0)
-    {
-        login_config.mysql_host = std::string(value);
-    }
-    else if (strcmp(key, "mysql_login") == 0)
-    {
-        login_config.mysql_login = std::string(value);
-    }
-    else if (strcmp(key, "mysql_password") == 0)
-    {
-        login_config.mysql_password = std::string(value);
-    }
-    else if (strcmp(key, "mysql_port") == 0)
-    {
-        login_config.mysql_port = atoi(value);
-    }
-    else if (strcmp(key, "mysql_database") == 0)
-    {
-        login_config.mysql_database = std::string(value);
-    }
-    else if (strcmp(key, "search_server_port") == 0)
-    {
-        login_config.search_server_port = atoi(value);
-    }
-    else if (strcmp(key, "servername") == 0)
-    {
-        login_config.servername = std::string(value);
-    }
-    else if (strcmpi(key, "import") == 0)
-    {
-        config_read(value, "login", login_config_read);
-    }
-    else if (strcmp(key, "msg_server_port") == 0)
-    {
-        login_config.msg_server_port = atoi(value);
-    }
-    else if (strcmp(key, "msg_server_ip") == 0)
-    {
-        login_config.msg_server_ip = std::string(value);
-    }
-    else if (strcmp(key, "log_user_ip") == 0)
-    {
-        login_config.log_user_ip = config_switch(value);
-    }
-    else if (strcmp(key, "account_creation") == 0)
-    {
-        login_config.account_creation = config_switch(value);
-    }
-    else
-    {
-        ShowWarning("Unknown setting '%s' with value '%s' in  login file\n", key, value);
-    }
-}
-
-void version_info_read(const char* key, const char* value)
-{
-    if (strcmp(key, "CLIENT_VER") == 0)
-    {
-        version_info.client_ver = std::string(value);
-    }
-    else if (strcmp(key, "VER_LOCK") == 0)
-    {
-        version_info.ver_lock = std::atoi(value);
-
-        if (version_info.ver_lock > 2 || version_info.ver_lock < 0)
-        {
-            ShowError("ver_lock not within bounds (0..2) was %i, defaulting to 1\r\n", version_info.ver_lock);
-            version_info.ver_lock = 1;
-        }
-    }
-    else
-    {
-        ShowWarning("Unknown setting '%s' with value '%s' in  version info file\n", key, value);
-    }
-}
-
-void login_config_default()
-{
-    login_config.login_data_ip   = "127.0.0.1";
-    login_config.login_data_port = 54230;
-    login_config.login_view_ip   = "127.0.0.1";
-    login_config.login_view_port = 54001;
-    login_config.login_auth_ip   = "127.0.0.1";
-    login_config.login_auth_port = 54231;
-
-    login_config.servername = "Topaz";
-
-    login_config.mysql_host     = "";
-    login_config.mysql_login    = "";
-    login_config.mysql_password = "";
-    login_config.mysql_database = "";
-    login_config.mysql_port     = 3306;
-
-    login_config.search_server_port = 54002;
-    login_config.msg_server_port    = 54003;
-    login_config.msg_server_ip      = "127.0.0.1";
-
-    login_config.log_user_ip      = "false";
-    login_config.account_creation = "true";
-}
-
-void login_config_read_from_env()
-{
-    login_config.mysql_login     = std::getenv("XI_DB_USER") ? std::getenv("XI_DB_USER") : login_config.mysql_login;
-    login_config.mysql_password  = std::getenv("XI_DB_USER_PASSWD") ? std::getenv("XI_DB_USER_PASSWD") : login_config.mysql_password;
-    login_config.mysql_host      = std::getenv("XI_DB_HOST") ? std::getenv("XI_DB_HOST") : login_config.mysql_host;
-    login_config.mysql_port      = std::getenv("XI_DB_PORT") ? std::stoi(std::getenv("XI_DB_PORT")) : login_config.mysql_port;
-    login_config.mysql_database  = std::getenv("XI_DB_NAME") ? std::getenv("XI_DB_NAME") : login_config.mysql_database;
-    login_config.msg_server_ip   = std::getenv("XI_MSG_IP") ? std::getenv("XI_MSG_IP") : login_config.msg_server_ip;
-    login_config.msg_server_port = std::getenv("XI_MSG_PORT") ? std::stoi(std::getenv("XI_MSG_PORT")) : login_config.msg_server_port;
-}
-
-void version_info_default()
-{
-    version_info.client_ver = "99999999_9"; // xxYYMMDD_m = xx:MajorRelease YY:year MM:month DD:day _m:MinorRelease
-    version_info.ver_lock   = 2;
-}
-
-void maint_config_read(const char* key, const char* value)
-{
-    if (strcmp(key, "MAINT_MODE") == 0)
-    {
-        maint_config.maint_mode = std::atoi(value);
-
-        if (maint_config.maint_mode > 2 || maint_config.maint_mode < 0)
-        {
-            ShowError("maint_mode not within bounds (0..1) was %i, defaulting to 0\r\n", maint_config.maint_mode);
-            maint_config.maint_mode = 0;
-        }
-    }
-    else
-    {
-        ShowWarning("Unknown setting '%s' with value '%s' in  maint info file\n", key, value);
-    }
-}
-
-void maint_config_default()
-{
-    maint_config.maint_mode = 0;
-}
-
-std::string maint_config_write(const char* key)
-{
-    if (strcmp(key, "MAINT_MODE") == 0)
-    {
-        return std::to_string(maint_config.maint_mode);
-    }
-
-    ShowWarning("Did not find value for setting '%s'\n", key);
-
-    return std::string();
-}
-
-int32 config_read(const char* fileName, const char* config, const std::function<void(const char*, const char*)>& method)
-{
-    char  line[1024];
-    char  key[1024];
-    char  value[1024];
-    FILE* fp;
-
-    fp = fopen(fileName, "r");
-    if (fp == nullptr)
-    {
-        ShowError("%s configuration file not found at: %s\n", config, fileName);
-        return 1;
-    }
-
-    while (fgets(line, sizeof(line), fp))
-    {
-        char* ptr;
-
-        if (line[0] == '#')
-        {
-            continue;
-        }
-        if (sscanf(line, "%[^:]: %[^\t\r\n]", key, value) < 2)
-        {
-            continue;
-        }
-
-        // Strip trailing spaces
-        ptr = value + strlen(value);
-        while (--ptr >= value && *ptr == ' ')
-        {
-            ;
-        }
-        ptr++;
-        *ptr = '\0';
-
-        method(key, value);
-    }
-
-    fclose(fp);
-    return 0;
-}
-
-int32 config_write(const char* fileName, const char* config, const std::function<std::string(const char*)>& method)
-{
-    char                     line[1024];
-    char                     key[1024];
-    char                     value[1024];
-    std::vector<std::string> lines;
-    FILE*                    fp;
-
-    fp = fopen(fileName, "r");
-    if (fp == nullptr)
-    {
-        ShowError("%s configuration file not found at: %s\n", config, fileName);
-        return 1;
-    }
-
-    while (fgets(line, sizeof(line), fp))
-    {
-        char* ptr;
-
-        if (line[0] == '#' || sscanf(line, "%[^:]: %[^\t\r\n]", key, value) < 2)
-        {
-            lines.emplace_back(line);
-            continue;
-        }
-
-        // Strip trailing spaces
-        ptr = value + strlen(value);
-        while (--ptr >= value && *ptr == ' ')
-        {
-            ;
-        }
-        ptr++;
-        *ptr = '\0';
-
-        auto replace  = method(key);
-        auto new_line = std::string(key);
-        new_line.append(": ");
-        new_line.append(replace);
-        lines.push_back(new_line);
-    }
-    fclose(fp);
-
-    fp = fopen(fileName, "w");
-    if (fp == nullptr)
-    {
-        ShowError("%s configuration file not found at: %s - unable to write changes\n", config, fileName);
-        return 1;
-    }
-
-    for (auto& item : lines)
-    {
-        fputs(item.c_str(), fp);
-    }
-    fclose(fp);
-    return 0;
-}
-
-void login_versionscreen(int32 flag)
-{
-    ShowInfo(CL_WHITE "Topaz version %d.%02d.%02d" CL_RESET "\n", XI_MAJOR_VERSION, XI_MINOR_VERSION, XI_REVISION);
-    ShowInfo(CL_GREEN "Website:" CL_RESET "\thttps://github.com/DerpyProjectGroup/topaz\n");
-    if (flag)
-    {
-        exit(EXIT_FAILURE);
-    }
-}
-
-void login_helpscreen(int32 flag)
-{
-    ShowMessage("Usage: login-server [options]\n");
-    ShowMessage("Options:\n");
-    ShowMessage(CL_WHITE "  Commands\t\t\tDescription\n" CL_RESET);
-    ShowMessage("-----------------------------------------------------------------------------\n");
-    ShowMessage("  --help, --h, --?, /?     Displays this help screen\n");
-    ShowMessage("  --login-config <file>    Load login-server configuration from <file>\n");
-    ShowMessage("  --lan-config   <file>    Load lan configuration from <file>\n");
-    ShowMessage("  --version, --v, -v, /v   Displays the server's version\n");
-    ShowMessage("\n");
-    if (flag)
-    {
-        exit(EXIT_FAILURE);
-    }
 }
 
 void log_init(int argc, char** argv)
 {
     std::string logFile;
+    bool        appendDate{};
 
 #ifdef WIN32
     logFile = "log\\login-server.log";
@@ -710,9 +377,10 @@ void log_init(int argc, char** argv)
         {
             logFile = argv[i + 1];
         }
+        else if (strcmp(argv[i], "--append-date") == 0)
+        {
+            appendDate = true;
+        }
     }
-    InitializeLog(logFile);
+    logging::InitializeLog("login", logFile, appendDate);
 }
-
-///////////////////////////////////////////////////////
-////////////////////////////////////////////////////////

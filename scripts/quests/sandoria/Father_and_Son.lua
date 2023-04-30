@@ -5,14 +5,14 @@
 -- Ailbeche : !pos 4 -1 24 231
 -- Exoroche : !pos 72 -1 60 230
 -----------------------------------
-require("scripts/globals/npc_util")
-require("scripts/globals/quests")
-require("scripts/globals/titles")
-require("scripts/globals/zone")
-require("scripts/globals/interaction/quest")
+require('scripts/globals/npc_util')
+require('scripts/globals/quests')
+require('scripts/globals/titles')
+require('scripts/globals/zone')
+require('scripts/globals/interaction/quest')
 -----------------------------------
-local northenSandoriaID = require("scripts/zones/Northern_San_dOria/IDs")
-local southernSandoriaID = require("scripts/zones/Southern_San_dOria/IDs")
+local northenSandoriaID = require('scripts/zones/Northern_San_dOria/IDs')
+local southernSandoriaID = require('scripts/zones/Southern_San_dOria/IDs')
 -----------------------------------
 
 local quest = Quest:new(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.FATHER_AND_SON)
@@ -20,6 +20,7 @@ local quest = Quest:new(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.FATHER_AN
 quest.reward =
 {
     fame = 30,
+    fameArea = xi.quest.fame_area.SANDORIA,
     item = xi.items.WILLOW_FISHING_ROD,
     title = xi.title.LOST_CHILD_OFFICER,
 }

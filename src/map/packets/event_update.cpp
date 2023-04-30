@@ -19,20 +19,20 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include "../entities/charentity.h"
 #include "event_update.h"
 
 CEventUpdatePacket::CEventUpdatePacket(std::vector<std::pair<uint8, uint32>> params)
 {
-    this->type = 0x5C;
-    this->size = 0x12;
+    this->setType(0x5C);
+    this->setSize(0x24);
 
     for (auto paramPair : params)
     {
         // Only params 0 through 7 are valid
-        if (paramPair.first >= 0 && paramPair.first <= 7)
+        if (paramPair.first <= 7)
         {
             ref<uint32>(0x0004 + paramPair.first * 4) = paramPair.second;
         }

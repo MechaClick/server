@@ -4,19 +4,21 @@
 -- When used, you will obtain one stack of Fusion Bolts
 -----------------------------------
 require("scripts/globals/msg")
+require("scripts/globals/items")
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     local result = 0
     if target:getFreeSlotsCount() == 0 then
         result = xi.msg.basic.ITEM_NO_USE_INVENTORY
     end
+
     return result
 end
 
-item_object.onItemUse = function(target)
-    target:addItem(19197, 99)
+itemObject.onItemUse = function(target)
+    target:addItem(xi.items.FUSION_BOLT, 99)
 end
 
-return item_object
+return itemObject

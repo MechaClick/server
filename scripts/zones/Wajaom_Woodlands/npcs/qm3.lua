@@ -9,14 +9,18 @@ require("scripts/globals/npc_util")
 local entity = {}
 
 entity.onTrade = function(player, npc, trade)
-    if npcUtil.tradeHas(trade, 2575) and npcUtil.popFromQM(player, npc, ID.mob.GOTOH_ZHA_THE_REDOLENT) then
+    if
+        npcUtil.tradeHas(trade, 2575) and
+        npcUtil.popFromQM(player, npc, ID.mob.GOTOH_ZHA_THE_REDOLENT)
+    then
+        -- Trade Sheep Botfly
         player:confirmTrade()
         player:messageSpecial(ID.text.DRAWS_NEAR)
     end
 end
 
 entity.onTrigger = function(player, npc)
-    player:messageSpecial(ID.text.INSECT_WINGS)
+    player:messageSpecial(ID.text.BROKEN_SHARDS)
 end
 
 entity.onEventUpdate = function(player, csid, option)

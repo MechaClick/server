@@ -11,11 +11,10 @@ cmdprops =
 
 function error(player, msg)
     player:PrintToPlayer(msg)
-    player:PrintToPlayer("!setjobpoints <amount> {player}")
+    player:PrintToPlayer("!setjobpoints <amount> (player)")
 end
 
 function onTrigger(player, amount, target)
-
     -- validate amount
     if amount == nil or amount < 0 then
         error(player, "Invalid amount.")
@@ -40,10 +39,10 @@ function onTrigger(player, amount, target)
 
     local jobNameByNum = {}
     for k, v in pairs(xi.job) do
-        jobNameByNum[v]=k
+        jobNameByNum[v] = k
     end
 
     -- set job points
     targ:setJobPoints(amount)
-    player:PrintToPlayer( string.format("%s now has %i job points on %s.", targ:getName(), amount, jobNameByNum[targ:getMainJob()] ) )
+    player:PrintToPlayer(string.format("%s now has %i job points on %s.", targ:getName(), amount, jobNameByNum[targ:getMainJob()]))
 end

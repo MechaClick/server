@@ -6,28 +6,27 @@
 -- Range: Melee
 -- Notes: Can be any (positive) buff, including food. Will drain about 100HP if it can't take any buffs
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/settings")
 require("scripts/globals/status")
 require("scripts/globals/msg")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
-
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     -- try to drain buff
     local effectFirst = mob:stealStatusEffect(target, xi.effectFlag.DISPELABLE)
     local effectSecond = mob:stealStatusEffect(target, xi.effectFlag.DISPELABLE)
     local dmg = 0
 
-    if (effectFirst ~= 0) then
+    if effectFirst ~= 0 then
         local count = 1
 
-        if (effectSecond ~= 0) then
+        if effectSecond ~= 0 then
             count = count + 1
         end
 
@@ -37,12 +36,11 @@ mobskill_object.onMobWeaponSkill = function(target, mob, skill)
     else
         -- time to drain HP. 100-200
         local power = math.random(0, 101) + 100
-        dmg = MobFinalAdjustments(power, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.DARK, MOBPARAM_IGNORE_SHADOWS)
+        dmg = xi.mobskills.mobFinalAdjustments(power, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.DARK, xi.mobskills.shadowBehavior.IGNORE_SHADOWS)
 
-        skill:setMsg(MobPhysicalDrainMove(mob, target, skill, MOBDRAIN_HP, dmg))
+        skill:setMsg(xi.mobskills.mobPhysicalDrainMove(mob, target, skill, xi.mobskills.drainType.HP, dmg))
         return dmg
     end
-
 end
 
-return mobskill_object
+return mobskillObject

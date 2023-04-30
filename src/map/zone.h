@@ -22,23 +22,28 @@
 #ifndef _CZONE_H
 #define _CZONE_H
 
-#include "../common/cbasetypes.h"
-#include "../common/mmo.h"
-#include "../common/taskmgr.h"
+#include "common/cbasetypes.h"
+#include "common/mmo.h"
+#include "common/taskmgr.h"
+#include "common/vana_time.h"
 
 #include <list>
 #include <map>
+#include <unordered_map>
 
 #include "battlefield_handler.h"
-#include "region.h"
-#include "vana_time.h"
-
+#include "campaign_handler.h"
+#include "los/zone_los.h"
 #include "navmesh.h"
 #include "packets/weather.h"
+#include "trigger_area.h"
 
 enum ZONEID : uint16
 {
-    ZONE_RESIDENTIAL_AREA               = 0,
+    // Note: "residential zones" aren't really zones of their own.
+    // It's more of a sub zone - the dats for messages and entities will all be from the zone you entered from.
+    ZONE_RESIDENTIAL_AREA = 0, // Old Tech Demonstration zone from pre-release (aka "the monorail place")
+                               // The Above should NOT be labeled "RESIDENTIAL_AREA"
     ZONE_PHANAUET_CHANNEL               = 1,
     ZONE_CARPENTERS_LANDING             = 2,
     ZONE_MANACLIPPER                    = 3,
@@ -171,7 +176,7 @@ enum ZONEID : uint16
     ZONE_RUAUN_GARDENS                  = 130,
     ZONE_MORDION_GAOL                   = 131,
     ZONE_ABYSSEA_LA_THEINE              = 132,
-    ZONE_133                            = 133, // Seems to be the zone background of char select.
+    ZONE_OUTER_RAKAZNAR_U2              = 133,
     ZONE_DYNAMIS_BEAUCEDINE             = 134,
     ZONE_DYNAMIS_XARCABARD              = 135,
     ZONE_BEAUCEDINE_GLACIER_S           = 136,
@@ -227,7 +232,7 @@ enum ZONEID : uint16
     ZONE_DYNAMIS_BASTOK                 = 186,
     ZONE_DYNAMIS_WINDURST               = 187,
     ZONE_DYNAMIS_JEUNO                  = 188,
-    ZONE_189                            = 189, // Southern San d'Oria [S] Residential Area
+    ZONE_OUTER_RAKAZNAR_U3              = 189,
     ZONE_KING_RANPERRES_TOMB            = 190,
     ZONE_DANGRUF_WADI                   = 191,
     ZONE_INNER_HORUTOTO_RUINS           = 192,
@@ -237,7 +242,7 @@ enum ZONEID : uint16
     ZONE_GUSGEN_MINES                   = 196,
     ZONE_CRAWLERS_NEST                  = 197,
     ZONE_MAZE_OF_SHAKHRAMI              = 198,
-    ZONE_199                            = 199, // Bastok Markets [S] Residential Area
+    ZONE_199                            = 199,
     ZONE_GARLAIGE_CITADEL               = 200,
     ZONE_CLOISTER_OF_GALES              = 201,
     ZONE_CLOISTER_OF_STORMS             = 202,
@@ -252,12 +257,12 @@ enum ZONEID : uint16
     ZONE_CLOISTER_OF_TIDES              = 211,
     ZONE_GUSTAV_TUNNEL                  = 212,
     ZONE_LABYRINTH_OF_ONZOZO            = 213,
-    ZONE_214                            = 214, // Aht Urhgan Residential Area
+    ZONE_214                            = 214,
     ZONE_ABYSSEA_ATTOHWA                = 215,
     ZONE_ABYSSEA_MISAREAUX              = 216,
     ZONE_ABYSSEA_VUNKERL                = 217,
     ZONE_ABYSSEA_ALTEPA                 = 218,
-    ZONE_219                            = 219, // Windurst Waters [S] Residential Area
+    ZONE_219                            = 219,
     ZONE_SHIP_BOUND_FOR_SELBINA         = 220,
     ZONE_SHIP_BOUND_FOR_MHAURA          = 221,
     ZONE_PROVENANCE                     = 222,
@@ -267,7 +272,7 @@ enum ZONEID : uint16
     ZONE_KAZHAM_JEUNO_AIRSHIP           = 226,
     ZONE_SHIP_BOUND_FOR_SELBINA_PIRATES = 227,
     ZONE_SHIP_BOUND_FOR_MHAURA_PIRATES  = 228,
-    ZONE_229                            = 229,
+    ZONE_THRONE_ROOM_V                  = 229,
     ZONE_SOUTHERN_SANDORIA              = 230,
     ZONE_NORTHERN_SANDORIA              = 231,
     ZONE_PORT_SANDORIA                  = 232,
@@ -313,10 +318,10 @@ enum ZONEID : uint16
     ZONE_DHO_GATES                      = 272,
     ZONE_WOH_GATES                      = 273,
     ZONE_OUTER_RAKAZNAR                 = 274,
-    ZONE_OUTER_RAKAZNAR_U               = 275,
+    ZONE_OUTER_RAKAZNAR_U1              = 275,
     ZONE_RAKAZNAR_INNER_COURT           = 276,
     ZONE_RAKAZNAR_TURRIS                = 277,
-    ZONE_278                            = 278,
+    ZONE_GWORA_CORRIDOR                 = 278,
     ZONE_WALK_OF_ECHOES_P2              = 279,
     ZONE_MOG_GARDEN                     = 280,
     ZONE_LEAFALLIA                      = 281,
@@ -336,10 +341,9 @@ enum ZONEID : uint16
     ZONE_DYNAMIS_BASTOK_D               = 295,
     ZONE_DYNAMIS_WINDURST_D             = 296,
     ZONE_DYNAMIS_JEUNO_D                = 297,
-    ZONE_WALK_OF_ECHOES_P1              = 298
+    ZONE_WALK_OF_ECHOES_P1              = 298,
+    MAX_ZONEID                          = 299,
 };
-
-#define MAX_ZONEID 299
 
 enum class REGION_TYPE : uint8
 {
@@ -410,7 +414,6 @@ enum class ZONE_TYPE : uint8
     BATTLEFIELD       = 4,
     DYNAMIS           = 5,
     DUNGEON_INSTANCED = 6,
-    LIMBUS            = 7
 };
 
 enum GLOBAL_MESSAGE_TYPE
@@ -428,36 +431,34 @@ enum class TELEPORT_TYPE : uint8
     OUTPOST_WINDY   = 2,
     RUNIC_PORTAL    = 3,
     PAST_MAW        = 4,
-    ABBYSEA_MAW     = 5,
+    ABYSSEA_CONFLUX = 5,
     CAMPAIGN_SANDY  = 6,
     CAMPAIGN_BASTOK = 7,
     CAMPAIGN_WINDY  = 8,
     HOMEPOINT       = 9,
-    SURVIVAL        = 10
+    SURVIVAL        = 10,
+    WAYPOINT        = 11,
+    ESCHAN_PORTAL   = 12,
 };
 
 enum ZONEMISC
 {
-    MISC_NONE     = 0x0000, // Able to be used in any area
-    MISC_ESCAPE   = 0x0001, // Ability to use Escape Spell
-    MISC_FELLOW   = 0x0002, // Ability to summon Fellow NPC
-    MISC_MOUNT    = 0x0004, // Ability to use Chocobos and mounts
-    MISC_MAZURKA  = 0x0008, // Ability to use Mazurka Spell
-    MISC_TRACTOR  = 0x0010, // Ability to use Tractor Spell
-    MISC_MOGMENU  = 0x0020, // Ability to communicate with Nomad Moogle (menu access mog house)
-    MISC_COSTUME  = 0x0040, // Ability to use a Costumes
-    MISC_PET      = 0x0080, // Ability to summon Pets
-    MISC_TREASURE = 0x0100, // Presence in the global zone TreasurePool
-    MISC_AH       = 0x0200, // Ability to use the auction house
-    MISC_YELL     = 0x0400, // Send and receive /yell commands
-    MISC_TRUST    = 0x0800, // Ability to summon Trust NPC
+    MISC_NONE             = 0x0000, // Able to be used in any area
+    MISC_ESCAPE           = 0x0001, // Ability to use Escape Spell
+    MISC_FELLOW           = 0x0002, // Ability to summon Fellow NPC
+    MISC_MOUNT            = 0x0004, // Ability to use Chocobos and mounts
+    MISC_MAZURKA          = 0x0008, // Ability to use Mazurka Spell
+    MISC_TRACTOR          = 0x0010, // Ability to use Tractor Spell
+    MISC_MOGMENU          = 0x0020, // Ability to communicate with Nomad Moogle (menu access mog house)
+    MISC_COSTUME          = 0x0040, // Ability to use a Costumes
+    MISC_PET              = 0x0080, // Ability to summon Pets
+    MISC_TREASURE         = 0x0100, // Presence in the global zone TreasurePool
+    MISC_AH               = 0x0200, // Ability to use the auction house
+    MISC_YELL             = 0x0400, // Send and receive /yell commands
+    MISC_TRUST            = 0x0800, // Ability to summon Trust NPC
+    MISC_LOS_PLAYER_BLOCK = 0x1000, // Players can't use magic/JAs through walls if this is set
+    MISC_LOS_OFF          = 0x2000, // Zone should not have LoS checks
 };
-
-/************************************************************************
- *                                                                       *
- *                                                                       *
- *                                                                       *
- ************************************************************************/
 
 struct zoneMusic_t
 {
@@ -466,12 +467,6 @@ struct zoneMusic_t
     uint8 m_bSongS;    // battle music (solo)
     uint8 m_bSongM;    // battle music (party)
 };
-
-/************************************************************************
- *                                                                       *
- *                                                                       *
- *                                                                       *
- ************************************************************************/
 
 struct zoneWeather_t
 {
@@ -501,12 +496,6 @@ struct zoneLine_t
     position_t m_toPos;
 };
 
-/************************************************************************
- *                                                                       *
- *                                                                       *
- *                                                                       *
- ************************************************************************/
-
 class CBasicPacket;
 class CBaseEntity;
 class CCharEntity;
@@ -516,79 +505,101 @@ class CTrustEntity;
 class CTreasurePool;
 class CZoneEntities;
 
-typedef std::list<CRegion*>    regionList_t;
-typedef std::list<zoneLine_t*> zoneLineList_t;
+typedef std::list<CTriggerArea*> triggerAreaList_t;
+typedef std::list<zoneLine_t*>   zoneLineList_t;
 
 typedef std::map<uint16, zoneWeather_t> weatherVector_t;
 
 typedef std::map<uint16, CBaseEntity*> EntityList_t;
+
+using QueryByNameResult_t = std::vector<CBaseEntity*>;
 
 int32 zone_update_weather(uint32 tick, CTaskMgr::CTask* PTask);
 
 class CZone
 {
 public:
-    ZONEID         GetID();
-    ZONE_TYPE      GetType();
-    REGION_TYPE    GetRegionID();
-    CONTINENT_TYPE GetContinentID();
-    uint32         GetIP() const;
-    uint16         GetPort() const;
-    uint16         GetTax() const;
-    WEATHER        GetWeather();
-    uint32         GetWeatherChangeTime() const;
-    const int8*    GetName();
-    uint8          GetSoloBattleMusic() const;
-    uint8          GetPartyBattleMusic() const;
-    uint8          GetBackgroundMusicDay() const;
-    uint8          GetBackgroundMusicNight() const;
-    zoneLine_t*    GetZoneLine(uint32 zoneLineID);
+    ZONEID             GetID();
+    ZONE_TYPE          GetType();
+    REGION_TYPE        GetRegionID();
+    CONTINENT_TYPE     GetContinentID();
+    uint8              getLevelRestriction();
+    uint32             GetIP() const;
+    uint16             GetPort() const;
+    uint16             GetTax() const;
+    WEATHER            GetWeather();
+    uint32             GetWeatherChangeTime() const;
+    const std::string& GetName();
+    zoneLine_t*        GetZoneLine(uint32 zoneLineID);
 
-    virtual CCharEntity* GetCharByName(int8* name); // finds the player if exists in zone
+    uint8 GetSoloBattleMusic() const;
+    uint8 GetPartyBattleMusic() const;
+    uint8 GetBackgroundMusicDay() const;
+    uint8 GetBackgroundMusicNight() const;
+
+    void SetSoloBattleMusic(uint8 music);
+    void SetPartyBattleMusic(uint8 music);
+    void SetBackgroundMusicDay(uint8 music);
+    void SetBackgroundMusicNight(uint8 music);
+
+    auto queryEntitiesByName(std::string const& pattern) -> QueryByNameResult_t const&;
+
+    uint32 GetLocalVar(const char* var);
+    void   SetLocalVar(const char* var, uint32 val);
+    void   ResetLocalVars();
+
+    virtual CCharEntity* GetCharByName(std::string name); // finds the player if exists in zone
     virtual CCharEntity* GetCharByID(uint32 id);
-    // Gets an entity - ignores instances (use CBaseEntity->GetEntity if possible)
-    virtual CBaseEntity* GetEntity(uint16 targid, uint8 filter = -1); // получаем указатель на любую сущность в зоне
 
-    bool IsWeatherStatic() const; // погода в зоне не требует изменения (никогда не меняется)
+    // Gets an entity - ignores instances (use CBaseEntity->GetEntity if possible)
+    virtual CBaseEntity* GetEntity(uint16 targid, uint8 filter = -1); // we get a pointer to any entity in the zone
+
+    bool IsWeatherStatic() const; // The weather in the zone does not require changes (never changes)
     bool CanUseMisc(uint16 misc) const;
     void SetWeather(WEATHER weatherCondition);
     void UpdateWeather();
 
-    virtual void SpawnPCs(CCharEntity* PChar);       // отображаем персонажей в зоне
-    virtual void SpawnMOBs(CCharEntity* PChar);      // отображаем MOBs в зоне
-    virtual void SpawnPETs(CCharEntity* PChar);      // отображаем PETs в зоне
-    virtual void SpawnNPCs(CCharEntity* PChar);      // отображаем NPCs в зоне
-    virtual void SpawnTRUSTs(CCharEntity* PChar);    // Display TRUSTs in zone
-    virtual void SpawnMoogle(CCharEntity* PChar);    // отображаем Moogle в MogHouse
-    virtual void SpawnTransport(CCharEntity* PChar); // отображаем транспорт
+    virtual void SpawnPCs(CCharEntity* PChar);       // We display the characters in the zone
+    virtual void SpawnMOBs(CCharEntity* PChar);      // We display MOBS in the zone
+    virtual void SpawnPETs(CCharEntity* PChar);      // We display Pets in the zone
+    virtual void SpawnNPCs(CCharEntity* PChar);      // display NPCS in the zone
+    virtual void SpawnTRUSTs(CCharEntity* PChar);    // displayTrusTsInZone
+    virtual void SpawnMoogle(CCharEntity* PChar);    // We display Moogle in Moghouse
+    virtual void SpawnTransport(CCharEntity* PChar); // We display transport
     void         SavePlayTime();
 
-    virtual void WideScan(CCharEntity* PChar, uint16 radius); // сканирование местности с заданным радиусом
+    virtual void WideScan(CCharEntity* PChar, uint16 radius); // scanning the area with a given radius
 
-    virtual void DecreaseZoneCounter(CCharEntity* PChar); // добавляем персонажа в зону
-    virtual void IncreaseZoneCounter(CCharEntity* PChar); // удаляем персонажа из зоны
+    virtual void DecreaseZoneCounter(CCharEntity* PChar); // Add the character to the zone
+    virtual void IncreaseZoneCounter(CCharEntity* PChar); // We remove the character from the zone
 
-    virtual void InsertNPC(CBaseEntity* PNpc);     // добавляем в зону npc
-    virtual void InsertMOB(CBaseEntity* PMob);     // добавляем в зону mob
-    virtual void InsertPET(CBaseEntity* PPet);     // добавляем в зону pet
-    virtual void InsertTRUST(CBaseEntity* PTrust); // Add a trust to the zone
+    virtual void InsertNPC(CBaseEntity* PNpc);     // Add to the NPC zone
+    virtual void InsertMOB(CBaseEntity* PMob);     // Add to the mob zone
+    virtual void InsertPET(CBaseEntity* PPet);     // Add to the pet zone
+    virtual void InsertTRUST(CBaseEntity* PTrust); // addATrustToTheZone
 
     virtual void DeletePET(CBaseEntity* PPet); // derefs the pet's ID from this zone
     virtual void DeleteTRUST(CBaseEntity* PTrust);
 
-    virtual void FindPartyForMob(CBaseEntity* PEntity);         // ищем группу для монстра
-    virtual void TransportDepart(uint16 boundary, uint16 zone); // транспотр отправляется, необходимо собрать пассажиров
+    virtual void FindPartyForMob(CBaseEntity* PEntity);          // We are looking for a group for a monster
+    virtual void TransportDepart(uint16 boundary, uint16 zone);  // transport is sent, it is necessary to collect passengers
+    virtual void updateCharLevelRestriction(CCharEntity* PChar); // removesTheCharacter'sLevelRestrictionIfTheZoneHasALevelRestrictionItAppliesTheZone'sAfterRemovingIt
 
-    void InsertRegion(CRegion* Region); // добавляем в зону активную область
+    void InsertTriggerArea(CTriggerArea* triggerArea); // Add an active area to the zone
 
-    virtual void TOTDChange(TIMETYPE TOTD); // обработка реакции мира на смену времени суток
-    virtual void PushPacket(CBaseEntity*, GLOBAL_MESSAGE_TYPE, CBasicPacket*); // отправляем глобальный пакет в пределах зоны
+    virtual void TOTDChange(TIMETYPE TOTD);
+    virtual void PushPacket(CBaseEntity*, GLOBAL_MESSAGE_TYPE, CBasicPacket*);
 
-    time_point      m_RegionCheckTime; // время последней проверки регионов
-    weatherVector_t m_WeatherVector;   // вероятность появления каждого типа погоды
+    virtual void UpdateCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask);
+    virtual void UpdateEntityPacket(CBaseEntity* PEntity, ENTITYUPDATE type, uint8 updatemask, bool alwaysInclude = false);
 
-    virtual void ZoneServer(time_point tick, bool check_regions);
-    void         CheckRegions(CCharEntity* PChar);
+    bool           IsZoneActive() const;
+    CZoneEntities* GetZoneEntities();
+
+    weatherVector_t m_WeatherVector; // the probability of each weather type
+
+    virtual void ZoneServer(time_point tick);
+    void         CheckTriggerAreas();
 
     virtual void ForEachChar(std::function<void(CCharEntity*)> func);
     virtual void ForEachCharInstance(CBaseEntity* PEntity, std::function<void(CCharEntity*)> func);
@@ -598,49 +609,65 @@ public:
     virtual void ForEachTrustInstance(CBaseEntity* PEntity, std::function<void(CTrustEntity*)> func);
     virtual void ForEachNpc(std::function<void(CNpcEntity*)> func);
 
-    CZone(ZONEID ZoneID, REGION_TYPE RegionID, CONTINENT_TYPE ContinentID);
+    CZone(ZONEID ZoneID, REGION_TYPE RegionID, CONTINENT_TYPE ContinentID, uint8 levelRestriction);
     virtual ~CZone();
 
     CBattlefieldHandler* m_BattlefieldHandler; // BCNM Instances in this zone
+    CCampaignHandler*    m_CampaignHandler;    // WOTG campaign information for this zone
 
-    CNavMesh* m_navMesh; // zones navmesh for finding paths
+    CNavMesh* m_navMesh   = nullptr; // zones navmesh for finding paths
+    ZoneLos*  lineOfSight = nullptr;
+
+    time_point m_LoadedAt; // time zone was loaded
+
+    void LoadNavMesh();
+    void LoadZoneLos();
 
 private:
-    ZONEID         m_zoneID; // ID зоны
+    ZONEID         m_zoneID;
     ZONE_TYPE      m_zoneType;
-    REGION_TYPE    m_regionID;    // ID области
-    CONTINENT_TYPE m_continentID; // ID континента
-    string_t       m_zoneName;    // имя зоны
-    uint16         m_zonePort;    // порт зоны
-    uint32         m_zoneIP;      // IP зоны
-    bool           m_useNavMesh;  // Use navmesh for roaming, chasing
+    REGION_TYPE    m_regionID;
+    CONTINENT_TYPE m_continentID;
+    uint8          m_levelRestriction;
+    std::string    m_zoneName;
+    uint16         m_zonePort;
+    uint32         m_zoneIP;
+    bool           m_useNavMesh;
 
-    WEATHER        m_Weather;           // текущая погода
-    uint32         m_WeatherChangeTime; // время начала текущей погоды
+    WEATHER m_Weather;
+    uint32  m_WeatherChangeTime;
+
     CZoneEntities* m_zoneEntities;
 
-    uint16 m_tax; // налог в bazaar
-    uint16 m_miscMask; // битовое поле, описывающее возможности использования в зоне определенных умений
+    uint16 m_tax;
+    uint16 m_miscMask;
 
-    zoneMusic_t m_zoneMusic; // информация о мелодиях, используемых в зоне
+    zoneMusic_t m_zoneMusic;
 
-    regionList_t   m_regionList;   // список активных областей зоны
-    zoneLineList_t m_zoneLineList; // список всех доступных zonelines для зоны
+    std::unordered_map<std::string, uint32> m_LocalVars;
 
-    void LoadZoneLines();    // список zonelines (можно было бы заменить этот метод методом InsertZoneLine)
-    void LoadZoneWeather();  // погода
-    void LoadZoneSettings(); // настройки зоны
-    void LoadNavMesh();      // Load the zones navmesh. Must exist in scripts/zones/:zone/NavMesh.nav
+    triggerAreaList_t m_triggerAreaList;
+    zoneLineList_t    m_zoneLineList;
 
-    CTreasurePool* m_TreasurePool; // глобальный TreasuerPool
+    void LoadZoneSettings();
+    void LoadZoneLines();
+    void LoadZoneWeather();
+
+    CTreasurePool* m_TreasurePool;
 
     time_point m_timeZoneEmpty; // The time_point when the last player left the zone
 
+    std::unordered_map<std::string, QueryByNameResult_t> m_queryByNameResults;
+
 protected:
-    CTaskMgr::CTask* ZoneTimer; // указатель на созданный таймер - ZoneServer. необходим для возможности его остановки
-    void createZoneTimer();
+    CTaskMgr::CTask* ZoneTimer;             // The pointer to the created timer is Zoneserver.necessary for the possibility of stopping it
+    CTaskMgr::CTask* ZoneTimerTriggerAreas; //
+
+    void createZoneTimers();
     void CharZoneIn(CCharEntity* PChar);
     void CharZoneOut(CCharEntity* PChar);
+
+    std::unordered_map<std::string, uint32> m_localVars;
 };
 
 #endif

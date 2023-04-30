@@ -22,7 +22,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #ifndef _INSTANCEUTILS_H
 #define _INSTANCEUTILS_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 class CInstanceLoader;
 class CCharEntity;
@@ -45,14 +45,31 @@ struct InstanceData_t
     uint16      battlesolo;
     uint16      battlemulti;
     std::string filename;
+
+    InstanceData_t()
+    {
+        id            = 0;
+        instance_zone = 0;
+        entrance_zone = 0;
+        time_limit    = 0;
+        start_x       = 0.f;
+        start_y       = 0.f;
+        start_z       = 0.f;
+        start_rot     = 0;
+        music_day     = 0;
+        music_night   = 0;
+        battlesolo    = 0;
+        battlemulti   = 0;
+    }
 };
 
 namespace instanceutils
 {
     void LoadInstanceList();
-    void CheckInstance();
-    void LoadInstance(uint8 instanceid, uint16 zoneid, CCharEntity* PRequester);
-    auto GetInstanceData(uint8 instanceid) -> InstanceData_t;
+    void CheckInstance(); // Called at the end of every tick by time_server
+    void LoadInstance(uint16 instanceid, CCharEntity* PRequester);
+    auto GetInstanceData(uint16 instanceid) -> InstanceData_t;
+    bool IsValidInstanceID(uint16 instanceid);
 }; // namespace instanceutils
 
 #endif

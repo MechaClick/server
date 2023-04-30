@@ -19,68 +19,85 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
 #include "../entities/charentity.h"
 #include "event.h"
 
-CEventPacket::CEventPacket(CCharEntity* PChar, uint16 EventID, std::vector<std::pair<uint8, uint32>> params, int16 textTable)
+CEventPacket::CEventPacket(CCharEntity* PChar, EventInfo* eventInfo)
 {
-    this->type = 0x32;
-    this->size = 0x0A;
+    this->setType(0x32);
+    this->setSize(0x14);
 
-    uint32 npcID = 0;
-    auto*  PNpc  = PChar->m_event.Target;
+    uint32       npcServerID = 0;
+    uint32       npcLocalID  = 0;
+    CBaseEntity* PNpc        = eventInfo->targetEntity;
+
     if (PNpc)
     {
-        npcID = PNpc->id;
+        npcServerID = PNpc->id;
+        npcLocalID  = PNpc->targid;
     }
     else
     {
         // Fallback to our own CharID because giving a value
         // of zero makes the game hang.
-        npcID = PChar->id;
+        npcServerID = PChar->id;
+        npcLocalID  = PChar->targid;
     }
-    ref<uint32>(0x04) = npcID;
 
-    if (params.size() > 0)
+    ref<uint32>(0x04) = npcServerID;
+
+    if (eventInfo->params.size() > 0 || eventInfo->textTable != -1)
     {
-        this->type = 0x34;
-        this->size = 0x1A;
+        this->setType(0x34);
+        this->setSize(0x34);
 
-        for (auto paramPair : params)
+        for (auto paramPair : eventInfo->params)
         {
             // Only params 0 through 7 are valid
-            if (paramPair.first >= 0 && paramPair.first <= 7)
+            if (paramPair.first <= 7)
             {
                 ref<uint32>(0x0008 + paramPair.first * 4) = paramPair.second;
             }
         }
 
-        ref<uint16>(0x28) = PChar->m_TargID;
+        ref<uint16>(0x28) = npcLocalID;
 
         ref<uint16>(0x2A) = PChar->getZone();
-        if (textTable != -1)
+        if (eventInfo->textTable != -1)
         {
-            ref<uint16>(0x30) = textTable;
+            ref<uint16>(0x30) = eventInfo->textTable;
         }
         else
         {
             ref<uint16>(0x30) = PChar->getZone();
         }
 
-        ref<uint16>(0x2C) = EventID;
-        ref<uint8>(0x2E)  = 8; // если патаметров меньше, чем 8, то после завершения события камера "прыгнет" за спину персонажу
+        ref<uint16>(0x2C) = eventInfo->eventId;
+
+        if (eventInfo->eventFlags != 0)
+        {
+            ref<uint16>(0x2E) = eventInfo->eventFlags & 0xFFFF;
+            ref<uint16>(0x32) = eventInfo->eventFlags >> 16;
+        }
+        else
+        {
+            // Backwards compatibility
+            ref<uint8>(0x2E) = 8; // if the parameter is less than 8, then after the event is over the camera will "jump" behind the character
+        }
     }
     else
     {
-        ref<uint16>(0x08) = PChar->targid;
-        ref<uint16>(0x0C) = EventID;
+        ref<uint16>(0x08) = npcLocalID;
+        ref<uint16>(0x0C) = eventInfo->eventId;
 
         ref<uint16>(0x0A) = PChar->getZone();
         ref<uint16>(0x10) = PChar->getZone();
+
+        ref<uint16>(0x0E) = eventInfo->eventFlags & 0xFFFF;
+        ref<uint16>(0x12) = eventInfo->eventFlags >> 16;
     }
-    PChar->m_event.EventID = EventID;
 }

@@ -2,37 +2,34 @@
 -- Area: Lower Jeuno (245)
 --  NPC: Waypoint
 --  SoA: Waypoint
--- !pos 20 -34.922 0.000
+-- !pos 20 -34.922 0.000 245
 -----------------------------------
-require("scripts/globals/missions")
-require("scripts/globals/zone")
+require('scripts/globals/keyitems')
+require('scripts/globals/waypoint')
+require('scripts/globals/zone')
+-----------------------------------
 local ID = require("scripts/zones/Lower_Jeuno/IDs")
 -----------------------------------
 local entity = {}
 
 entity.onTrade = function(player, npc, trade)
+    xi.waypoint.onTrade(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local onwardToAdoulin = player:getCurrentMission(SOA) == xi.mission.id.soa.ONWARD_TO_ADOULIN
-    local adoulinAccess = player:getCurrentMission(SOA) > xi.mission.id.soa.ONWARD_TO_ADOULIN
-
-    if onwardToAdoulin then
-        player:startEvent(10120)
-    elseif adoulinAccess then
-        player:startEvent(10121)
+    if player:hasKeyItem(xi.ki.ADOULINIAN_CHARTER_PERMIT) then
+        xi.waypoint.onTrigger(player, npc)
     else
         player:messageSpecial(ID.text.WAYPOINT_EXAMINE)
     end
 end
 
-entity.onEventUpdate = function(player, csid, option)
+entity.onEventUpdate = function(player, csid, option, npc)
+    xi.waypoint.onEventUpdate(player, csid, option, npc)
 end
 
-entity.onEventFinish = function(player, csid, option)
-    if csid == 10120 and option == 1 then -- teleport
-        player:setPos(172, 0.3, -21, 211, xi.zone.CEIZAK_BATTLEGROUNDS)
-    end
+entity.onEventFinish = function(player, csid, option, npc)
+    xi.waypoint.onEventFinish(player, csid, option, npc)
 end
 
 return entity

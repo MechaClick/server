@@ -1,36 +1,28 @@
 -----------------------------------
 -- Attachment: Accelerator IV
 -----------------------------------
-require("scripts/globals/status")
+require("scripts/globals/automaton")
 -----------------------------------
-local attachment_object = {}
+local attachmentObject = {}
 
-attachment_object.onEquip = function(pet)
-    pet:addMod(xi.mod.EVA, 30)
+attachmentObject.onEquip = function(pet, attachment)
+    xi.automaton.onAttachmentEquip(pet, attachment)
 end
 
-attachment_object.onUnequip = function(pet)
-    pet:delMod(xi.mod.EVA, 30)
+attachmentObject.onUnequip = function(pet, attachment)
+    xi.automaton.onAttachmentUnequip(pet, attachment)
 end
 
-attachment_object.onManeuverGain = function(pet, maneuvers)
-    if maneuvers == 1 then
-        pet:addMod(xi.mod.EVA, 15)
-    elseif maneuvers == 2 then
-        pet:addMod(xi.mod.EVA, 15)
-    elseif maneuvers == 3 then
-        pet:addMod(xi.mod.EVA, 20)
-    end
+attachmentObject.onManeuverGain = function(pet, attachment, maneuvers)
+    xi.automaton.onManeuverGain(pet, attachment, maneuvers)
 end
 
-attachment_object.onManeuverLose = function(pet, maneuvers)
-    if maneuvers == 1 then
-        pet:delMod(xi.mod.EVA, 15)
-    elseif maneuvers == 2 then
-        pet:delMod(xi.mod.EVA, 15)
-    elseif maneuvers == 3 then
-        pet:delMod(xi.mod.EVA, 20)
-    end
+attachmentObject.onManeuverLose = function(pet, attachment, maneuvers)
+    xi.automaton.onManeuverLose(pet, attachment, maneuvers)
 end
 
-return attachment_object
+attachmentObject.onUpdate = function(pet, attachment, maneuvers)
+    xi.automaton.updateAttachmentModifier(pet, attachment, maneuvers)
+end
+
+return attachmentObject

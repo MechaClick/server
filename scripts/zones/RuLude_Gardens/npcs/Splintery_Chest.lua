@@ -2,28 +2,26 @@
 -- Area: Ru'Lude Gardens
 --  NPC: Splintery Chest
 -----------------------------------
-require("scripts/globals/settings")
-require("scripts/globals/keyitems")
 local ID = require("scripts/zones/RuLude_Gardens/IDs")
+require("scripts/globals/settings")
 -----------------------------------
 local entity = {}
 
-entity.onTrade = function(player,npc,trade)
+entity.onTrade = function(player, npc, trade)
 end
 
-entity.onTrigger = function(player,npc)
-    if ENABLE_MAGIAN_TRIALS ~= 1 then
+entity.onTrigger = function(player, npc)
+    if xi.settings.main.ENABLE_MAGIAN_TRIALS ~= 1 then
         return
     end
 
     player:startEvent(10133)
-
 end
 
-entity.onEventUpdate = function(player,csid,option)
+entity.onEventUpdate = function(player, csid, option, npc)
 end
 
-entity.onEventFinish = function(player,csid,option)
+entity.onEventFinish = function(player, csid, option, npc)
     local itemId = 0
     local optionTable =
     {
@@ -77,15 +75,16 @@ entity.onEventFinish = function(player,csid,option)
     }
 
     itemId = optionTable[option]
-    if (option ~= 1073741824) then
-        if (not itemId) then
+
+    if option ~= 1073741824 then
+        if not itemId then
             -- How did you get here??
-            player:PrintToPlayer( "itemId or OptionID related script error!" )
+            player:PrintToPlayer("itemId or OptionID related script error!")
         elseif player:getFreeSlotsCount() >= 1 then
-            player:addItem(itemId,1)
-            player:messageSpecial(ID.text.ITEM_OBTAINED,itemId)
+            player:addItem(itemId, 1)
+            player:messageSpecial(ID.text.ITEM_OBTAINED, itemId)
         else
-            player:messageSpecial(ID.text.ITEM_CANNOT_BE_OBTAINED,itemId)
+            player:messageSpecial(ID.text.ITEM_CANNOT_BE_OBTAINED, itemId)
         end
     end
 end

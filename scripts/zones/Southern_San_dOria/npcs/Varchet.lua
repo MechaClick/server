@@ -9,12 +9,12 @@ require("scripts/globals/quests")
 -----------------------------------
 local entity = {}
 
-local GAME_WON  = 0
-local GAME_LOST = 2
-local GAME_TIE  = 3
+local gameWon  = 0
+local gameLost = 2
+local gameTie  = 3
 
 entity.onTrade = function(player, npc, trade)
-    if npcUtil.tradeHas(trade, {{"gil", 5}}) then
+    if npcUtil.tradeHas(trade, { { "gil", 5 } }) then
         player:confirmTrade()
 
         local vdie1 = math.random(1, 6)
@@ -24,12 +24,13 @@ entity.onTrade = function(player, npc, trade)
         local pdie2 = math.random(1, 6)
         local ptotal = pdie1 + pdie2
 
-        local result = GAME_LOST
+        local result = gameLost
         if ptotal > vtotal then
-            result = GAME_WON
+            result = gameWon
         elseif ptotal == vtotal then
-            result = GAME_TIE
+            result = gameTie
         end
+
         player:setLocalVar('VarchetGame', result)
         player:startEvent(519, vdie1, vdie2, vtotal, pdie1, pdie2, ptotal, result)
     else
@@ -51,22 +52,19 @@ end
 entity.onEventFinish = function(player, csid, option)
     if csid == 519 then
         local result = player:getLocalVar('VarchetGame')
-        if result == GAME_WON then
-            local gilPayout = 10
-            player:addGil(gilPayout)
-            player:messageSpecial(ID.text.GIL_OBTAINED, gilPayout)
+        if result == gameWon then
+            npcUtil.giveCurrency(player, 'gil', 10)
 
             if player:getQuestStatus(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.EXIT_THE_GAMBLER) == QUEST_ACCEPTED then
                 player:setCharVar("exitTheGamblerStat", 1)
                 player:showText(player:getEventTarget(), ID.text.VARCHET_KEEP_PROMISE)
             end
-        elseif result == GAME_TIE then
-            local gilPayout = 5
-            player:addGil(gilPayout)
-            player:messageSpecial(ID.text.GIL_OBTAINED, gilPayout)
+        elseif result == gameTie then
+            npcUtil.giveCurrency(player, 'gil', 5)
         else
             player:messageSpecial(ID.text.VARCHET_BET_LOST)
         end
+
         player:setLocalVar('VarchetGame', 0)
     end
 end

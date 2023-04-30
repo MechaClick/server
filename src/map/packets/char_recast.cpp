@@ -19,8 +19,8 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 ===========================================================================
 */
 
-#include "../../common/socket.h"
-#include "../../common/timer.h"
+#include "common/socket.h"
+#include "common/timer.h"
 
 #include <cstring>
 
@@ -31,8 +31,8 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 
 CCharRecastPacket::CCharRecastPacket(CCharEntity* PChar)
 {
-    this->type = 0x19;
-    this->size = 0x83;
+    this->setType(0x119);
+    this->setSize(0x104);
 
     uint8 count = 0;
 
@@ -56,6 +56,15 @@ CCharRecastPacket::CCharRecastPacket(CCharEntity* PChar)
         else
         {
             ref<uint32>(0x04) = recasttime; // 2h ability (recast id is 0)
+        }
+
+        // Retail currently only allows 31 distinct recasts to be sent in the packet
+        // Reject 32 abilities and higher (zero-indexed)
+        // This may change with Master Levels, as there is some padding that appears to be not used for each recast that could be removed to add more abilities.
+        if (count > 30)
+        {
+            ShowDebug("CCharRecastPacket constructor attempting to send recast packet to player '%s' with > 31 abilities. This is unsupported.", PChar->GetName());
+            break;
         }
     }
 }

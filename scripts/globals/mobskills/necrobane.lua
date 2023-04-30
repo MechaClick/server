@@ -3,44 +3,45 @@
 -----------------------------------
 require("scripts/globals/settings")
 require("scripts/globals/status")
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
-  if(mob:getFamily() == 316) then
-    local mobSkin = mob:getModelId()
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
+    if mob:getFamily() == 316 then
+        local mobSkin = mob:getModelId()
 
-    if (mobSkin == 1840) then
-        return 0
-    else
-        return 1
+        if mobSkin == 1840 then
+            return 0
+        else
+            return 1
+        end
     end
-  end
-  if(mob:getFamily() == 91) then
-    local mobSkin = mob:getModelId()
 
-    if (mobSkin == 1839) then
-        return 0
-    else
-        return 1
+    if mob:getFamily() == 91 then
+        local mobSkin = mob:getModelId()
+
+        if mobSkin == 1839 then
+            return 0
+        else
+            return 1
+        end
     end
-  end
 
-  return 0
+    return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local numhits = 1
     local accmod = 1
     local dmgmod = 2
-    local info = MobPhysicalMove(mob, target, skill, numhits, accmod, dmgmod, TP_NO_EFFECT)
-    local dmg = MobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.PHYSICAL, xi.damageType.BLUNT, info.hitslanded)
+    local info = xi.mobskills.mobPhysicalMove(mob, target, skill, numhits, accmod, dmgmod, xi.mobskills.magicalTpBonus.NO_EFFECT)
+    local dmg = xi.mobskills.mobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.PHYSICAL, xi.damageType.BLUNT, info.hitslanded)
 
     target:takeDamage(dmg, mob, xi.attackType.PHYSICAL, xi.damageType.BLUNT)
-    MobStatusEffectMove(mob, target, xi.effect.CURSE_I, 1, 0, 60)
+    xi.mobskills.mobStatusEffectMove(mob, target, xi.effect.CURSE_I, 1, 0, 60)
 
     return dmg
 end
 
-return mobskill_object
+return mobskillObject

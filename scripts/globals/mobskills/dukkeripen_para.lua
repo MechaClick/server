@@ -4,12 +4,12 @@
 -- Type: Magical
 -----------------------------------
 require("scripts/globals/status")
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/msg")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     if mob:getMainJob() == xi.job.COR then
         return 0
     else
@@ -17,10 +17,10 @@ mobskill_object.onMobSkillCheck = function(target, mob, skill)
     end
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local typeEffect = xi.effect.PARALYSIS
 
-    if MobStatusEffectMove(mob, target, typeEffect, 20, 0, 120) then
+    if xi.mobskills.mobStatusEffectMove(mob, target, typeEffect, 20, 0, 120) then
         skill:setMsg(xi.msg.basic.SKILL_ENFEEB_IS)
     else
         skill:setMsg(xi.msg.basic.SKILL_MISS)
@@ -29,4 +29,4 @@ mobskill_object.onMobWeaponSkill = function(target, mob, skill)
     return typeEffect
 end
 
-return mobskill_object
+return mobskillObject

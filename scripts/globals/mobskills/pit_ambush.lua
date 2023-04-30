@@ -9,29 +9,29 @@
 -----------------------------------
 require("scripts/globals/settings")
 require("scripts/globals/status")
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
-    if (mob:getPool() == 1318 and mob:getLocalVar("AMBUSH") == 1) then
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
+    if mob:getPool() == 1318 and mob:getLocalVar("AMBUSH") == 1 then
         return 1
     else
         return 0
     end
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local numhits = 1
     local accmod = 1
     local dmgmod = 3.3
-    local info = MobPhysicalMove(mob, target, skill, numhits, accmod, dmgmod, TP_NO_EFFECT)
-    local dmg = MobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.PHYSICAL, xi.damageType.PIERCING, MOBPARAM_WIPE_SHADOWS)
+    local info = xi.mobskills.mobPhysicalMove(mob, target, skill, numhits, accmod, dmgmod, xi.mobskills.magicalTpBonus.NO_EFFECT)
+    local dmg = xi.mobskills.mobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.PHYSICAL, xi.damageType.PIERCING, xi.mobskills.shadowBehavior.WIPE_SHADOWS)
 
     -- These are here as it doesn't look right otherwise
     mob:hideName(false)
-    mob:untargetable(false)
+    mob:setUntargetable(false)
     mob:setAnimationSub(1)
     mob:setLocalVar("AMBUSH", 1) -- Used it for the last time!
 
@@ -39,4 +39,4 @@ mobskill_object.onMobWeaponSkill = function(target, mob, skill)
     return dmg
 end
 
-return mobskill_object
+return mobskillObject

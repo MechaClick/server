@@ -3,9 +3,7 @@
 --  Mob: Valor
 -- Coming of Age (San dOria Mission 8-1)
 -----------------------------------
-mixins = {require("scripts/mixins/job_special")}
-local ID = require("scripts/zones/Quicksand_Caves/IDs")
-require("scripts/globals/missions")
+mixins = { require("scripts/mixins/job_special") }
 require("scripts/globals/status")
 -----------------------------------
 local entity = {}
@@ -16,16 +14,11 @@ end
 
 entity.onMobSpawn = function(mob)
     DespawnMob(mob:getID(), 180)
-    mob:addMod(xi.mod.SLEEPRES, 50)
-    mob:addMod(xi.mod.LULLABYRES, 50)
+    mob:addMod(xi.mod.SLEEP_MEVA, 50)
+    mob:addMod(xi.mod.LULLABY_MEVA, 50)
 end
 
-entity.onMobDeath = function(mob, player, isKiller)
-    if (player:getCurrentMission(SANDORIA) == xi.mission.id.sandoria.COMING_OF_AGE and player:getMissionStatus(player:getNation()) == 2
-        and GetMobByID(ID.mob.VALOR):isDead() and GetMobByID(ID.mob.HONOR):isDead()
-    ) then
-        player:setMissionStatus(player:getNation(), 3)
-    end
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

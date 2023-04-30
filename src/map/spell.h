@@ -233,6 +233,7 @@ enum SPELLFLAG
     SPELLFLAG_IGNORE_SHADOWS = 0x04  // Ignore shadows and hit player anyways (example: Mobs "Death" spell)
 };
 
+// clang-format off
 enum class SpellID : uint16
 {
     Cure                 = 1,
@@ -725,6 +726,7 @@ enum class SpellID : uint16
     Gain_MND             = 491,
     Gain_CHR             = 492,
     Temper               = 493,
+    Arise                = 494,
     Adloquium            = 495,
     Firaja               = 496,
     Blizzaja             = 497,
@@ -892,25 +894,90 @@ enum class SpellID : uint16
     Wind_Breath          = 698,
     Barbed_Crescent      = 699,
 
-    Thunderbolt     = 736,
-    Harden_Shell    = 737,
-    Absolute_Terror = 738,
-    Gates_of_Hades  = 739,
-    Tourbillion     = 740,
-    Pyric_Bulwark   = 741,
-    Bilgestorm      = 742,
-    Bloodrake       = 743,
+    Thunderbolt          = 736,
+    Harden_Shell         = 737,
+    Absolute_Terror      = 738,
+    Gates_of_Hades       = 739,
+    Tourbillion          = 740,
+    Pyric_Bulwark        = 741,
+    Bilgestorm           = 742,
+    Bloodrake            = 743,
 
-    Indi_Regen  = 768,
-    Indi_Poison = 769,
-    Geo_Regen   = 798,
-    Geo_Poison  = 799,
-    Geo_Refresh = 800,
-    Geo_Haste   = 801,
-    Geo_STR     = 802,
-    Geo_DEX     = 803,
+    Indi_Regen           = 768,
+    Indi_Poison          = 769,
+    Indi_Refresh         = 770,
+    Indi_Haste           = 771,
+    Indi_Str             = 772,
+    Indi_Dex             = 773,
+    Indi_Vit             = 774,
+    Indi_Agi             = 775,
+    Indi_Int             = 776,
+    Indi_Mnd             = 777,
+    Indi_Chr             = 778,
+    Indi_Fury            = 779,
+    Indi_Barrier         = 780,
+    Indi_Acumen          = 781,
+    Indi_Fend            = 782,
+    Indi_Precision       = 783,
+    Indi_Voidance        = 784,
+    Indi_Focus           = 785,
+    Indi_Attunement      = 786,
+    Indi_Wilt            = 787,
+    Indi_Frailty         = 788,
+    Indi_Fade            = 789,
+    Indi_Malaise         = 790,
+    Indi_Slip            = 791,
+    Indi_Torpor          = 792,
+    Indi_Vex             = 793,
+    Indi_Languor         = 794,
+    Indi_Slow            = 795,
+    Indi_Paralysis       = 796,
+    Indi_Gravity         = 797,
 
+    Geo_Regen            = 798,
+    Geo_Poison           = 799,
+    Geo_Refresh          = 800,
+    Geo_Haste            = 801,
+    Geo_STR              = 802,
+    Geo_DEX              = 803,
+    Geo_VIT              = 804,
+    Geo_AGI              = 805,
+    Geo_INT              = 806,
+    Geo_MND              = 807,
+    Geo_CHR              = 808,
+    Geo_Fury             = 809,
+    Geo_Barrier          = 810,
+    Geo_Acumen           = 811,
+    Geo_Fend             = 812,
+    Geo_Precision        = 813,
+    Geo_Voidance         = 814,
+    Geo_Focus            = 815,
+    Geo_Attunement       = 816,
+    Geo_Wilt             = 817,
+    Geo_Frailty          = 818,
+    Geo_Fade             = 819,
+    Geo_Malaise          = 820,
+    Geo_Slip             = 821,
+    Geo_Torpor           = 822,
+    Geo_Vex              = 823,
+    Geo_Languor          = 824,
+    Geo_Slow             = 825,
+    Geo_Paralysis        = 826,
+    Geo_Gravity          = 827,
+
+    Fira                  = 828,
+    Fira_II               = 829,
+    Blizzara              = 830,
+    Blizzara_II           = 831,
+    Aera                  = 832,
+    Aera_II               = 833,
+    Stonera               = 834,
+    Stonera_II            = 835,
+    Thundara              = 836,
+    Thundara_II           = 837,
+    Watera                = 838,
     Watera_II             = 839,
+
     Foil                  = 840,
     Distract              = 841,
     Distract_II           = 842,
@@ -967,8 +1034,8 @@ enum class SpellID : uint16
     Full_Cure             = 893,
     Refresh_III           = 894,
     Temper_II             = 895,
-
 };
+// clang-format on
 
 #define MAX_SPELL_ID 1024U
 
@@ -984,43 +1051,45 @@ public:
     bool isSevere();          // damage spells that have severe effects like Death or Impact
     bool dealsDamage() const; // checks if the spell deals hp damage to target, this is relative to message
 
-    uint16      getTotalTargets() const;
-    SpellID     getID();
-    uint8       getJob(JOBTYPE JobID);
-    uint16      getMPCost() const;
-    uint32      getCastTime() const;
-    uint32      getRecastTime() const;
-    uint8       getValidTarget() const;
-    uint16      getAnimationID() const;
-    uint16      getAnimationTime() const;
-    SPELLGROUP  getSpellGroup();
-    SPELLFAMILY getSpellFamily();
-    uint8       getSkillType() const;
-    uint16      getZoneMisc() const;
-    uint8       getAOE() const;
-    uint16      getBase() const;
-    uint16      getElement() const;
-    float       getMultiplier() const;
-    uint16      getMessage() const;
-    uint16      getDefaultMessage();
-    uint16      getMagicBurstMessage() const;
-    uint16      getCE() const;
-    uint16      getVE() const;
-    uint32      getModifiedRecast() const;
-    float       getRadius() const;
-    uint16      getAoEMessage() const; // returns the single target message for AoE moves
-    uint8       getRequirements() const;
-    uint16      getMeritId() const;
-    uint8       getFlag() const;
-    int8*       getContentTag();
-    float       getRange() const;
-    bool        tookEffect() const; // returns true if the spell landed, not resisted or missed
-    bool        hasMPCost();        // checks if spell costs mp to use
-    bool        isHeal();           // is a heal spell
-    bool        isCure();           // is a Cure spell
-    bool        isDebuff();         // is a debuff spell
-    bool        isNa();             // is a -na spell
-    bool        canHitShadow();     // check if spell ignores shadows
+    uint16             getTotalTargets() const;
+    SpellID            getID();
+    uint8              getJob(JOBTYPE JobID);
+    uint16             getMPCost() const;
+    uint32             getCastTime() const;
+    uint32             getRecastTime() const;
+    uint16             getValidTarget() const;
+    uint16             getAnimationID() const;
+    uint16             getAnimationTime() const;
+    SPELLGROUP         getSpellGroup();
+    SPELLFAMILY        getSpellFamily();
+    uint8              getSkillType() const;
+    uint16             getZoneMisc() const;
+    uint8              getAOE() const;
+    uint16             getBase() const;
+    uint16             getElement() const;
+    float              getMultiplier() const;
+    uint16             getMessage() const;
+    uint16             getDefaultMessage();
+    uint16             getMagicBurstMessage() const;
+    uint16             getCE() const;
+    uint16             getVE() const;
+    uint32             getModifiedRecast() const;
+    float              getRadius() const;
+    uint16             getAoEMessage() const; // returns the single target message for AoE moves
+    uint8              getRequirements() const;
+    uint16             getMeritId() const;
+    uint8              getFlag() const;
+    const std::string& getContentTag();
+    float              getRange() const;
+    uint32             getPrimaryTargetID() const;
+    bool               tookEffect() const; // returns true if the spell landed, not resisted or missed
+    bool               hasMPCost();        // checks if spell costs mp to use
+    bool               isHeal();           // is a heal spell
+    bool               isCure();           // is a Cure spell
+    bool               isDebuff();         // is a debuff spell
+    bool               isNa();             // is a -na spell
+    bool               isRaise();          // is a raise spell (e.g. Trust: Ferreous Coffin)
+    bool               canHitShadow();     // check if spell ignores shadows
 
     void setRadius(float radius);
     void setTotalTargets(uint16 total);
@@ -1029,7 +1098,7 @@ public:
     void setMPCost(uint16 MP);
     void setCastTime(uint32 CastTime);
     void setRecastTime(uint32 RecastTime);
-    void setValidTarget(uint8 ValidTarget);
+    void setValidTarget(uint16 ValidTarget);
     void setAnimationID(uint16 AnimationID);
     void setAnimationTime(uint16 AnimationTime);
     void setSpellGroup(SPELLGROUP SpellGroup);
@@ -1042,27 +1111,32 @@ public:
     void setMultiplier(float multiplier);
     void setMessage(uint16 message);
     void setMagicBurstMessage(uint16 message);
+    auto getModifier() -> MODIFIER;
+    void setModifier(MODIFIER modifier); // set Spell modifier message, MUST reset the modifier on use otherwise it will be stale
+    void setPrimaryTargetID(uint32);
+
     void setCE(uint16 ce);
     void setVE(uint16 ve);
     void setRequirements(uint8 requirements);
     void setMeritId(uint16 meritId);
     void setModifiedRecast(uint32 mrec);
     void setFlag(uint8 flag);
-    void setContentTag(int8* contentTag);
+    void setContentTag(const std::string& contentTag);
     void setRange(float range);
 
-    const int8* getName();
-    void        setName(int8* name);
+    const std::string& getName();
+    void               setName(const std::string& name);
 
 protected:
-    CSpell(const CSpell&) = default;
+    CSpell(const CSpell&)            = default;
     CSpell& operator=(const CSpell&) = default;
 
 private:
-    SpellID     m_ID;           // spell id
-    uint32      m_castTime{};   // time to cast spell
-    uint32      m_recastTime{}; // recast time
-    uint16      m_animation{};  // animation for spell
+    SpellID     m_ID;                // spell id
+    uint32      m_primaryTargetID{}; // primary target ID
+    uint32      m_castTime{};        // time to cast spell
+    uint32      m_recastTime{};      // recast time
+    uint16      m_animation{};       // animation for spell
     uint16      m_animationTime{};
     uint8       m_skillType{};
     float       m_range{};
@@ -1070,7 +1144,7 @@ private:
     uint16      m_totalTargets{};
     uint16      m_mpCost{};                        // mpCost/itemId for ninjitsu tool
     uint8       m_job[MAX_JOBTYPE]{};              // job
-    uint8       m_ValidTarget{};                   // target pc/npc/both
+    uint16      m_ValidTarget{};                   // target pc/npc/both
     SPELLGROUP  m_spellGroup{ SPELLGROUP_NONE };   // spellgroup
     SPELLFAMILY m_spellFamily{ SPELLFAMILY_NONE }; // spell family
     uint16      m_zoneMisc{};                      // spellcasting conditions
@@ -1080,14 +1154,15 @@ private:
     uint16      m_element{};                       // element of spell
     uint16      m_message{};                       // message id
     uint16      m_MagicBurstMessage{};             // Message used for magic bursts.
+    MODIFIER    m_MessageModifier{};               // Message modifier, "Cover!", "Resist!" or "Immunobreak!"
     uint16      m_CE{};                            // cumulative enmity of spell
     uint16      m_VE{};                            // volatile enmity of spell
-    string_t    m_name;                            // spell name
+    std::string m_name;                            // spell name
     uint32      m_modifiedRecastTime{};            // recast time after modifications
     uint8       m_requirements{};                  // requirements before being able to cast spell
     uint16      m_meritId{};                       // associated merit (if applicable)
     uint8       m_flag{};
-    int8*       m_contentTag{};
+    std::string m_contentTag{};
 };
 
 // Namespace to work with spells

@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
@@ -29,8 +29,8 @@
 
 CPartyInvitePacket::CPartyInvitePacket(uint32 id, uint16 targid, CCharEntity* PInviter, INVITETYPE InviteType)
 {
-    this->type = 0xDC;
-    this->size = 0x10;
+    this->setType(0xDC);
+    this->setSize(0x20);
 
     // XI_DEBUG_BREAK_IF(PInviter->name.size() > 15);
 
@@ -39,5 +39,5 @@ CPartyInvitePacket::CPartyInvitePacket(uint32 id, uint16 targid, CCharEntity* PI
 
     ref<uint8>(0x0B) = InviteType;
 
-    memcpy(data + (0x0C), PInviter->GetName(), PInviter->name.size());
+    memcpy(data + (0x0C), PInviter->GetName().c_str(), PInviter->GetName().size());
 }

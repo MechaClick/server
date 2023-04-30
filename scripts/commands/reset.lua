@@ -12,25 +12,50 @@ cmdprops =
 
 function error(player, msg)
     player:PrintToPlayer(msg)
-    player:PrintToPlayer("!reset {player}")
+    player:PrintToPlayer("!reset (player)")
 end
 
 function onTrigger(player, target)
     -- validate target
     local targ
-    if (target == nil) then
+    if not target then
         targ = player
     else
         targ = GetPlayerByName(target)
-        if (targ == nil) then
-            error(player, string.format( "Player named '%s' not found!", target ) )
+        if targ == nil then
+            error(player, string.format("Player named '%s' not found!", target))
             return
         end
     end
 
     -- reset target recasts
     targ:resetRecasts()
-    if (targ:getID() ~= player:getID()) then
-        player:PrintToPlayer( string.format( "Reset %s's recast timers.", targ:getName() ) )
+    if targ:getID() ~= player:getID() then
+        player:PrintToPlayer(string.format("Reset %s's recast timers.", targ:getName()))
+    end
+
+    -- Clear debilitating effects from player
+    player:eraseAllStatusEffect()
+
+    -- Table of non-erasable effects
+    local effects =
+    {
+        xi.effect.TERROR,
+        xi.effect.SLEEP_I,
+        xi.effect.SLEEP_II,
+        xi.effect.LULLABY,
+        xi.effect.STUN,
+        xi.effect.SILENCE,
+        xi.effect.WEAKNESS,
+        xi.effect.PARALYSIS,
+        xi.effect.BLINDNESS,
+        xi.effect.AMNESIA,
+        xi.effect.CHARM_I,
+        xi.effect.CHARM_II,
+        xi.effect.POISON,
+    }
+
+    for _, v in pairs(effects) do
+        player:delStatusEffect(v)
     end
 end

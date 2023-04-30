@@ -7,9 +7,9 @@
 -- RuAun_Gardens     : !zone 130
 -----------------------------------
 require('scripts/globals/interaction/mission')
-require("scripts/globals/keyitems")
+require('scripts/globals/keyitems')
 require('scripts/globals/missions')
-require("scripts/globals/titles")
+require('scripts/globals/titles')
 require('scripts/globals/zone')
 -----------------------------------
 
@@ -22,29 +22,9 @@ mission.reward =
 
 mission.sections =
 {
-    -- Section: Mission Active, missionStatus == 0
     {
         check = function(player, currentMission, missionStatus, vars)
-            return currentMission == mission.missionId and missionStatus == 0
-        end,
-
-        [xi.zone.HALL_OF_THE_GODS] =
-        {
-            ['Shimmering_Circle'] = mission:progressEvent(3),
-
-            onEventFinish =
-            {
-                [3] = function(player, csid, option, npc)
-                    player:setMissionStatus(xi.mission.log_id.ZILART, 1)
-                end,
-            },
-        },
-    },
-
-    -- Section: Mission Active, missionStatus == 1
-    {
-        check = function(player, currentMission, missionStatus, vars)
-            return currentMission == mission.missionId and missionStatus == 1
+            return currentMission == mission.missionId
         end,
 
         [xi.zone.RUAUN_GARDENS] =
@@ -59,7 +39,6 @@ mission.sections =
             onEventFinish =
             {
                 [51] = function(player, csid, option, npc)
-                    player:setMissionStatus(xi.mission.log_id.ZILART, 0)
                     mission:complete(player)
                 end,
             },

@@ -1,5 +1,5 @@
 -----------------------------------
--- func: checklocalvar <varName> {'player'/'mob'/'npc'} {name/ID}
+-- func: checklocalvar <varName> { 'player'/'mob'/'npc' } { name/ID }
 -- desc: checks player or npc local variable and returns result value.
 -----------------------------------
 
@@ -11,7 +11,7 @@ cmdprops =
 
 function error(player, msg)
     player:PrintToPlayer(msg)
-    player:PrintToPlayer("!checklocalvar <variable name> {'player', 'mob', or 'npc'} {name or ID}")
+    player:PrintToPlayer("!checklocalvar <variable name> { 'player', 'mob', or 'npc' } { name or ID }")
 end
 
 function onTrigger(player, arg1, arg2, arg3)
@@ -27,18 +27,18 @@ function onTrigger(player, arg1, arg2, arg3)
     if arg2 == nil then
         targ = player:getCursorTarget()
     elseif arg3 ~= nil then
-        local entity_type = string.upper(arg2)
-        if (entity_type == 'NPC') or (entity_type == 'MOB') then
+        local entityType = string.upper(arg2)
+        if entityType == 'NPC' or entityType == 'MOB' then
             arg3 = tonumber(arg3)
             if zone:getType() == xi.zoneType.INSTANCED then
                 local instance = player:getInstance()
-                targ = instance:getEntity(bit.band(arg3, 0xFFF), xi.objType[entity_type])
-            elseif entity_type == 'NPC' then
+                targ = instance:getEntity(bit.band(arg3, 0xFFF), xi.objType[entityType])
+            elseif entityType == 'NPC' then
                 targ = GetNPCByID(arg3)
             else
                 targ = GetMobByID(arg3)
             end
-        elseif entity_type == 'PLAYER' then
+        elseif entityType == 'PLAYER' then
             targ = GetPlayerByName(arg3)
         else
             error(player, "Invalid entity type.")

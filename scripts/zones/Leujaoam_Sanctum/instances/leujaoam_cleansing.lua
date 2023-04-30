@@ -1,73 +1,64 @@
 -----------------------------------
 -- Assault: Leujaoam Cleansing
+-- instance 6900
 -----------------------------------
-require("scripts/globals/instance")
 local ID = require("scripts/zones/Leujaoam_Sanctum/IDs")
+require("scripts/globals/assault")
+require("scripts/globals/instance")
+require("scripts/globals/items")
 -----------------------------------
-local instance_object = {}
+local instanceObject = {}
 
-instance_object.afterInstanceRegister = function(player)
+instanceObject.registryRequirements = function(player)
+    return player:hasKeyItem(xi.ki.LEUJAOAM_ASSAULT_ORDERS) and
+        player:getCurrentAssault() == xi.assault.mission.LEUJAOAM_CLEANSING and
+        player:getCharVar("assaultEntered") == 0 and
+        player:hasKeyItem(xi.ki.ASSAULT_ARMBAND) and
+        player:getMainLvl() > 50
+end
+
+instanceObject.entryRequirements = function(player)
+    return player:hasKeyItem(xi.ki.LEUJAOAM_ASSAULT_ORDERS) and
+        player:getCurrentAssault() == xi.assault.mission.LEUJAOAM_CLEANSING and
+        player:getCharVar("assaultEntered") == 0 and
+        player:getMainLvl() > 50
+end
+
+instanceObject.onInstanceCreated = function(instance)
+end
+
+instanceObject.onInstanceCreatedCallback = function(player, instance)
+    xi.assault.onInstanceCreatedCallback(player, instance)
+    xi.instance.onInstanceCreatedCallback(player, instance)
+end
+
+instanceObject.afterInstanceRegister = function(player)
     local instance = player:getInstance()
-    player:messageSpecial(ID.text.ASSAULT_01_START, 1)
-    player:messageSpecial(ID.text.TIME_TO_COMPLETE, instance:getTimeLimit())
+
+    xi.assault.afterInstanceRegister(player, xi.items.CAGE_OF_AZOUPH_FIREFLIES)
+    GetNPCByID(ID.npc.RUNE_OF_RELEASE, instance):setPos(476.000, 8.479, 40.000, 49)
+    GetNPCByID(ID.npc.ANCIENT_LOCKBOX, instance):setPos(476.000, 8.479, 39.000, 49)
 end
 
-instance_object.onInstanceCreated = function(instance)
-
-    for i, v in pairs(ID.mob[1]) do
-        SpawnMob(v, instance)
-    end
-
-    local rune = GetNPCByID(ID.npc.RUNE_OF_RELEASE, instance)
-    local box = GetNPCByID(ID.npc.ANCIENT_LOCKBOX, instance)
-    rune:setPos(476, 8.479, 39, 49)
-    box:setPos(476, 8.479, 40, 49)
-
-    GetNPCByID(ID.npc._1XN, instance):setAnimation(8)
-
-end
-
-instance_object.onInstanceTimeUpdate = function(instance, elapsed)
+instanceObject.onInstanceTimeUpdate = function(instance, elapsed)
     xi.instance.updateInstanceTime(instance, elapsed, ID.text)
 end
 
-instance_object.onInstanceFailure = function(instance)
-
-    local chars = instance:getChars()
-
-    for i, v in pairs(chars) do
-        v:messageSpecial(ID.text.MISSION_FAILED, 10, 10)
-        v:startEvent(102)
-    end
+instanceObject.onInstanceFailure = function(instance)
+    xi.assault.onInstanceFailure(instance)
 end
 
-instance_object.onInstanceProgressUpdate = function(instance, progress)
-
-    if (progress >= 15) then
+instanceObject.onInstanceProgressUpdate = function(instance, progress)
+    if progress >= 1 then
         instance:complete()
     end
-
 end
 
-instance_object.onInstanceComplete = function(instance)
-
-    local chars = instance:getChars()
-
-    for i, v in pairs(chars) do
-        v:messageSpecial(ID.text.RUNE_UNLOCKED_POS, 8, 8)
-    end
-
-    local rune = GetNPCByID(ID.npc.RUNE_OF_RELEASE, instance)
-    local box = GetNPCByID(ID.npc.ANCIENT_LOCKBOX, instance)
-    rune:setStatus(xi.status.NORMAL)
-    box:setStatus(xi.status.NORMAL)
-
+instanceObject.onInstanceComplete = function(instance)
+    xi.assault.onInstanceComplete(instance, 8, 8)
 end
 
-instance_object.onEventUpdate = function(player, csid, option)
+instanceObject.onEventFinish = function(player, csid, option)
 end
 
-instance_object.onEventFinish = function(player, csid, option)
-end
-
-return instance_object
+return instanceObject

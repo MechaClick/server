@@ -2,7 +2,6 @@
 -- Area: Windurst Woods
 --  NPC: Jack of Spades
 -- Adventurer's Assistant
--- Working 100%
 -----------------------------------
 require("scripts/globals/npc_util")
 require("scripts/globals/settings")
@@ -11,7 +10,7 @@ local entity = {}
 
 entity.onTrade = function(player, npc, trade)
     if npcUtil.tradeHas(trade, 536) then -- adventurer coupon
-        player:startEvent(10010, GIL_RATE * 50)
+        player:startEvent(10010, xi.settings.main.GIL_RATE * 50)
     end
 end
 
@@ -25,7 +24,7 @@ end
 entity.onEventFinish = function(player, csid, option)
     if csid == 10010 then
         player:confirmTrade()
-        player:addGil(GIL_RATE * 50)
+        player:addGil(xi.settings.main.GIL_RATE * 50)
     end
 end
 

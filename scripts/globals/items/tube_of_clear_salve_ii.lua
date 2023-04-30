@@ -5,17 +5,19 @@
 -----------------------------------
 require("scripts/globals/settings")
 require("scripts/globals/msg")
+require("scripts/globals/item_utils")
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     if not target:hasPet() then
         return xi.msg.basic.REQUIRES_A_PET
     end
+
     return 0
 end
 
-item_object.onItemUse = function(target)
+itemObject.onItemUse = function(target)
     local pet = target:getPet()
 
     local effects =
@@ -33,25 +35,8 @@ item_object.onItemUse = function(target)
     }
 
     local count = 10
-    local statusEffectTable = effects
 
-    local function removeStatus()
-        for _, effect in ipairs(statusEffectTable) do
-            if pet:delStatusEffect(effect) then return true end
-        end
-        if pet:eraseStatusEffect() ~= 255 then return true end
-        return false
-    end
-
-    local removed = 0
-
-    for i = 0, count do
-        if not removeStatus() then break end
-        removed = removed + 1
-        if removed >= count then break end
-    end
-
-    return removed
+    xi.item_utils.removeMultipleEffects(pet, effects, count)
 end
 
-return item_object
+return itemObject

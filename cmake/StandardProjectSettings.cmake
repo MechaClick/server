@@ -1,8 +1,8 @@
 # Set a default build type if none was specified
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Setting build type to 'RelWithDebInfo' as none was specified.")
   set(CMAKE_BUILD_TYPE
-      RelWithDebInfo
+      "RelWithDebInfo"
       CACHE STRING "Choose the type of build." FORCE)
   # Set the possible values of build type for cmake-gui, ccmake
   set_property(
@@ -13,9 +13,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
              "MinSizeRel"
              "RelWithDebInfo")
 endif()
-
-# Generate compile_commands.json to make it easier to work with clang based tools
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_IPO "Enable Interprocedural Optimization, aka Link Time Optimization (LTO)" ON)
 
@@ -61,6 +58,7 @@ if(MSVC)
         # /Ob2 # Inline Function Expansion
         /Oy- # Frame-Pointer Omission
         /MP # Build with Multiple Processes
+        /bigobj # Allow bigger .obj files, which we have from mainly the sol templating
     )
 
     if(CMAKE_CONFIGURATION_TYPES STREQUAL Debug)
@@ -80,7 +78,7 @@ if(MSVC)
         )
     endif()
 
-    link_libraries(WS2_32 dbghelp)
+    link_libraries(WS2_32 dbghelp Shlwapi)
 endif()
 
 if(UNIX)
@@ -108,3 +106,19 @@ function(set_target_output_directory target)
         RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}"
     )
 endfunction()
+
+function(disable_lto target)
+    target_compile_options(${target} PRIVATE -fno-lto)
+    target_link_options(${target} PRIVATE -fno-lto)
+endfunction()
+
+# If we're on Unix and the system is 32-bit (void* is 4-bytes wide),
+# then there's a good chance we're compiling for Raspberry Pi.
+# Currently, CMake doesn't detect this properly and needs some help
+# to link libatomic.
+# Source: https://gitlab.kitware.com/cmake/cmake/-/issues/21174
+#
+# TODO: Use include(CheckCXXSourceCompiles) to make this check better.
+if(UNIX AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -latomic")
+endif()

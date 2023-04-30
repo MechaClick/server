@@ -2,11 +2,12 @@
 -- Tables and Functions Used at Multiple Places within Aht Urgan Whitegate
 -----------------------------------
 require("scripts/globals/settings")
-require("scripts/globals/common")
 -----------------------------------
 
+local sharedObj = {}
+
 -- Set of Royal Palace Approved Armor
-local ROYAL_PALACE_ALLOWED_BODY_ARMORS = set{
+local allowedBodyArmors = set{
     12548, -- Adaman Cuirass Lv. 73 WAR / PLD
     13746, -- Gem Cuirass Lv. 73 WAR / PLD
     13742, -- Aketon Lv. 60 MNK / WHM / RDM / THF / PLD / BST / BRD / DRG / SMN / BLU / COR / PUP / DNC
@@ -72,20 +73,19 @@ local ROYAL_PALACE_ALLOWED_BODY_ARMORS = set{
 }
 
 -- Function to check if the player is wearing armor that is appropriate for the royal palace.
-function doRoyalPalaceArmorCheck(player)
+sharedObj.doRoyalPalaceArmorCheck = function(player)
     local bodyArmor = player:getEquipID(xi.slot.BODY)
-    local check = (ROYAL_PALACE_ALLOWED_BODY_ARMORS[bodyArmor] ~= nil)
+    local check = allowedBodyArmors[bodyArmor] ~= nil
 
     local hasHandArmor = player:getEquipID(xi.slot.HANDS)
     local hasLegArmor = player:getEquipID(xi.slot.LEGS)
     local hasFeetArmor = player:getEquipID(xi.slot.FEET)
 
-    if (hasHandArmor == 0 or hasLegArmor == 0 or hasFeetArmor == 0) then
+    if hasHandArmor == 0 or hasLegArmor == 0 or hasFeetArmor == 0 then
         check = false
-        -- printf("Royal Palace Armor Check for Player <%s> -> Missing Required Hand/Leg/Feet Armor", player:getName())
     end
-
-    -- printf("Royal Palace Armor Check for Player <%s> with Body Armor <%u>, allowed = %s", player:getName(), bodyArmor, check)
 
     return check
 end
+
+return sharedObj

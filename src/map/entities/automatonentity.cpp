@@ -20,7 +20,6 @@
 */
 
 #include "automatonentity.h"
-#include "../../common/utils.h"
 #include "../ai/ai_container.h"
 #include "../ai/controllers/automaton_controller.h"
 #include "../ai/states/magic_state.h"
@@ -34,6 +33,7 @@
 #include "../status_effect_container.h"
 #include "../utils/mobutils.h"
 #include "../utils/puppetutils.h"
+#include "common/utils.h"
 
 CAutomatonEntity::CAutomatonEntity()
 : CPetEntity(PET_TYPE::AUTOMATON)
@@ -105,6 +105,27 @@ uint8 CAutomatonEntity::getElementCapacity(uint8 element)
     return m_ElementEquip[element];
 }
 
+uint8 CAutomatonEntity::getElementalCapacityBonus()
+{
+    return m_elementalCapacityBonus;
+}
+
+void CAutomatonEntity::setElementalCapacityBonus(uint8 bonus)
+{
+    if (bonus == m_elementalCapacityBonus)
+    {
+        return;
+    }
+
+    int8 difference = static_cast<int8>(bonus) - m_elementalCapacityBonus;
+    for (size_t i = 0; i < m_ElementMax.size(); ++i)
+    {
+        m_ElementMax[i] += difference;
+    }
+
+    m_elementalCapacityBonus = bonus;
+}
+
 void CAutomatonEntity::burdenTick()
 {
     for (auto&& burden : m_Burden)
@@ -114,11 +135,6 @@ void CAutomatonEntity::burdenTick()
             burden -= std::clamp<uint8>(1 + PMaster->getMod(Mod::BURDEN_DECAY) + this->getMod(Mod::BURDEN_DECAY), 1, burden);
         }
     }
-}
-
-void CAutomatonEntity::setInitialBurden()
-{
-    m_Burden.fill(30);
 }
 
 auto CAutomatonEntity::getBurden() -> std::array<uint8, 8>
@@ -161,6 +177,13 @@ uint8 CAutomatonEntity::addBurden(uint8 element, int8 burden)
         }
     }
     return 0;
+}
+
+uint8 CAutomatonEntity::getOverloadChance(uint8 element)
+{
+    int16 thresh = 30 + PMaster->getMod(Mod::OVERLOAD_THRESH);
+
+    return std::clamp(m_Burden[element] - thresh + 5, 0, 255);
 }
 
 void CAutomatonEntity::PostTick()
@@ -225,7 +248,7 @@ void CAutomatonEntity::OnMobSkillFinished(CMobSkillState& state, action_t& actio
 
 void CAutomatonEntity::Spawn()
 {
-    status = allegiance == ALLEGIANCE_TYPE::MOB ? STATUS_TYPE::MOB : STATUS_TYPE::NORMAL;
+    status = allegiance == ALLEGIANCE_TYPE::MOB ? STATUS_TYPE::UPDATE : STATUS_TYPE::NORMAL;
     updatemask |= UPDATE_HP;
     PAI->Reset();
     PAI->EventHandler.triggerListener("SPAWN", CLuaBaseEntity(this));

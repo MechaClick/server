@@ -19,16 +19,16 @@
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
+#include "common/logging.h"
 
 #include "../spell.h"
 #include "../utils/battleutils.h"
 #include "lua_spell.h"
 
 /************************************************************************
- *																		*
- *  Constructor															*
- *																		*
+ *                                                                        *
+ *  Constructor                                                            *
+ *                                                                        *
  ************************************************************************/
 
 CLuaSpell::CLuaSpell(CSpell* PSpell)
@@ -36,7 +36,7 @@ CLuaSpell::CLuaSpell(CSpell* PSpell)
 {
     if (PSpell == nullptr)
     {
-        ShowError("CLuaSpell created with nullptr instead of valid CSpell*!\n");
+        ShowError("CLuaSpell created with nullptr instead of valid CSpell*!");
     }
 }
 
@@ -49,6 +49,11 @@ CLuaSpell::CLuaSpell(CSpell* PSpell)
 void CLuaSpell::setMsg(uint16 messageID)
 {
     m_PLuaSpell->setMessage(messageID);
+}
+
+void CLuaSpell::setModifier(uint8 modifier)
+{
+    m_PLuaSpell->setModifier(static_cast<MODIFIER>(modifier));
 }
 
 void CLuaSpell::setAoE(uint8 aoe)
@@ -84,6 +89,11 @@ uint32 CLuaSpell::getCastTime()
 void CLuaSpell::setCastTime(uint32 casttime)
 {
     m_PLuaSpell->setCastTime(casttime);
+}
+
+uint32 CLuaSpell::getPrimaryTargetID()
+{
+    return m_PLuaSpell->getPrimaryTargetID();
 }
 
 bool CLuaSpell::canTargetEnemy()
@@ -123,7 +133,7 @@ uint16 CLuaSpell::getID()
 
 uint16 CLuaSpell::getMPCost()
 {
-    return static_cast<uint16>(m_PLuaSpell->getMPCost());
+    return m_PLuaSpell->getMPCost();
 }
 
 uint8 CLuaSpell::getSkillType()
@@ -134,6 +144,11 @@ uint8 CLuaSpell::getSkillType()
 uint8 CLuaSpell::getSpellGroup()
 {
     return static_cast<uint8>(m_PLuaSpell->getSpellGroup());
+}
+
+uint8 CLuaSpell::getSpellFamily()
+{
+    return static_cast<uint8>(m_PLuaSpell->getSpellFamily());
 }
 
 uint8 CLuaSpell::getFlag()
@@ -147,6 +162,7 @@ void CLuaSpell::Register()
 {
     SOL_USERTYPE("CSpell", CLuaSpell);
     SOL_REGISTER("setMsg", CLuaSpell::setMsg);
+    SOL_REGISTER("setModifier", CLuaSpell::setModifier);
     SOL_REGISTER("setAoE", CLuaSpell::setAoE);
     SOL_REGISTER("setFlag", CLuaSpell::setFlag);
     SOL_REGISTER("setRadius", CLuaSpell::setRadius);
@@ -162,8 +178,16 @@ void CLuaSpell::Register()
     SOL_REGISTER("getID", CLuaSpell::getID);
     SOL_REGISTER("getMPCost", CLuaSpell::getMPCost);
     SOL_REGISTER("getSpellGroup", CLuaSpell::getSpellGroup);
+    SOL_REGISTER("getSpellFamily", CLuaSpell::getSpellFamily);
     SOL_REGISTER("getFlag", CLuaSpell::getFlag);
     SOL_REGISTER("getCastTime", CLuaSpell::getCastTime);
+    SOL_REGISTER("getPrimaryTargetID", CLuaSpell::getPrimaryTargetID);
+}
+
+std::ostream& operator<<(std::ostream& os, const CLuaSpell& spell)
+{
+    std::string id = spell.m_PLuaSpell ? std::to_string(static_cast<uint16>(spell.m_PLuaSpell->getID())) : "nullptr";
+    return os << "CLuaSpell(" << id << ")";
 }
 
 //======================================================//

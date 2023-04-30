@@ -1,5 +1,9 @@
 -----------------------------------
+-- Global file for Apollyopn and Temenos
+-----------------------------------
+require("scripts/globals/battlefield")
 require("scripts/globals/keyitems")
+require('scripts/globals/interaction/container')
 require("scripts/globals/status")
 require("scripts/globals/zone")
 -----------------------------------
@@ -10,411 +14,248 @@ xi.limbus = xi.limbus or {}
 function xi.limbus.enter(player, entrance)
     switch (entrance): caseof
     {
-        [0] = function ()
+        [0] = function()
             player:setPos(-668, 0.1, -666, 209, 38)  --  instance entrer -599 0 -600
         end, --  sortiezone -642, -4, -642, -637, 4, -637
-        [1] = function ()
+
+        [1] = function()
             player:setPos(643, 0.1, -600, 124, 38)  --  instance entrer 600 1 -600
         end, --  sortiezone  637, -4, -642, 642, 4, -637
     }
 end
 
-function xi.limbus.setupArmouryCrates(bfid, hide)
-    local ID
-    if bfid == 1290 or bfid == 1291 or bfid == 1292 or bfid == 1293 or
-        bfid == 1294 or bfid == 1296
-    then
-        ID = zones[xi.zone.APOLLYON]
-    else
-        ID = zones[xi.zone.TEMENOS]
-    end
-
-    switch (bfid): caseof
-    {
-        [1290] = function() -- NW_Apollyon
-            for i = 1, 4 do
-                GetNPCByID(ID.npc.APOLLYON_NW_CRATE[i][1]):setStatus(xi.status.DISAPPEAR)
-                for j = 2, 5 do
-                    GetNPCByID(ID.npc.APOLLYON_NW_CRATE[i][j]):setStatus(xi.status.NORMAL)
-                end
-            end
-            GetNPCByID(ID.npc.APOLLYON_NW_CRATE[5]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1291] = function() -- SW_Apollyon
-            for i = 1, 2 do
-                    for j = 0, 2 do
-                        GetNPCByID(ID.npc.APOLLYON_SW_CRATE[i]+j):setStatus(xi.status.DISAPPEAR)
-                    end
-            end
-            for i = 0, 9 do
-                GetNPCByID(ID.npc.APOLLYON_SW_CRATE[3]+i):untargetable(false)
-                GetNPCByID(ID.npc.APOLLYON_SW_CRATE[3]+i):setStatus(xi.status.NORMAL)
-            end
-            GetNPCByID(ID.npc.APOLLYON_SW_CRATE[4]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1292] = function() -- NE_Apollyon
-            for i = 1, 4 do
-                GetNPCByID(ID.npc.APOLLYON_NE_CRATE[i][1]):setStatus(xi.status.DISAPPEAR)
-                for j = 2, 5 do
-                    GetNPCByID(ID.npc.APOLLYON_NE_CRATE[i][j]):setStatus(xi.status.NORMAL)
-                end
-            end
-            GetNPCByID(ID.npc.APOLLYON_NE_CRATE[5]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1293] = function() -- SE_Apollyon
-            for i = 1, 3 do
-                for j = 0, 2 do
-                    GetNPCByID(ID.npc.APOLLYON_SE_CRATE[i]+j):setStatus(xi.status.DISAPPEAR)
-                end
-            end
-            GetNPCByID(ID.mob.APOLLYON_SE_MOB[4]):setStatus(xi.status.NORMAL)
-            GetNPCByID(ID.npc.APOLLYON_SE_CRATE[4]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1294] = function() -- CS_Apollyon
-            for i = 0, 2 do
-                GetNPCByID(ID.npc.APOLLYON_CS_CRATE+i):setStatus(xi.status.DISAPPEAR)
-            end
-        end,
-        [1296] = function() -- Central_Apollyon
-            GetNPCByID(ID.npc.APOLLYON_CENTRAL_CRATE):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1298] = function() -- Temenos_Western_Tower
-            for i = 1, #ID.npc.TEMENOS_W_CRATE-1 do
-                for j = 0, 2 do
-                    GetNPCByID(ID.npc.TEMENOS_W_CRATE[i]+j):setStatus(xi.status.DISAPPEAR)
-                end
-            end
-            GetNPCByID(ID.npc.TEMENOS_W_CRATE[7]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1299] = function() -- Temenos_Northern_Tower
-            for i = 1, #ID.npc.TEMENOS_N_CRATE-1 do
-                for j = 0, 2 do
-                    GetNPCByID(ID.npc.TEMENOS_N_CRATE[i]+j):setStatus(xi.status.DISAPPEAR)
-                end
-            end
-            GetNPCByID(ID.npc.TEMENOS_N_CRATE[7]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1300] = function() -- Temenos_Eastern_Tower
-            for i = 1, #ID.npc.TEMENOS_E_CRATE-1 do
-                for j = 0, 3 do
-                    GetNPCByID(ID.npc.TEMENOS_E_CRATE[i]+j):setStatus(xi.status.DISAPPEAR)
-                end
-            end
-            GetNPCByID(ID.npc.TEMENOS_E_CRATE[7]):setStatus(xi.status.DISAPPEAR)
-            GetNPCByID(ID.npc.TEMENOS_E_CRATE[7]+1):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1301] = function() -- Central_Temenos_Basement
-            GetNPCByID(ID.npc.TEMENOS_C_CRATE[5]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1303] = function() -- Central_Temenos_1st_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_CRATE[1]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1304] = function() -- Central_Temenos_2nd_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_CRATE[2]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1305] = function() -- Central_Temenos_3rd_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_CRATE[3]):setStatus(xi.status.DISAPPEAR)
-        end,
-        [1306] = function() -- Central_Temenos_4th_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_CRATE[4][1]):setStatus(xi.status.DISAPPEAR)
-            for i = ID.npc.TEMENOS_C_CRATE[4][1]+2, ID.npc.TEMENOS_C_CRATE[4][1]+20 do
-                if hide then
-                    GetNPCByID(i):setStatus(xi.status.DISAPPEAR)
-                else
-                    GetNPCByID(i):setStatus(xi.status.NORMAL)
-                end
-            end
-        end,
-    }
+function xi.limbus.showRecoverCrate(crateID)
+    local crate = GetMobByID(crateID)
+    crate:setAnimationSub(8)
+    crate:setStatus(xi.status.NORMAL)
+    crate:setUntargetable(false)
+    crate:resetLocalVars()
 end
 
-function xi.limbus.handleDoors(battlefield, open, door)
-    local bfid = battlefield:getID()
-    local animation = xi.animation.CLOSE_DOOR
-    if open then animation = xi.animation.OPEN_DOOR end
-    local ID
-    if bfid == 1290 or bfid == 1291 or bfid == 1292 or bfid == 1293 then
-        ID = zones[xi.zone.APOLLYON]
-    else
-        ID = zones[xi.zone.TEMENOS]
-    end
-
-    if door then
-        if open then
-            local players = battlefield:getPlayers()
-            for i, member in pairs(players) do
-                member:messageSpecial(ID.text.GATE_OPEN)
-                member:messageSpecial(ID.text.TIME_LEFT, battlefield:getRemainingTime()/60)
-            end
-        end
-        GetNPCByID(door):setAnimation(animation)
-        return
-    end
-
-    switch (bfid): caseof
-    {
-        [1290] = function() -- NW_Apollyon
-            for i = 1, 5 do
-                GetNPCByID(ID.npc.APOLLYON_NW_PORTAL[i]):setAnimation(animation)
-            end
-        end,
-        [1291] = function() -- SW_Apollyon
-            for i = 1, 4 do
-                GetNPCByID(ID.npc.APOLLYON_SW_PORTAL[i]):setAnimation(animation)
-            end
-        end,
-        [1292] = function() -- NE_Apollyon
-            for i = 1, 5 do
-                GetNPCByID(ID.npc.APOLLYON_NE_PORTAL[i]):setAnimation(animation)
-            end
-        end,
-        [1293] = function() -- SE_Apollyon
-            for i = 1, 4 do
-                GetNPCByID(ID.npc.APOLLYON_SE_PORTAL[i]):setAnimation(animation)
-            end
-        end,
-        [1299] = function() -- Temenos_Northern_Tower
-            for i = 1, 7 do
-                GetNPCByID(ID.npc.TEMENOS_N_GATE[i]):setAnimation(animation)
-            end
-        end,
-        [1300] = function() -- Temenos_Eastern_Tower
-            for i = 1, 7 do
-                GetNPCByID(ID.npc.TEMENOS_E_GATE[i]):setAnimation(animation)
-            end
-        end,
-        [1298] = function() -- Temenos_Western_Tower
-            for i = 1, 7 do
-                GetNPCByID(ID.npc.TEMENOS_W_GATE[i]):setAnimation(animation)
-            end
-        end,
-        [1303] = function() -- Central_Temenos_1st_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_GATE[1]):setAnimation(animation)
-        end,
-        [1304] = function() -- Central_Temenos_2nd_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_GATE[2]):setAnimation(animation)
-        end,
-        [1305] = function() -- Central_Temenos_3rd_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_GATE[3]):setAnimation(animation)
-        end,
-        [1306] = function() -- Central_Temenos_4th_Floor
-            GetNPCByID(ID.npc.TEMENOS_C_GATE[4]):setAnimation(animation)
-        end,
-        [1301] = function() -- Central_Temenos_Basement
-            GetNPCByID(ID.npc.TEMENOS_C_GATE[5]):setAnimation(animation)
-        end,
-    }
+function xi.limbus.hideCrate(crate)
+    crate:setStatus(xi.status.DISAPPEAR)
+    crate:setUntargetable(true)
+    crate:resetLocalVars()
 end
 
-function xi.limbus.handleLootRolls(battlefield, lootTable, players, npc)
-    players = players or battlefield:getPlayers()
-    for i = 1, #lootTable do
-        local lootGroup = lootTable[i]
-        if lootGroup then
-            local max = 0
-            for _, entry in pairs(lootGroup) do
-                max = max + entry.droprate
-            end
-            local roll = math.random(max)
-            for _, entry in pairs(lootGroup) do
-                max = max - entry.droprate
-                if roll > max then
-                    if entry.itemid ~= 0 then
-                        players[1]:addTreasure(entry.itemid, npc)
-                    end
-                    break
-                end
+function xi.limbus.spawnFrom(mob, crateID)
+    local crate = GetEntityByID(crateID)
+    if crate:getLocalVar("opened") == 0 then
+        crate:setPos(mob:getXPos(), mob:getYPos(), mob:getZPos(), mob:getRotPos())
+        crate:setStatus(xi.status.NORMAL)
+        crate:setUntargetable(false)
+        crate:setAnimationSub(8)
+    end
+end
+
+function xi.limbus.spawnRecoverFrom(mob, crateID)
+    local crate = GetMobByID(crateID)
+    crate:setPos(mob:getXPos(), mob:getYPos(), mob:getZPos(), mob:getRotPos())
+    xi.limbus.showRecoverCrate(crateID)
+end
+
+Limbus = setmetatable({ }, { __index = Battlefield })
+Limbus.__index = Limbus
+Limbus.__eq = function(m1, m2)
+    return m1.name == m2.name
+end
+
+Limbus.name = ""
+Limbus.serverVar = ""
+
+-- Creates a new Limbus Battlefield interaction
+-- Data takes the additional following keys:
+--  - name: The name of the Limbus area.
+--  - exitLocation: Where to boot the player out. This is specifically used for Apollyon areas.
+--  - timeExtension: How much time to grant when openning a time Armoury Crate.
+function Limbus:new(data)
+    data.createsWornItem = false
+    data.showTimer = false
+    local obj = Battlefield:new(data)
+    setmetatable(obj, self)
+    obj.name = data.name
+    obj.ID = zones[obj.zoneId][obj.name]
+    obj.serverVar = "[" .. obj.name .. "]Time"
+    obj.exitLocation = data.exitLocation or 0
+    obj.timeExtension = data.timeExtension or 0
+    return obj
+end
+
+function Limbus:register()
+    Battlefield.register(self)
+
+    -- Add recover crates that are technically "mobs"
+    table.insert(self.groups, { mobIds = self.ID.npc.RECOVER_CRATES })
+
+    return self
+end
+
+function Limbus:onEventFinishEnter(player, csid, option)
+    Battlefield.onEventFinishEnter(self, player, csid, option)
+
+    local battlefield = player:getBattlefield()
+    local initiatorId, _ = battlefield:getInitiator()
+    if player:getID() == initiatorId then
+        local ID = zones[player:getZoneID()]
+        local alliance = player:getAlliance()
+        for _, member in pairs(alliance) do
+            if member:getZoneID() == player:getZoneID() then
+                member:messageSpecial(ID.text.HUM)
             end
         end
     end
 end
 
-function xi.limbus.extendTimeLimit(battlefield, minutes, zone, npc)
+function Limbus:onBattlefieldInitialise(battlefield)
+    Battlefield.onBattlefieldInitialise(self, battlefield)
+    SetServerVariable(self.serverVar, battlefield:getTimeLimit() / 60)
+
+    self:closeDoors()
+
+    local ID = zones[battlefield:getZoneID()][self.name]
+
+    -- Setup Item Crates
+    if ID.npc.ITEM_CRATES then
+        for i, crateID in ipairs(ID.npc.ITEM_CRATES) do
+            local crate = GetEntityByID(crateID)
+            xi.limbus.hideCrate(crate)
+            crate:addListener("ON_TRIGGER", "TRIGGER_ITEM_CRATE", utils.bind(self.handleOpenItemCrate, self))
+        end
+    end
+
+    -- Setup Time Crates
+    if ID.npc.TIME_CRATES then
+        for i, crateID in ipairs(ID.npc.TIME_CRATES) do
+            local crate = GetEntityByID(crateID)
+            xi.limbus.hideCrate(crate)
+            crate:addListener("ON_TRIGGER", "TRIGGER_TIME_CRATE", utils.bind(self.handleOpenTimeCrate, self))
+        end
+    end
+
+    -- Setup Recover Crates
+    -- Recover crates are special in that they are mobs that perform a skill on the player when triggered
+    if ID.npc.RECOVER_CRATES then
+        for i, crateID in ipairs(ID.npc.RECOVER_CRATES) do
+            local crate = GetEntityByID(crateID)
+            xi.limbus.hideCrate(crate)
+            crate:setBattleID(1) -- Different battle ID prevents the crate from being hit by AOEs
+            crate:addListener("ON_TRIGGER", "TRIGGER_RECOVER_CRATE", utils.bind(self.handleOpenRecoverCrate, self))
+        end
+    end
+
+    -- Setup Winning Loot Crate
+    if ID.npc.LOOT_CRATE then
+        local crate = GetEntityByID(ID.npc.LOOT_CRATE)
+        xi.limbus.hideCrate(crate)
+        crate:addListener("ON_TRIGGER", "TRIGGER_LOOT_CRATE", utils.bind(self.handleOpenLootCrate, self))
+    end
+
+    -- Setup Linked Crates (can only open one)
+    if ID.LINKED_CRATES then
+        for crateID, _ in pairs(ID.LINKED_CRATES) do
+            local mainCrate = GetEntityByID(crateID)
+            mainCrate:addListener("ON_TRIGGER", "TRIGGER_LINKED_CRATE", utils.bind(self.handleLinkedCrate, self))
+        end
+    end
+end
+
+function Limbus:onBattlefieldTick(battlefield, tick)
+    Battlefield.onBattlefieldTick(self, battlefield, tick)
+    if battlefield:getRemainingTime() % 60 == 0 then
+        SetServerVariable(self.serverVar, battlefield:getRemainingTime() / 60)
+    end
+end
+
+function Limbus:onBattlefieldRegister(player, battlefield)
+end
+
+function Limbus:onBattlefieldEnter(player, battlefield)
+    Battlefield.onBattlefieldEnter(self, player, battlefield)
+    player:setCharVar("Cosmo_Cleanse_TIME", os.time())
+end
+
+function Limbus:onBattlefieldDestroy(battlefield)
+    SetServerVariable(self.serverVar, 0)
+end
+
+function Limbus:onBattlefieldWin(player, battlefield)
+    player:startEvent(32001, { [0] = self.exitLocation, [4] = self.zoneId, [5] = battlefield:getArea() - 1 })
+end
+
+function Limbus:onBattlefieldLeave(player, battlefield, leavecode)
+    Battlefield.onBattlefieldLeave(self, player, battlefield, leavecode)
+    local ID = zones[battlefield:getZoneID()]
+    player:messageSpecial(ID.text.HUM + 1)
+end
+
+function Limbus:extendTimeLimit(ID, battlefield)
     local timeLimit = battlefield:getTimeLimit()
-    local extension = minutes * 60
-    battlefield:setTimeLimit(timeLimit + extension)
-    local ID = zones[zone]
+    battlefield:setTimeLimit(timeLimit + utils.minutes(self.timeExtension))
+    local remaining = battlefield:getRemainingTime() / 60
 
-    local players = battlefield:getPlayers()
-    for _, player in pairs(players) do
-        player:messageSpecial(ID.text.TIME_EXTENDED, minutes)
-        player:messageSpecial(ID.text.TIME_LEFT, battlefield:getRemainingTime()/60)
+    for _, player in pairs(battlefield:getPlayers()) do
+        player:messageSpecial(ID.text.TIME_EXTENDED, self.timeExtension)
+        player:messageSpecial(ID.text.TIME_LEFT, remaining)
     end
 end
 
-function xi.limbus.spawnRandomCrate(npc, battlefield, var, mask, canMimic)
-    if mask < 8 then
-        local spawnMimic = math.random(0,1) == 1
-        switch (mask): caseof
-        {
-            [0] = function() -- spawn anything
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    local random = math.random(0,2)
-                    switch (random): caseof
-                    {
-                        [0] = function() GetNPCByID(npc):setModelId(960) end, --bronze
-                        [1] = function() GetNPCByID(npc):setModelId(961) end, --gold
-                        [2] = function() GetNPCByID(npc):setModelId(962) end, --blue
-                    }
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, bit.bor(math.pow(2,random), mask))
-                end
-            end,
-            [1] = function() -- spawn gold or blue
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    local random = math.random(1,2)
-                    switch (random): caseof
-                    {
-                        [1] = function() GetNPCByID(npc):setModelId(961) end, --gold
-                        [2] = function() GetNPCByID(npc):setModelId(962) end, --blue
-                    }
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, bit.bor(math.pow(2,random), mask))
-                end
-            end,
-            [2] = function() -- spawn bronze or blue
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    local random = math.random(0,1)
-                    if random == 1 then random = 2 end
-                    switch (random): caseof
-                    {
-                        [0] = function() GetNPCByID(npc):setModelId(960) end, --bronze
-                        [2] = function() GetNPCByID(npc):setModelId(962) end, --blue
-                    }
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, bit.bor(math.pow(2,random), mask))
-                end
-            end,
-            [3] = function() -- spawn blue
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    GetNPCByID(npc):setModelId(962) --blue
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+4)
-                end
-            end,
-            [4] = function() -- spawn bronze or gold
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    local random = math.random(0,1)
-                    switch (random): caseof
-                    {
-                        [0] = function() GetNPCByID(npc):setModelId(960) end, --bronze
-                        [1] = function() GetNPCByID(npc):setModelId(961) end, --gold
-                    }
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, bit.bor(math.pow(2,random), mask))
-                end
-            end,
-            [5] = function() -- spawn gold
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    GetNPCByID(npc):setModelId(961) --gold
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+2)
-                end
-            end,
-            [6] = function() -- spawn bronze
-                if spawnMimic and canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                else
-                    GetNPCByID(npc):setModelId(960) --bronze
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+1)
-                end
-            end,
-            [7] = function() -- spawn mimic
-                if canMimic then
-                    GetNPCByID(npc):setModelId(961) --mimic
-                    GetNPCByID(npc):setStatus(xi.status.NORMAL)
-                    battlefield:setLocalVar(var, mask+8)
-                end
-            end,
-        }
-    else
-        xi.limbus.spawnRandomCrate(npc, battlefield, var, mask-8)
-        mask = battlefield:getLocalVar(var)
-        battlefield:setLocalVar(var, mask+8)
+function Limbus:handleOpenItemCrate(player, crate)
+    npcUtil.openCrate(crate, function()
+        self:handleLootRolls(player:getBattlefield(), self.loot[crate:getID()], crate)
+    end)
+end
+
+function Limbus:handleOpenTimeCrate(player, crate)
+    npcUtil.openCrate(crate, function()
+        self:extendTimeLimit(zones[self.zoneId], player:getBattlefield())
+    end)
+end
+
+function Limbus:handleOpenRecoverCrate(player, crate)
+    npcUtil.openCrate(crate, function()
+        -- Use wz_recover_all to heal players
+        crate:useMobAbility(1531, player)
+    end)
+end
+
+function Limbus:handleOpenLootCrate(player, crate)
+    npcUtil.openCrate(crate, function()
+        local battlefield = player:getBattlefield()
+        self:handleLootRolls(battlefield, self.loot[self.ID.npc.LOOT_CRATE], crate)
+        battlefield:setLocalVar("cutsceneTimer", self.delayToExit)
+        battlefield:setStatus(xi.battlefield.status.WON)
+    end)
+end
+
+function Limbus:handleLinkedCrate(player, npc)
+    for _, crateID in ipairs(self.ID.LINKED_CRATES[npc:getID()]) do
+        local crate = GetEntityByID(crateID)
+        crate:setLocalVar("opened", 1)
+        npcUtil.disappearCrate(crate)
+    end
+end
+
+function Limbus:openDoor(battlefield, floor)
+    local door = GetNPCByID(self.ID.npc.PORTAL[floor])
+    if door:getAnimation() == xi.animation.OPEN_DOOR then
         return
     end
-end
 
-function xi.limbus.elementalsDead()
-    local ID = zones[xi.zone.APOLLYON]
-    local day = VanadielDayOfTheWeek()
-    local daykill = false
-    if day == 0 then  --  fire
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+3):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+11):isDead()
-            and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+19):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 1 then --  earth
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+2):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+10):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+18):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 2 then --  water
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+6):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+14):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+22):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 3 then --  wind
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+8):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+16):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 4 then --  ice
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+4):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+12):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+20):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 5 then --  lightning
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+7):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+15):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+23):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 6 then --  ligth
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+5):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+13):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+21):isDead()
-        then
-            daykill = true
-        end
-    elseif day == 7 then  --  dark
-        if GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+1):isDead() and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+9):isDead()
-        and GetMobByID(ID.mob.APOLLYON_SW_MOB[4]+17):isDead()
-        then
-            daykill = true
-        end
+    local ID = zones[door:getZoneID()]
+    local remaining = battlefield:getRemainingTime() / 60
+
+    for i, player in pairs(battlefield:getPlayers()) do
+        player:messageSpecial(ID.text.GATE_OPEN)
+        player:messageSpecial(ID.text.TIME_LEFT, remaining)
     end
 
-    return daykill
+    door:setAnimation(xi.animation.OPEN_DOOR)
+end
+
+function Limbus:closeDoors()
+    if self.ID.npc.PORTAL then
+        for _, doorID in ipairs(self.ID.npc.PORTAL) do
+            GetNPCByID(doorID):setAnimation(xi.animation.CLOSE_DOOR)
+        end
+    end
 end

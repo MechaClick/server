@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Port Bastok
 --  NPC: Carey
--- Standard Info NPC
 -----------------------------------
 local ID = require("scripts/zones/Port_Bastok/IDs")
 -----------------------------------
@@ -11,7 +10,7 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    player:messageSpecial(ID.text.CAREY_DIALOG)
+    player:messageSpecial(ID.text.DEPARTING_PASSENGER_DIALOG)
 end
 
 entity.onEventUpdate = function(player, csid, option)

@@ -1,9 +1,6 @@
 -----------------------------------
--- Area: Ru'Lud Gardens
+-- Area: Ru'Lude Gardens
 --  NPC: Colti
--- Standard Info NPC
------------------------------------
-require("scripts/globals/settings")
 -----------------------------------
 local entity = {}
 
@@ -11,7 +8,6 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    player:startEvent(153)
 end
 
 entity.onEventUpdate = function(player, csid, option)

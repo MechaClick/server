@@ -5,52 +5,57 @@
 -- Recast Time: 1:00
 -- Duration: Instant
 -----------------------------------
-require("scripts/globals/settings")
-require("scripts/globals/status")
-require("scripts/globals/pets")
 require("scripts/globals/msg")
+require("scripts/globals/pets")
+require("scripts/globals/status")
 -----------------------------------
-local ability_object = {}
+local abilityObject = {}
 
-ability_object.onAbilityCheck = function(player, target, ability)
-    if not player:getPet() then
+abilityObject.onAbilityCheck = function(player, target, ability)
+    local pet = player:getPet()
+
+    if not pet then
         return xi.msg.basic.REQUIRES_A_PET, 0
-    elseif not player:getPetID() or not (player:getPetID() >= 69 and player:getPetID() <= 72) then
+    elseif not pet:isAutomaton() then
         return xi.msg.basic.NO_EFFECT_ON_PET, 0
-    else
-        return 0, 0
     end
+
+    return 0, 0
 end
 
-ability_object.onUseAbility = function(player, target, ability)
+abilityObject.onUseAbility = function(player, target, ability)
     local pet = player:getPet()
+
     if pet then
-        local enmitylist = target:getEnmityList()
+        local enmitylist            = target:getEnmityList()
         local playerfound, petfound = false, false
+
         for k, v in pairs(enmitylist) do
-            if v.entity:getShortID() == player:getShortID() then
+            if v.entity:getTargID() == player:getTargID() then
                 playerfound = true
-            elseif v.entity:getShortID() == pet:getShortID() then
+            elseif v.entity:getTargID() == pet:getTargID() then
                 petfound = true
             end
         end
 
         if playerfound and petfound then
-            local bonus = (player:getMerit(xi.merit.VENTRILOQUY)-5)/100
-
-            local playerCE = target:getCE(player)
-            local playerVE = target:getVE(player)
-            local petCE = target:getCE(pet)
-            local petVE = target:getVE(pet)
-
+            local bonus             = (player:getMerit(xi.merit.VENTRILOQUY) - 5) / 100
+            local playerCE          = target:getCE(player)
+            local playerVE          = target:getVE(player)
+            local petCE             = target:getCE(pet)
+            local petVE             = target:getVE(pet)
             local playerEnmityBonus = 1
-            local petEnmityBonus = 1
-            if target:getTarget():getShortID() == player:getShortID() or ((playerCE + playerVE) >= (petCE + petVE) and target:getTarget():getShortID() ~= pet:getShortID()) then
+            local petEnmityBonus    = 1
+
+            if
+                target:getTarget():getTargID() == player:getTargID() or
+                ((playerCE + playerVE) >= (petCE + petVE) and target:getTarget():getTargID() ~= pet:getTargID())
+            then
                 playerEnmityBonus = playerEnmityBonus + bonus
-                petEnmityBonus = petEnmityBonus - bonus
+                petEnmityBonus    = petEnmityBonus - bonus
             else
                 playerEnmityBonus = playerEnmityBonus - bonus
-                petEnmityBonus = petEnmityBonus + bonus
+                petEnmityBonus    = petEnmityBonus + bonus
             end
 
             target:setCE(player, petCE * petEnmityBonus)
@@ -61,4 +66,4 @@ ability_object.onUseAbility = function(player, target, ability)
     end
 end
 
-return ability_object
+return abilityObject

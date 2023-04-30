@@ -3,14 +3,16 @@
 -- Ionohelix Schema
 -- Teaches the black magic Ionohelix
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(283)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.IONOHELIX)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(283)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.IONOHELIX)
 end
 
-return item_object
+return itemObject

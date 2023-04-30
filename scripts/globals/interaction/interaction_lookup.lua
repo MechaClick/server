@@ -16,25 +16,25 @@ require('scripts/globals/interaction/interaction_util')
 --[[ Illustration of the structure of the data:
 {
     -- First level (zone ID)
-    [xi.zone.SOME_ZONE] = {
-
+    [xi.zone.SOME_ZONE] =
+    {
         -- Second level (entity name)
-        ['Some_NPC'] = {
-
+        ['Some_NPC'] =
+        {
             -- Third level (handler name)
-            ['onTrigger'] = {
-
+            ['onTrigger'] =
+            {
                 -- List of handlers in the form below
                 { check = function (player) .. end, handler = function (player) .. end, container = .. },
             }
         },
 
         -- Second level (zone-wide handler name)
-        ['onEventFinish'] = {
-
+        ['onEventFinish'] =
+        {
             -- Third level (specifier for handler, here the ID of the event)
-            [123] = {
-
+            [123] =
+            {
                 -- List of handlers in the form below
                 { check = function (player) .. end, handler = function (player) .. end, container = .. },
             }
@@ -42,8 +42,7 @@ require('scripts/globals/interaction/interaction_util')
     }
 }
 --]]
-InteractionLookup = {
-}
+InteractionLookup = {}
 
 function InteractionLookup:new(original)
     local obj = original or {}
@@ -54,7 +53,6 @@ function InteractionLookup:new(original)
     obj.zoneDefaults = obj.zoneDefaults or {}
     return obj
 end
-
 
 -----------------------------------
 -- Add/Remove helpers
@@ -73,16 +71,18 @@ end
 --        handler = <action definition or function to run>,
 --      }
 local function addHandlers(secondLevel, lookupSecondLevel, checkFunc, container)
-
     -- Use base table that all the handlers will reuse, to avoid creating many
     -- very similar objects in the lookup table
+
     local baseHandlerTable = {}
     if checkFunc then
         baseHandlerTable.check = checkFunc
     end
+
     if container then
         baseHandlerTable.container = container
     end
+
     local mt = { __index = baseHandlerTable }
 
     -- Loop through the given second level table, and add them to lookup as needed
@@ -152,8 +152,11 @@ end
 -- Remove default handlers for a given zone
 function InteractionLookup:removeDefaultHandlers(zoneId)
     if self.data[zoneId] then
-        removeHandlersMatching(self.data[zoneId], self.data[zoneId], function (entry) return entry.check == nil and entry.container == nil end)
+        removeHandlersMatching(self.data[zoneId], self.data[zoneId], function(entry)
+            return entry.check == nil and entry.container == nil
+        end)
     end
+
     self.zoneDefaults[zoneId] = false
 end
 
@@ -162,8 +165,8 @@ function InteractionLookup:addContainers(containers, zoneIds)
     local validZoneTable = nil
     if zoneIds ~= nil then
         validZoneTable = {}
-        for i=1, #zoneIds do
-           validZoneTable[zoneIds[i]] = true
+        for i = 1, #zoneIds do
+            validZoneTable[zoneIds[i]] = true
         end
     end
 
@@ -176,7 +179,7 @@ end
 function InteractionLookup:addContainer(container, validZoneTable)
     if self.containers[container.id] then
         -- Container already added, need to remove it first to re-add.
-        printf("Can't add a container that is already a loaded. Need to remove it first: " .. container.id);
+        printf("Can't add a container that is already a loaded. Need to remove it first: " .. container.id)
         return
     end
 
@@ -204,7 +207,9 @@ function InteractionLookup:removeContainer(container)
     for _, section in ipairs(container.sections) do
         for zoneid, secondLevel in pairs(section) do
             if zoneid ~= "check" and self.data[zoneid] then
-                removeHandlersMatching(secondLevel, self.data[zoneid], function (entry) return entry.container == container end)
+                removeHandlersMatching(secondLevel, self.data[zoneid], function(entry)
+                    return entry.container == container
+                end)
             end
         end
     end
@@ -230,7 +235,6 @@ local function runHandler(handler, args)
     end
 end
 
-
 -- Use preprocessed lookup to run relevant handlers
 local function runHandlersInData(data, player, secondLevelKey, thirdLevelKey, args)
     if not data then
@@ -238,16 +242,19 @@ local function runHandlersInData(data, player, secondLevelKey, thirdLevelKey, ar
     end
 
     local secondLevelTable = data[player:getZoneID()]
-    if not secondLevelTable
-        or not secondLevelTable[secondLevelKey]
-        or not secondLevelTable[secondLevelKey][thirdLevelKey] then
+    if
+        not secondLevelTable or
+        not secondLevelTable[secondLevelKey] or
+        not secondLevelTable[secondLevelKey][thirdLevelKey]
+    then
         return { }
     end
 
     local actions = { }
-    local varCache = interactionUtil.makeTableCache(function (varname)
+    local varCache = interactionUtil.makeTableCache(function(varname)
         return player:getVar(varname)
     end)
+
     local containerVarCache = interactionUtil.makeContainerVarCache(player)
     for _, entry in ipairs(secondLevelTable[secondLevelKey][thirdLevelKey]) do
         local checkArgs = { }
@@ -255,8 +262,9 @@ local function runHandlersInData(data, player, secondLevelKey, thirdLevelKey, ar
             if entry.container.getCheckArgs then
                 checkArgs = entry.container:getCheckArgs(player)
             end
-            checkArgs[#checkArgs+1] = containerVarCache[entry.container]
-            checkArgs[#checkArgs+1] = varCache
+
+            checkArgs[#checkArgs + 1] = containerVarCache[entry.container]
+            checkArgs[#checkArgs + 1] = varCache
         end
 
         local ok, res = true, true
@@ -277,13 +285,16 @@ local function runHandlersInData(data, player, secondLevelKey, thirdLevelKey, ar
     return actions
 end
 
-
 -- Find the current highest priority actions
 local function getHighestPriorityActions(data, player, secondLevelKey, thirdLevelKey, args)
     local possibleActions = runHandlersInData(data, player, secondLevelKey, thirdLevelKey, args)
 
     -- If the possible actions is a number, we should always return immediately since it's CS ID from an onZoneIn
-    if possibleActions and #possibleActions == 0 or type(possibleActions[1]) == 'number' then
+    if
+        possibleActions and
+        #possibleActions == 0 or
+        type(possibleActions[1]) == 'number'
+    then
         return possibleActions, Action.Priority.Progress
     end
 
@@ -335,6 +346,7 @@ local function performNextAction(player, containerId, handlerId, actions, target
                 end
             end
         end
+
         if nextIndex > actionCount then
             nextIndex = 1
         end
@@ -354,10 +366,9 @@ local function performNextAction(player, containerId, handlerId, actions, target
     if didPerformAction and actionToPerform.secondaryPriority then
         player:setLocalVar(actionUtil.getActionVarName(containerId, handlerId, actionToPerform.id), actionToPerform.secondaryPriority)
     end
+
     return didPerformAction and returnValue
 end
-
-
 
 -----------------------------------
 -- Handlers
@@ -368,7 +379,11 @@ local function onHandler(data, secondLevelKey, thirdLevelKey, args, fallbackHand
     local playerArg = args.playerArg or 1
     local player = args[playerArg]
     if not player then -- if no player object is present, we can't do anything in the handler system
-        return fallbackHandler(unpack(args))
+        if fallbackHandler then
+            return fallbackHandler(unpack(args))
+        end
+
+        return defaultReturn -- likely nil in most cases
     end
 
     local actions, priority = getHighestPriorityActions(data, player, secondLevelKey, thirdLevelKey, args)
@@ -376,25 +391,30 @@ local function onHandler(data, secondLevelKey, thirdLevelKey, args, fallbackHand
 
     -- Most handlers should run both the handler system and fallback if available,
     -- except those that should only perform one action at a time, like onTrigger and onTrade
-    if fallbackHandler and thirdLevelKey ~= 'onTrigger' and thirdLevelKey ~= 'onTrade' then
+    if
+        fallbackHandler and
+        thirdLevelKey ~= 'onTrigger' and
+        thirdLevelKey ~= 'onTrade'
+    then
         local result = performNextAction(player, secondLevelKey, thirdLevelKey, actions, targetId) or defaultReturn
         local fallbackResult = fallbackHandler(unpack(args))
         return result or fallbackResult
     end
 
     -- Prioritize important actions from the handler system if applicable
-    if not fallbackHandler
-        or (#actions > 0 -- only prioritize if there's actually actions to do
-            and (secondLevelKey == 'onZoneIn' -- play onZoneIn cs if given
-                or priority > Action.Priority.Event -- prioritize this if event is important enough
-                or player:getLocalVar(fallbackVar) == 0) -- alternate between trying handler system and fallback handler
-            )
+    if
+        not fallbackHandler or
+        (
+            #actions > 0 and                      -- only prioritize if there's actually actions to do
+            (secondLevelKey == 'onZoneIn' or      -- play onZoneIn cs if given
+            priority > Action.Priority.Event or   -- prioritize this if event is important enough
+            player:getLocalVar(fallbackVar) == 0) -- alternate between trying handler system and fallback handler
+        )
     then
-        player:setLocalVar(fallbackVar, 1)
+        player:setLocalVar(fallbackVar, priority <= Action.Priority.Event and 1 or 0)
         local result = performNextAction(player, secondLevelKey, thirdLevelKey, actions, targetId) or defaultReturn
         return result
     end
-
 
     -- Else we try to fallback to Lua files for the entity/zone
     player:setLocalVar(fallbackVar, 0)
@@ -402,9 +422,10 @@ local function onHandler(data, secondLevelKey, thirdLevelKey, args, fallbackHand
 
     -- Fall back to side-loaded handler from other lua file
     local result = fallbackHandler(unpack(args))
-    if player:isInEvent() or player:didGetMessage() -- Fallback handler triggered something
-        or (result == -1 and thirdLevelKey == 'onTrigger')  -- Doors return -1 to open
-        or (result ~= nil and result ~= -1 and secondLevelKey == 'onZoneIn') -- onZoneIn returns a csid if any, else -1
+    if
+        player:isInEvent() or player:didGetMessage() or -- Fallback handler triggered something
+        (result == -1 and thirdLevelKey == 'onTrigger') or  -- Doors return -1 to open
+        (result ~= nil and result ~= -1 and secondLevelKey == 'onZoneIn') -- onZoneIn returns a csid if any, else -1
     then
         return result
     end
@@ -415,6 +436,9 @@ local function onHandler(data, secondLevelKey, thirdLevelKey, args, fallbackHand
     return result
 end
 
+function InteractionLookup:afterZoneIn(player, fallbackFn)
+    return onHandler(self.data, 'afterZoneIn', 1, { player }, fallbackFn)
+end
 
 function InteractionLookup:onTrigger(player, npc, fallbackFn)
     return onHandler(self.data, npc:getName(), 'onTrigger', { player, npc }, fallbackFn, -1, npc:getID())
@@ -424,20 +448,24 @@ function InteractionLookup:onTrade(player, npc, trade, fallbackFn)
     return onHandler(self.data, npc:getName(), 'onTrade', { player, npc, trade }, fallbackFn, nil, npc:getID())
 end
 
-function InteractionLookup:onMobDeath(mob, player, isKiller, firstCall, fallbackFn)
-    return onHandler(self.data, mob:getName(), 'onMobDeath', { mob, player, isKiller, firstCall, playerArg = 2 }, fallbackFn)
+function InteractionLookup:onMobDeath(mob, player, optParams, fallbackFn)
+    return onHandler(self.data, mob:getName(), 'onMobDeath', { mob, player, optParams, playerArg = 2 }, fallbackFn)
 end
 
-function InteractionLookup:onRegionEnter(player, region, fallbackFn)
-    return onHandler(self.data, 'onRegionEnter', region:GetRegionID(), { player, region }, fallbackFn)
+function InteractionLookup:onTriggerAreaEnter(player, triggerArea, fallbackFn)
+    return onHandler(self.data, 'onTriggerAreaEnter', triggerArea:GetTriggerAreaID(), { player, triggerArea }, fallbackFn)
 end
 
-function InteractionLookup:onRegionLeave(player, region, fallbackFn)
-    return onHandler(self.data, 'onRegionLeave', region:GetRegionID(), { player, region }, fallbackFn)
+function InteractionLookup:onTriggerAreaLeave(player, triggerArea, fallbackFn)
+    return onHandler(self.data, 'onTriggerAreaLeave', triggerArea:GetTriggerAreaID(), { player, triggerArea }, fallbackFn)
 end
 
 function InteractionLookup:onZoneIn(player, prevZone, fallbackFn)
     return onHandler(self.data, 'onZoneIn', 1, { player, prevZone }, fallbackFn)
+end
+
+function InteractionLookup:onZoneOut(player, fallbackFn)
+    return onHandler(self.data, 'onZoneOut', 1, { player }, fallbackFn)
 end
 
 function InteractionLookup:onEventFinish(player, csid, option, npc, fallbackFn)

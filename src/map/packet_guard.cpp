@@ -36,6 +36,7 @@ namespace PacketGuard
         allowList[SUBSTATE_IN_CS][0x01A] = true; // Player Action
         allowList[SUBSTATE_IN_CS][0x03A] = true; // Sort Inventory
         allowList[SUBSTATE_IN_CS][0x053] = true; // LockStyleSet
+        allowList[SUBSTATE_IN_CS][0x058] = true; // Synthesis Suggestion
         allowList[SUBSTATE_IN_CS][0x05A] = true; // Map Update (Conquest, Besieged, Campaign)
         allowList[SUBSTATE_IN_CS][0x05B] = true; // Event Update (Completion or Update)
         allowList[SUBSTATE_IN_CS][0x05C] = true; // Event Update (Update Player Position)
@@ -52,6 +53,9 @@ namespace PacketGuard
         allowList[SUBSTATE_IN_CS][0x11B] = true; // Not Impl
 
         // Rate limiting
+        // NOTE: You should rate limit any packet that a player can
+        //       send at will that results in an immediate database hit
+        // ratelimitList[0x03B] = 1; // Mannequin Equip
         ratelimitList[0x05D] = 2; // Emotes
         ratelimitList[0x11B] = 2; // Set Job Master Display
         ratelimitList[0x11D] = 2; // Jump
@@ -95,4 +99,34 @@ namespace PacketGuard
         return timeNowSeconds - lastPacketRecievedTime < ratelimitList[SmallPD_Type];
     }
 
+    void PrintPacketList(CCharEntity* PChar)
+    {
+        // Count packets in queue
+        std::map<std::string, uint32> packetCounterMap;
+        for (auto& entry : PChar->getPacketList())
+        {
+            auto packetStr = fmt::format("0x{:4X}", entry->getType());
+            packetCounterMap[packetStr]++;
+        }
+
+        // Sort
+        using pair_t = std::pair<std::string, uint32>;
+        std::vector<pair_t> sortedVec;
+        for (auto& entry : packetCounterMap)
+        {
+            sortedVec.emplace_back(entry);
+        }
+        std::sort(sortedVec.begin(), sortedVec.end(), [](pair_t& a, pair_t& b)
+                  { return a.second < b.second; });
+
+        // Print
+        std::string output;
+        output += "\n=======================================\n";
+        for (auto& entry : packetCounterMap)
+        {
+            output += fmt::format("{} : {}\n", entry.first, entry.second);
+        }
+        output += "=======================================\n";
+        ShowInfo(output);
+    }
 } // namespace PacketGuard

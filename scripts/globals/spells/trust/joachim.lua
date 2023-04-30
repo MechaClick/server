@@ -9,16 +9,13 @@ require("scripts/globals/roe")
 require("scripts/globals/trust")
 require("scripts/globals/weaponskillids")
 -----------------------------------
-local spell_object = {}
+local spellObject = {}
 
-local message_page_offset = 15
-
-spell_object.onMagicCastingCheck = function(caster, target, spell)
+spellObject.onMagicCastingCheck = function(caster, target, spell)
     return xi.trust.canCast(caster, spell)
 end
 
-spell_object.onSpellCast = function(caster, target, spell)
-
+spellObject.onSpellCast = function(caster, target, spell)
     -- Records of Eminence: Alter Ego: Joachim
     if caster:getEminenceProgress(937) then
         xi.roe.onRecordTrigger(caster, 937)
@@ -27,8 +24,8 @@ spell_object.onSpellCast = function(caster, target, spell)
     return xi.trust.spawn(caster, spell)
 end
 
-spell_object.onMobSpawn = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.SPAWN)
+spellObject.onMobSpawn = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.SPAWN)
 
     mob:addSimpleGambit(ai.t.PARTY, ai.c.STATUS, xi.effect.POISON, ai.r.MA, ai.s.SPECIFIC, xi.magic.spell.POISONA)
     mob:addSimpleGambit(ai.t.PARTY, ai.c.STATUS, xi.effect.PARALYSIS, ai.r.MA, ai.s.SPECIFIC, xi.magic.spell.PARALYNA)
@@ -38,7 +35,7 @@ spell_object.onMobSpawn = function(mob)
     mob:addSimpleGambit(ai.t.PARTY, ai.c.STATUS, xi.effect.DISEASE, ai.r.MA, ai.s.SPECIFIC, xi.magic.spell.VIRUNA)
     mob:addSimpleGambit(ai.t.PARTY, ai.c.STATUS, xi.effect.CURSE_I, ai.r.MA, ai.s.SPECIFIC, xi.magic.spell.CURSNA)
 
-    -- TODO: Better logic than this
+    -- TODO: BRD trusts need better logic and major overhaul, for now they compliment each other
     mob:addSimpleGambit(ai.t.SELF, ai.c.NOT_STATUS, xi.effect.MARCH, ai.r.MA, ai.s.HIGHEST, xi.magic.spellFamily.MARCH)
     mob:addSimpleGambit(ai.t.SELF, ai.c.NOT_STATUS, xi.effect.BALLAD, ai.r.MA, ai.s.HIGHEST, xi.magic.spellFamily.MAGES_BALLAD)
 
@@ -47,15 +44,15 @@ spell_object.onMobSpawn = function(mob)
     -- Try and ranged attack every 60s
     mob:addSimpleGambit(ai.t.TARGET, ai.c.ALWAYS, 0, ai.r.RATTACK, 0, 0, 60)
 
-    mob:SetAutoAttackEnabled(false)
+    mob:setAutoAttackEnabled(false)
 end
 
-spell_object.onMobDespawn = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DESPAWN)
+spellObject.onMobDespawn = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DESPAWN)
 end
 
-spell_object.onMobDeath = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DEATH)
+spellObject.onMobDeath = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DEATH)
 end
 
-return spell_object
+return spellObject

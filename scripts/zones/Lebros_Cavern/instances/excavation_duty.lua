@@ -1,67 +1,63 @@
 -----------------------------------
 -- Assault: Excavation Duty
 -----------------------------------
-require("scripts/globals/instance")
 local ID = require("scripts/zones/Lebros_Cavern/IDs")
+require("scripts/globals/assault")
+require("scripts/globals/instance")
+require("scripts/globals/items")
 -----------------------------------
-local instance_object = {}
+local instanceObject = {}
 
-instance_object.afterInstanceRegister = function(player)
-    local instance = player:getInstance()
-    player:messageSpecial(ID.text.ASSAULT_21_START, 21)
-    player:messageSpecial(ID.text.TIME_TO_COMPLETE, instance:getTimeLimit())
+instanceObject.registryRequirements = function(player)
+    return player:hasKeyItem(xi.ki.LEBROS_ASSAULT_ORDERS) and
+        player:getCurrentAssault() == xi.assault.mission.EXCAVATION_DUTY and
+        player:getCharVar("assaultEntered") == 0 and
+        player:hasKeyItem(xi.ki.ASSAULT_ARMBAND) and
+        player:getMainLvl() > 50
 end
 
-instance_object.onInstanceCreated = function(instance)
+instanceObject.entryRequirements = function(player)
+    return player:hasKeyItem(xi.ki.LEBROS_ASSAULT_ORDERS) and
+        player:getCurrentAssault() == xi.assault.mission.EXCAVATION_DUTY and
+        player:getCharVar("assaultEntered") == 0 and
+        player:getMainLvl() > 50
+end
 
-    for i, v in pairs(ID.mob[21]) do
-        SpawnMob(v, instance)
-    end
+instanceObject.onInstanceCreated = function(instance)
+end
 
+instanceObject.onInstanceCreatedCallback = function(player, instance)
+    xi.assault.onInstanceCreatedCallback(player, instance)
+    xi.instance.onInstanceCreatedCallback(player, instance)
+end
+
+instanceObject.afterInstanceRegister = function(player)
+    local instance = player:getInstance()
+
+    xi.assault.afterInstanceRegister(player, xi.items.CAGE_OF_ZHAYOLM_FIREFLIES)
     GetNPCByID(ID.npc.RUNE_OF_RELEASE, instance):setPos(49.999, -40.837, 96.999, 0)
     GetNPCByID(ID.npc.ANCIENT_LOCKBOX, instance):setPos(50.000, -40.070, 99.999, 0)
-
 end
 
-instance_object.onInstanceTimeUpdate = function(instance, elapsed)
+instanceObject.onInstanceTimeUpdate = function(instance, elapsed)
     xi.instance.updateInstanceTime(instance, elapsed, ID.text)
 end
 
-instance_object.onInstanceFailure = function(instance)
-
-    local chars = instance:getChars()
-
-    for i, v in pairs(chars) do
-        v:messageSpecial(ID.text.MISSION_FAILED, 10, 10)
-        v:startEvent(102)
-    end
+instanceObject.onInstanceFailure = function(instance)
+    xi.assault.onInstanceFailure(instance)
 end
 
-instance_object.onInstanceProgressUpdate = function(instance, progress)
-
+instanceObject.onInstanceProgressUpdate = function(instance, progress)
     if progress >= 5 then
         instance:complete()
     end
-
 end
 
-instance_object.onInstanceComplete = function(instance)
-
-    local chars = instance:getChars()
-
-    for i, v in pairs(chars) do
-        v:messageSpecial(ID.text.RUNE_UNLOCKED, 5, 10)
-    end
-
-    GetNPCByID(ID.npc.RUNE_OF_RELEASE, instance):setStatus(xi.status.NORMAL)
-    GetNPCByID(ID.npc.ANCIENT_LOCKBOX, instance):setStatus(xi.status.NORMAL)
-
+instanceObject.onInstanceComplete = function(instance)
+    xi.assault.onInstanceComplete(instance, 5, 10)
 end
 
-instance_object.onEventUpdate = function(player, csid, option)
+instanceObject.onEventFinish = function(player, csid, option)
 end
 
-instance_object.onEventFinish = function(player, csid, option)
-end
-
-return instance_object
+return instanceObject

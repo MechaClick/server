@@ -3,14 +3,16 @@
 -- Firestorm Schema
 -- Teaches the white magic Firestorm
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(115)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.FIRESTORM)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(115)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.FIRESTORM)
 end
 
-return item_object
+return itemObject

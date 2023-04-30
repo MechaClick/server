@@ -14,15 +14,14 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local guildMember = isGuildMember(player, 7)
-    local SkillCap = getCraftSkillCap(player, xi.skill.LEATHERCRAFT)
-    local SkillLevel = player:getSkillLevel(xi.skill.LEATHERCRAFT)
+    local skillCap = xi.crafting.getCraftSkillCap(player, xi.skill.LEATHERCRAFT)
+    local skillLevel = player:getSkillLevel(xi.skill.LEATHERCRAFT)
 
-    if (guildMember == 1) then
-        if (player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) == false) then
-            player:startEvent(652, SkillCap, SkillLevel, 2, 239, player:getGil(), 0, 0, 0)
+    if xi.crafting.hasJoinedGuild(player, xi.crafting.guild.LEATHERCRAFT) then
+        if not player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) then
+            player:startEvent(652, skillCap, skillLevel, 2, 239, player:getGil(), 0, 0, 0)
         else
-            player:startEvent(652, SkillCap, SkillLevel, 2, 239, player:getGil(), 7075, 0, 0)
+            player:startEvent(652, skillCap, skillLevel, 2, 239, player:getGil(), 7075, 0, 0)
         end
     else
         player:startEvent(652) -- Standard Dialogue
@@ -33,7 +32,7 @@ entity.onEventUpdate = function(player, csid, option)
 end
 
 entity.onEventFinish = function(player, csid, option)
-    if (csid == 652 and option == 1) then
+    if csid == 652 and option == 1 then
         player:messageSpecial(ID.text.LEATHER_SUPPORT, 0, 5, 2)
         player:addStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY, 1, 0, 120)
     end

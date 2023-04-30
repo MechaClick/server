@@ -9,25 +9,25 @@
 -----------------------------------
 require("scripts/globals/settings")
 require("scripts/globals/status")
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local needles = 1000 / skill:getTotalTargets()
     local typeEffect = xi.effect.POISON
 
-    MobStatusEffectMove(mob, target, typeEffect, 20, 3, 60)
+    xi.mobskills.mobStatusEffectMove(mob, target, typeEffect, 20, 3, 60)
 
-    local dmg = MobFinalAdjustments(needles, mob, skill, target, xi.attackType.PHYSICAL, xi.damageType.WATER, MOBPARAM_WIPE_SHADOWS)
+    local dmg = xi.mobskills.mobFinalAdjustments(needles, mob, skill, target, xi.attackType.PHYSICAL, xi.damageType.WATER, xi.mobskills.shadowBehavior.WIPE_SHADOWS)
 
     target:takeDamage(dmg, mob, xi.attackType.PHYSICAL, xi.damageType.WATER)
 
     return dmg
 end
 
-return mobskill_object
+return mobskillObject

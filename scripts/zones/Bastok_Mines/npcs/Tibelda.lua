@@ -18,12 +18,12 @@ entity.onTrigger = function(player, npc)
     else
         local stock =
         {
-            4382,  29,    --Frost Turnip
-            638,  170,     --Sage
+            4382,  29, --Frost Turnip
+            638,  170, --Sage
         }
 
         player:showText(npc, ID.text.TIBELDA_OPEN_DIALOG)
-        xi.shop.general(player, stock, BASTOK)
+        xi.shop.general(player, stock, xi.quest.fame_area.BASTOK)
     end
 end
 

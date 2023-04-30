@@ -19,8 +19,8 @@
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
 #include "../items/item.h"
+#include "common/logging.h"
 
 #include "../trade_container.h"
 #include "lua_item.h"
@@ -33,7 +33,7 @@ CLuaTradeContainer::CLuaTradeContainer(CTradeContainer* pTrade)
 {
     if (pTrade == nullptr)
     {
-        ShowError("CLuaTradeContainer created with nullptr instead of valid CTradeContainer*!\n");
+        ShowError("CLuaTradeContainer created with nullptr instead of valid CTradeContainer*!");
     }
 }
 
@@ -186,6 +186,12 @@ void CLuaTradeContainer::Register()
     SOL_REGISTER("hasItemQty", CLuaTradeContainer::hasItemQty);
     SOL_REGISTER("confirmItem", CLuaTradeContainer::confirmItem);
     SOL_REGISTER("confirmSlot", CLuaTradeContainer::confirmSlot);
+}
+
+std::ostream& operator<<(std::ostream& os, const CLuaTradeContainer& trade)
+{
+    // TODO: Print out contents of container
+    return os << "CLuaTradeContainer";
 }
 
 //======================================================//

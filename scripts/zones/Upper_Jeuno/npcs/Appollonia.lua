@@ -3,15 +3,13 @@
 --  NPC: Appollonia
 -- Type: Weather Reporter
 -----------------------------------
-require("scripts/globals/settings")
------------------------------------
 local entity = {}
 
 entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    player:startEvent(534296, 0, 0, 0, 0, 0, 0, 0, VanadielTime())
+    player:startEvent(10008, 0, 0, 0, 0, 0, 0, 0, VanadielTime())
 end
 
 entity.onEventUpdate = function(player, csid, option)

@@ -34,7 +34,7 @@ xi.msg.channel =
     UNKNOWN_24     = 24,
     UNKNOWN_25     = 25,
     YELL           = 26,
-    LINKSHELL2     = 27, -- Second LS color...Default is Green
+    LINKSHELL2     = 27, -- Second LS color. Default is Green
     NS_LINKSHELL2  = 28, -- Same as LINKSHELL_2 but has but has no speaker object displayed
     SYSTEM_3       = 29, -- "Basic system messages" in config menu. Yellow by default.
     LINKSHELL3     = 30, -- Yes really it looks like a 3rd LS may have been planned at some point.
@@ -81,6 +81,9 @@ xi.msg.basic =
     MAGIC_GAIN_EFFECT      = 230, -- <caster> casts <spell>. <target> gains the effect of <status>.
     MAGIC_ENFEEB_IS        = 236, -- <caster> casts <spell>. <target> is <status>.
     MAGIC_ENFEEB           = 237, -- <caster> casts <spell>. <target> receives the effect of <status>.
+    MAGIC_BURST_DAMAGE     = 252, -- <caster> casts <spell> Magic burst! <target> takes <amount> points of damage.
+    MAGIC_BURST_ENFEEB     = 268, -- <caster> casts <spell> Magic burst! <target> receives the effect of <status>.
+    MAGIC_BURST_ENFEEB_IS  = 271, -- <caster> casts <spell> Magic burst! <target> is <status>.
     MAGIC_RESIST_2         = 284, -- <target> resists the effects of the spell!
     MAGIC_CASTS_ON         = 309, -- <caster> casts <spell> on <target>.
     MAGIC_ABSORB_STR       = 329, -- <caster> casts <spell>. <target>'s STR is drained.
@@ -115,6 +118,8 @@ xi.msg.basic =
     SKILL_ENFEEB           = 243, -- <user> uses <skill>. <target> receives the effect of <status>.
     SELF_HEAL_SECONDARY    = 263, -- <target> recovers <amount> HP.
     DAMAGE_SECONDARY       = 264, -- <target> takes <amount> points of damage.
+    RANGED_ATTACK_HIT      = 352, -- <user> ranged attack hits <target> for <amount> points of damage.
+    RANGED_ATTACK_MISS     = 354, -- <user> ranged attack misses.
     AOE_REGAIN_HP          = 357, -- <target> regains <amount> HP.
     AOE_REGAIN_MP          = 358, -- <target> regains <amount> MP.
     ABILITIES_RECHARGED    = 360, -- <user> uses <skill>. All of <target>'s abilities are recharged.
@@ -123,16 +128,20 @@ xi.msg.basic =
     USES_JA                = 100, -- The <player> uses ..
     USES                   = 101, -- The <entity> uses ..
     JA_RECOVERS_HP         = 102, -- The <player> uses .. <target> recovers .. HP.
+    JA_RECOVERS_HP_2       = 318, -- <user> uses ability. <target> recovers <amount> HP. -- Observed on healing breath.
     JA_DAMAGE              = 110, -- <user> uses <ability>. <target> takes <amount> damage.
     JA_REMOVE_EFFECT       = 123, -- <user> uses <ability>. <user> successfully removes <target>'s <status>.
     JA_ENFEEB_IS           = 127, -- <user> uses <ability>. <target> is <status>.
     JA_NO_EFFECT           = 156, -- <user> uses <ability>. No effect on <target>. (1 line msg)
     JA_MISS                = 158, -- <user> uses <ability>, but misses. (no name included)
     USES_JA_TAKE_DAMAGE    = 317, -- The <player> uses .. <target> takes .. points of damage.
+    JA_GAIN_EFFECT         = 266, -- <target> gains the effect of <ability>.
     JA_REMOVE_EFFECT_2     = 321, -- <user> uses <ability>. <target>'s <status> wears off.
     JA_NO_EFFECT_2         = 323, -- <user> uses <ability>. No effect on <target>. (2 line msg)
     JA_MISS_2              = 324, -- <user> uses <ability>, but misses <target>. (includes target name)
     JA_RECOVERS_MP         = 451, -- <user> uses <ability>. <target> regains <amount> MP.
+    JA_ATK_ENHANCED        = 285, -- <target>'s attacks are enhanced.
+    JA_MAGIC_BURST         = 379, -- <user> uses <ability>. Magic Burst! the <target> takes <amount> damage.
 
     -- Misc Other
     DEFEATS_TARG           = 6,   -- The <player> defeats <target>.
@@ -188,7 +197,7 @@ xi.msg.basic =
     TOO_FAR_AWAY           = 78,  -- <target> is too far away.
 
     -- Weaponskills
-    READIES_WS             = 43,  -- ${actor} readies ${weapon_skill}.
+    READIES_WS             = 43,  -- <actor> readies <weapon_skill>.
     CANNOT_USE_WS          = 190, -- The <player> cannot use that weapon ability.
     NOT_ENOUGH_TP          = 192, -- The <player> does not have enough TP.
 
@@ -199,32 +208,34 @@ xi.msg.basic =
     NO_EFFECT_ON_PET       = 336, -- No effect on that pet.
     NO_JUG_PET_ITEM        = 337, -- You do not have the necessary item equipped to call a beast.
     MUST_HAVE_FOOD         = 347, -- You must have pet food equipped to use that command.
-    STATUS_INCREASED       = 562, -- The status parameters of ${target} have increased.
+    STATUS_INCREASED       = 562, -- The status parameters of <target> have increased.
     PET_CANNOT_DO_ACTION   = 574, -- <player>'s pet is currently unable to perform that action.
     PET_NOT_ENOUGH_TP      = 575, -- <player>'s pet does not have enough TP to perform that action.
+    SPIRIT_BOND            = 800, -- Spirit Bond Activates. <Player> takes <number> points of damage. -- Wyvern Spirit bond
 
     -- Food
-    IS_FULL                 = 246,  -- ${target} is full.
-    CANNOT_EAT              = 247,  -- ${actor} can't eat the ${item}.
-    EATS_FINDS_ITEM         = 600,  -- ${actor} eats a ${item}.${lb}${actor} finds a ${item2} inside!
-    EATS_FINDS_NOTHING      = 604,  -- ${actor} eats a ${item}, but finds nothing inside...
+    IS_FULL                 = 246,  -- <target> is full.
+    CANNOT_EAT              = 247,  -- <actor> can't eat the <item>.
+    EATS_FINDS_ITEM         = 600,  -- <actor> eats a <item>.<br><actor> finds a <item2> inside!
+    EATS_FINDS_NOTHING      = 604,  -- <actor> eats a <item>, but finds nothing inside...
 
     -- Items
-    ITEM_USES               = 28,   -- ${actor} uses a ${item}.
-    ITEM_UNABLE_TO_USE      = 55,   -- Unable to use item.
-    ITEM_UNABLE_TO_USE_2    = 56,   -- Unable to use item.
-    ITEM_FAILS_TO_ACTIVATE  = 62,   -- The ${item} fails to activate.
-    ITEM_NO_PETRAS          = 65,   -- You are not carrying any Petras.${lb}You cannot use the ${item}.
-    ITEM_DOES_NOT_HAVE      = 91,   -- ${actor} does not have any ${item}.
-    ITEM_CANNOT_USE_ON      = 92,   -- Cannot use the ${item} on ${target}.
-    ITEM_YOU_OBTAIN_FROM    = 98,   -- You obtain a ${item} from ${target}.
-    ITEM_NO_USE_LEVEL       = 104,  -- Unable to use item.${lb}You do not meet the level requirement.
-    ITEM_NO_USE_MEDICATED   = 111,  -- You cannot use ${item} while medicated.
-    ITEM_NO_USE_INVENTORY   = 308,  -- Unable to use the ${item}.${lb}${target}'s inventory is full.
-    ITEM_RECEIVES_EFFECT    = 375,  -- ${actor} uses a ${item}.${lb}${target} receives the effect of ${status}.
-    ITEM_OBTAINS_A          = 376,  -- ${actor} uses a ${item}.${lb}${target} obtains a ${item2}.
-    ITEM_OBTAINS            = 377,  -- ${actor} uses a ${item}.${lb}${target} obtains ${item2}.
-    ITEM_EFFECT_DISAPPEARS  = 378,  -- ${actor} uses a ${item}.${lb}${target}'s ${status} effect disappears!
+    ITEM_USES                       = 28,  -- <actor> uses a <item>.
+    ITEM_UNABLE_TO_USE              = 55,  -- Unable to use item.
+    ITEM_UNABLE_TO_USE_2            = 56,  -- Unable to use item.
+    ITEM_FAILS_TO_ACTIVATE          = 62,  -- The <item> fails to activate.
+    ITEM_NO_PETRAS                  = 65,  -- You are not carrying any Petras.<br>You cannot use the <item>.
+    ITEM_DOES_NOT_HAVE              = 91,  -- <actor> does not have any <item>.
+    ITEM_CANNOT_USE_ON              = 92,  -- Cannot use the <item> on <target>.
+    ITEM_YOU_OBTAIN_FROM            = 98,  -- You obtain a <item> from <target>.
+    ITEM_NO_USE_LEVEL               = 104, -- Unable to use item.<br>You do not meet the level requirement.
+    ITEM_NO_USE_MEDICATED           = 111, -- You cannot use <item> while medicated.
+    ITEM_NO_USE_INVENTORY           = 308, -- Unable to use the <item>.<br><target>'s inventory is full.
+    ITEM_RECEIVES_EFFECT            = 375, -- <actor> uses a <item>.<br><target> receives the effect of <status>.
+    ITEM_OBTAINS_A                  = 376, -- <actor> uses a <item>.<br><target> obtains a <item2>.
+    ITEM_OBTAINS                    = 377, -- <actor> uses a <item>.<br><target> obtains <item2>.
+    ITEM_EFFECT_DISAPPEARS          = 378, -- <actor> uses a <item>.<br><target>'s <status> effect disappears!
+    ITEM_UNABLE_TO_USE_PARTY_LEADER = 580, -- Unable to use <item>. The party leader is in either an area beyond warping range or a place you have yet to visit.
 
     -- Ranged
     NO_RANGED_WEAPON       = 216, -- You do not have an appropriate ranged weapon equipped.
@@ -232,16 +243,17 @@ xi.msg.basic =
     MOVE_AND_INTERRUPT     = 218, -- You move and interrupt your aim.
 
     -- Additional effects and spike effects
-    SPIKES_EFFECT_DMG      = 44 , -- <Defender>'s spikes deal <number> points of damage to the <Attacker>.
+    SPIKES_EFFECT_DMG      = 44,  -- <Defender>'s spikes deal <number> points of damage to the <Attacker>.
     SPIKES_EFFECT_HP_DRAIN = 132, -- <Defender>'s spikes drain <number> HP from the <Attacker>.
     ADD_EFFECT_MP_HEAL     = 152, -- Additional effect: The <player> recovers <number> MP.
     ADD_EFFECT_STATUS      = 160, -- Additional effect: <Status Effect>.
     ADD_EFFECT_HP_DRAIN    = 161, -- Additional effect: <number> HP drained from <target>.
     ADD_EFFECT_MP_DRAIN    = 162, -- Additional effect: <number> MP drained from <target>.
     ADD_EFFECT_DMG         = 163, -- Additional effect: <number> points of damage.
+    ADD_EFFECT_DMG_2       = 229, -- Additional effect: The <target> takes <number> additional points of damage.
     ADD_EFFECT_STATUS_2    = 164, -- Additional effect: <Status Effect>. (Duplicate?)
     ADD_EFFECT_TP_DRAIN    = 165, -- Additional effect: <number> TP drained from <target>.
-    ADD_EFFECT_STATUS_3    = 166, -- Additional effect: The <target> gains the effect of <Status Effect>. (Only difference from 160 and 164 is "The")
+    ADD_EFFECT_SELFBUFF    = 166, -- Additional effect: <player> gains the effect of <Status Effect>.
     ADD_EFFECT_HP_HEAL     = 167, -- Additional effect: The <player> recovers <number> HP.
     ADD_EFFECT_DISPEL      = 168, -- Additional effect: <target>'s <Status Effect> effect disappears!
     ADD_EFFECT_WARP        = 169, -- Additional effect: Warp! (used by Halloween staves)
@@ -250,15 +262,16 @@ xi.msg.basic =
     ADD_EFFECT_HEAL        = 384, -- Additional effect: <target> recovers <number> HP.
 
     -- Status
-    RECOVERS_HP             = 24,   -- ${target} recovers ${number} HP.
-    RECOVERS_MP             = 25,   -- ${target} recovers ${number} MP.
-    RECOVERS_HP_AND_MP      = 26,   -- ${target} recovers ${number} HP and MP.
-    IS_STATUS               = 203,  -- ${target} is ${status}.
-    IS_NO_LONGER_STATUS     = 204,  -- ${target} is no longer ${status}.
-    GAINS_EFFECT_OF_STATUS  = 205,  -- ${target} gains the effect of ${status}.
-    STATUS_WEARS_OFF        = 206,  -- ${target}'s ${status} effect wears off.
-    ABOUT_TO_WEAR_OFF       = 251,  -- The effect of ${status} is about to wear off.
-    ALL_ABILITIES_RECHARGED = 361,  -- All of ${target}'s abilities are recharged.
+    RECOVERS_HP             = 24,   -- <target> recovers <number> HP.
+    RECOVERS_MP             = 25,   -- <target> recovers <number> MP.
+    RECOVERS_HP_AND_MP      = 26,   -- <target> recovers <number> HP and MP.
+    IS_PARALYZED_2          = 84,   -- <target> is paralyzed.
+    IS_STATUS               = 203,  -- <target> is <status>.
+    IS_NO_LONGER_STATUS     = 204,  -- <target> is no longer <status>.
+    GAINS_EFFECT_OF_STATUS  = 205,  -- <target> gains the effect of <status>.
+    STATUS_WEARS_OFF        = 206,  -- <target>'s <status> effect wears off.
+    ABOUT_TO_WEAR_OFF       = 251,  -- The effect of <status> is about to wear off.
+    ALL_ABILITIES_RECHARGED = 361,  -- All of <target>'s abilities are recharged.
 
     -- Battlefield
     UNABLE_TO_ACCESS_SJ     = 107, -- <player> is temporarily unable to access support job abilities
@@ -295,6 +308,12 @@ xi.msg.basic =
     COVER_SUCCESS          = 311, -- The <player> covers <target>.
     COVER_FAILURE          = 312, -- The <player>'s attempt to cover has no effect.
 
+    -- PUP
+    AUTO_EXCEEDS_CAPACITY  = 745, -- Your automaton exceeds one or more elemental capacity values and cannot be activated.
+    AUTO_OVERLOAD_CHANCE   = 798, -- The <pet>'s overload chance is <number>%.
+    AUTO_OVERLOADED        = 799, -- The <pet>'s overload chance is <number>%. The <pet> is overloaded!
+    PROVOKE_SWITCH         = 418, -- The <actor> uses <action> on <target>. The <target> switches to <actor>!
+
     -- DNC
     NO_FINISHINGMOVES      = 524, -- You have not earned enough finishing moves to perform that action.
     SPECTRAL_JIG           = 532, -- <user> uses <ability>. <target> receives the effect of Sneak and Invisible.
@@ -307,24 +326,33 @@ xi.msg.basic =
     LUOPAN_HP_RATE_UP      = 664, -- <player> uses <ability>. The luopan's HP consumption rate has been increased.
     HAS_LUOPON_NO_USE      = 665, -- <player> has a pet. Unable to use ability.
 
+    --- RUN
+    REQUIRE_RUNE           = 666, -- That action requires the ability Rune Enchantment.
+    SWORDPLAY_GAIN         = 667, -- <Player> uses <Ability>. Accuracy and evasion are enhanced.
+    VALLATION_GAIN         = 668, -- <Target> receives the effect of Vallation, reducing damage taken from certain elemental magic spells. -- Vallation and Valiance both use this message for the RUN using the ja
+    VALIANCE_GAIN_PARTY    = 669, -- Magic damage of a certain element is reduced for <Target>                                             -- This message is when a party member recieves the aoe effect of Valiance
+    LIEMENT_GAIN           = 670, -- <Player> uses <Ability>. <Target> can now absorb magic damage of a certain element.
+    PFLUG_GAIN             = 671, -- <Player> uses <Ability>. <Target> now has enhanced resistance.
+    GAMBIT_GAIN            = 672, -- <Player> uses <Ability>. <Target> receives the effect of Gambit, reducing magic defense against magic of a certain element.
+
     -- Fields / Grounds of Valor
-    FOV_DEFEATED_TARGET     = 558,  -- You defeated a designated target.${lb}(Progress: ${number}/${number2})
+    FOV_DEFEATED_TARGET     = 558,  -- You defeated a designated target.<br>(Progress: <number>/<number2>)
     FOV_COMPLETED_REGIME    = 559,  -- You have successfully completed the training regime.
-    FOV_OBTAINS_GIL         = 565,  -- ${target} obtains ${gil}.
-    FOV_OBTAINS_TABS        = 566,  -- ${target} obtains ${number} tab.${lb}(Total: ${number})
+    FOV_OBTAINS_GIL         = 565,  -- <target> obtains <gil>.
+    FOV_OBTAINS_TABS        = 566,  -- <target> obtains <number> tab.<br>(Total: <number>)
     FOV_REGIME_BEGINS_ANEW  = 643,  -- Your current training regime will begin anew!
 
     -- Magian Trials
     MAGIAN_TRIAL_COMPLETE   = 584,  -- You have completed Trial <trialID>. Report your success to a Magian Moogle.
 
     -- Depoil Statuses
-    DESPOIL_ATT_DOWN        = 593,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Attack Down.
-    DESPOIL_DEF_DOWN        = 594,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Defense Down.
-    DESPOIL_MATT_DOWN       = 595,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Magic Atk. Down.
-    DESPOIL_MDEF_DOWN       = 596,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Magic Def. Down.
-    DESPOIL_EVA_DOWN        = 597,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Evasion Down.
-    DESPOIL_ACC_DOWN        = 598,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Accuracy Down.
-    DESPOIL_SLOW            = 599,  -- ${actor} uses ${ability}.${lb}${actor} steals a ${item} from ${target}.${lb}Additional effect: ${target} is afflicted with Slow.
+    DESPOIL_ATT_DOWN        = 593,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Attack Down.
+    DESPOIL_DEF_DOWN        = 594,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Defense Down.
+    DESPOIL_MATT_DOWN       = 595,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Magic Atk. Down.
+    DESPOIL_MDEF_DOWN       = 596,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Magic Def. Down.
+    DESPOIL_EVA_DOWN        = 597,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Evasion Down.
+    DESPOIL_ACC_DOWN        = 598,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Accuracy Down.
+    DESPOIL_SLOW            = 599,  -- <actor> uses <ability>.<br><actor> steals a <item> from <target>.<br>Additional effect: <target> is afflicted with Slow.
 
     -- Records of Eminence
     ROE_COMPLETE            = 690,  -- You have completed the following Records of Eminence objective: <record>.
@@ -346,6 +374,16 @@ xi.msg.basic =
     -- TRUST & ALTER EGO
     TRUST_NO_CAST_TRUST     = 700,  -- You are unable to use Trust magic at this time.
     TRUST_NO_CALL_AE        = 717,  -- You cannot call forth alter egos here.
+}
+
+-- Used to modify certain basic messages.
+xi.msg.actionModifier =
+{
+    NONE        = 0x00,
+    COVER       = 0x01,
+    RESIST      = 0x02, -- Resist! <Regular message> -- Used for resist traits triggers.
+    MAGIC_BURST = 0x04, -- Currently known to be used for Swipe/Lunge only
+    IMMUNOBREAK = 0x08,
 }
 
 -----------------------------------

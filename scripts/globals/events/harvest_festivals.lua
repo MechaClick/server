@@ -10,20 +10,26 @@ function isHalloweenEnabled()
     local option = 0
     local month = tonumber(os.date("%m"))
     local day = tonumber(os.date("%d"))
-    if (month == 10 and day >= 20 or month == 11 and day == 1 or HALLOWEEN_YEAR_ROUND ~= 0) then -- According to wiki Harvest Fest is Oct 20 - Nov 1.
-        if (HALLOWEEN_2005 == 1) then
+
+    if
+        month == 10 and day >= 20 or
+        month == 11 and day == 1 or
+        xi.settings.main.HALLOWEEN_YEAR_ROUND ~= 0
+    then
+        -- According to wiki Harvest Fest is Oct 20 - Nov 1.
+        if xi.settings.main.HALLOWEEN_2005 == 1 then
             option = 1
-        elseif (HALLOWEEN_2008 == 1) then
-            option = 2
-        elseif (HALLOWEEN_2009 == 1) then
-            option = 3
-        elseif (HALLOWEEN_2010 == 1) then
-            option = 4
+        -- elseif HALLOWEEN_2008 == 1 then
+        --     option = 2
+        -- elseif HALLOWEEN_2009 == 1 then
+        --     option = 3
+        -- elseif HALLOWEEN_2010 == 1 then
+        --     option = 4
         end
     end
+
     return option
 end
-
 
 local function halloweenItemsCheck(player)
     local headSlot = player:getEquipID(xi.slot.HEAD)
@@ -36,38 +42,40 @@ local function halloweenItemsCheck(player)
     local trickStaff = 17565
     local trickStaff2 = 17587
 
-    local reward_list = {pumpkinHead, pumpkinHead2, trickStaff, trickStaff2}
+    local rewardList = { pumpkinHead, pumpkinHead2, trickStaff, trickStaff2 }
 
     -- Checks for HQ Upgrade
-    for ri = 1, #reward_list do
-        if (headSlot == reward_list[ri] or mainHand == reward_list[ri]) then
-            if (headSlot == pumpkinHead and player:hasItem(13917) == false) then
+    for ri = 1, #rewardList do
+        if headSlot == rewardList[ri] or mainHand == rewardList[ri] then
+            if headSlot == pumpkinHead and not player:hasItem(13917) then
                 reward = 13917 -- Horror Head
-            elseif (headSlot == pumpkinHead2 and player:hasItem(15177) == false) then
+            elseif headSlot == pumpkinHead2 and not player:hasItem(15177) then
                 reward = 15177 -- Horror Head II
-            elseif (mainHand == trickStaff and player:hasItem(17566) == false) then
+            elseif mainHand == trickStaff and not player:hasItem(17566) then
                 reward =  17566 -- Treat Staff
-            elseif (mainHand == trickStaff2 and player:hasItem(17588) == false) then
+            elseif mainHand == trickStaff2 and not player:hasItem(17588) then
                 reward = 17588 -- Treat Staff II
             end
+
             return reward
         end
     end
 
     -- Checks the possible item rewards to ensure player doesnt already have the item we are about to give them
-    local cnt = #reward_list
+    local cnt = #rewardList
 
     while cnt ~= 0 do
-        local picked = reward_list[math.random(1, #reward_list)]
-        if (player:hasItem(picked) == false) then
+        local picked = rewardList[math.random(1, #rewardList)]
+        if not player:hasItem(picked) then
             reward = picked
             cnt = 0
         else
-            table.remove(reward_list, picked)
+            table.remove(rewardList, picked)
             cnt = cnt - 1
         end
-    return reward
     end
+
+    return reward
 end
 
 function onHalloweenTrade(player, trade, npc)
@@ -79,11 +87,11 @@ function onHalloweenTrade(player, trade, npc)
     -----------------------------------
     -- 2005 edition
     -----------------------------------
-    if (contentEnabled == 1) then
+    if contentEnabled == 1 then
         -----------------------------------
         -- Treats allowed
         -----------------------------------
-        local treats_table =
+        local treatsTable =
         {
             4510, -- Acorn Cookie
             5646, -- Bloody Chocolate
@@ -130,13 +138,12 @@ function onHalloweenTrade(player, trade, npc)
             5627, -- Yogurt Cake
         }
 
-        for itemInList = 1, #treats_table  do
-
-            if (item == treats_table[itemInList]) then
+        for itemInList = 1, #treatsTable do
+            if item == treatsTable[itemInList] then
                 local itemReward = halloweenItemsCheck(player)
                 local varName = "harvestFestTreats"
                 local harvestFestTreats
-                if (itemInList < 32) then -- The size of the list is too big for int 32 used that stores the bit mask, as such there are two lists
+                if itemInList < 32 then -- The size of the list is too big for int 32 used that stores the bit mask, as such there are two lists
 
                     harvestFestTreats = player:getCharVar(varName)
                 else
@@ -146,14 +153,19 @@ function onHalloweenTrade(player, trade, npc)
                     itemInList = itemInList - 32
                 end
 
-                local AlreadyTradedChk = utils.mask.getBit(harvestFestTreats, itemInList)
-                if (itemReward ~= 0 and player:getFreeSlotsCount() >= 1 and math.random(1, 3) < 2) then -- Math.random added so you have 33% chance on getting item
+                local alreadyTradedChk = utils.mask.getBit(harvestFestTreats, itemInList)
+                if
+                    itemReward ~= 0 and
+                    player:getFreeSlotsCount() >= 1 and
+                    math.random(1, 3) < 2
+                then
+                    -- Math.random added so you have 33% chance on getting item
 
                     player:messageSpecial(ID.text.HERE_TAKE_THIS)
                     player:addItem(itemReward)
                     player:messageSpecial(ID.text.ITEM_OBTAINED, itemReward)
 
-                elseif player:canUseMisc(xi.zoneMisc.COSTUME) and not AlreadyTradedChk then
+                elseif player:canUseMisc(xi.zoneMisc.COSTUME) and not alreadyTradedChk then
                 -- Other neat looking halloween type costumes
                 -- two dragon skins: @420/421
                 -- @422 dancing weapon
@@ -167,48 +179,52 @@ function onHalloweenTrade(player, trade, npc)
                 -- 564/579 skele
 
                     -- Possible costume values:
-                    local Yagudo = math.random(580, 607)
-                    local Quadav = math.random(644, 671)
-                    local Shade = math.random(535, 538)
-                    local Orc = math.random(612, 639)
-                    local Ghost = 368
-                    local Hound = 365
-                    local Skeleton = 564
-                    local Dark_Stalker = math.random(531, 534)
+                    local yagudo = math.random(580, 607)
+                    local quadav = math.random(644, 671)
+                    local shade = math.random(535, 538)
+                    local orc = math.random(612, 639)
+                    local ghost = 368
+                    local hound = 365
+                    local skeleton = 564
+                    local darkStalker = math.random(531, 534)
 
-                    local halloween_costume_list = {Quadav, Orc, Yagudo, Shade, Ghost, Hound, Skeleton, Dark_Stalker}
+                    local halloweenCostumeList = { quadav, orc, yagudo, shade, ghost, hound, skeleton, darkStalker }
 
-                    local costumePicked = halloween_costume_list[math.random(1, #halloween_costume_list)] -- will randomly pick one of the costumes in the list
+                    local costumePicked = halloweenCostumeList[math.random(1, #halloweenCostumeList)] -- will randomly pick one of the costumes in the list
                     player:addStatusEffect(xi.effect.COSTUME, costumePicked, 0, 3600)
 
                     -- pitchForkCostumeList defines the special costumes per zone that can trigger the pitch fork requirement
                     -- zone, costumeID
                     local pitchForkCostumeList =
                     {
-                        234, Shade, Skeleton, -- Bastok mines
-                        235, Hound, Ghost,    -- Bastok Markets
-                        230, Ghost, Skeleton, -- Southern Sandoria
-                        231, Hound, Skeleton, -- Northern Sandoria
-                        241, Ghost, Shade,    -- Windurst Woods
-                        238, Shade, Hound     -- Windurst Woods
+                        234, shade, skeleton, -- Bastok mines
+                        235, hound, ghost,    -- Bastok Markets
+                        230, ghost, skeleton, -- Southern Sandoria
+                        231, hound, skeleton, -- Northern Sandoria
+                        241, ghost, shade,    -- Windurst Woods
+                        238, shade, hound     -- Windurst Woods
                     }
 
                     for zi = 1, #pitchForkCostumeList, 3 do
-
-                        if (zone == pitchForkCostumeList[zi] and (costumePicked == pitchForkCostumeList[zi + 1] or zone == pitchForkCostumeList[zi] and costumePicked == pitchForkCostumeList[zi + 2])) then -- Gives special hint for pitch fork costume
+                        if
+                            zone == pitchForkCostumeList[zi] and
+                            (
+                                costumePicked == pitchForkCostumeList[zi + 1] or
+                                zone == pitchForkCostumeList[zi] and
+                                costumePicked == pitchForkCostumeList[zi + 2]
+                            )
+                        then -- Gives special hint for pitch fork costume
                             player:messageSpecial(ID.text.IF_YOU_WEAR_THIS)
 
-                        elseif (zi == 16) then
+                        elseif zi == 16 then
                             player:messageSpecial(ID.text.THANK_YOU_TREAT)
-
                         end
-
                     end
                 else
                     player:messageSpecial(ID.text.THANK_YOU)
                 end
 
-                if not AlreadyTradedChk then
+                if not alreadyTradedChk then
                     player:setCharVar(varName, utils.mask.setBit(harvestFestTreats, itemInList, true))
                 end
 
@@ -227,7 +243,7 @@ function applyHalloweenNpcCostumes(zoneid)
             for id, skin in pairs(skins) do
                 local npc = GetNPCByID(id)
                 if npc then
-                    npc:changeSkin(skin)
+                    npc:setModelId(skin)
                 end
             end
         end

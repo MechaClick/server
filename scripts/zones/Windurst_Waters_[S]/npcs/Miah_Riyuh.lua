@@ -17,35 +17,48 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local Allegiance = player:getCampaignAllegiance()
+    local allegiance = player:getCampaignAllegiance()
     -- 0 = none, 1 = San d'Oria Iron Rams, 2 = Bastok Fighting Fourth, 3 = Windurst Cobras
 
-    local TheFightingFourth = player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.THE_FIGHTING_FOURTH)
-    local SnakeOnThePlains = player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SNAKE_ON_THE_PLAINS)
-    local SteamedRams = player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.STEAMED_RAMS)
-    local GreenLetter = player:hasKeyItem(xi.ki.GREEN_RECOMMENDATION_LETTER)
+    local theFightingFourth = player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.THE_FIGHTING_FOURTH)
+    local snakeOnThePlains = player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SNAKE_ON_THE_PLAINS)
+    local steamedRams = player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.STEAMED_RAMS)
+    local greenLetter = player:hasKeyItem(xi.ki.GREEN_RECOMMENDATION_LETTER)
 
-    if SteamedRams == QUEST_ACCEPTED or TheFightingFourth == QUEST_ACCEPTED then
+    if steamedRams == QUEST_ACCEPTED or theFightingFourth == QUEST_ACCEPTED then
         player:startEvent(122)
-    elseif SnakeOnThePlains == QUEST_AVAILABLE and GreenLetter then
+    elseif snakeOnThePlains == QUEST_AVAILABLE and greenLetter then
         player:startEvent(103)
-    elseif SnakeOnThePlains == QUEST_AVAILABLE and player:getCharVar("GREEN_R_LETTER_USED") == 1 then
+    elseif
+        snakeOnThePlains == QUEST_AVAILABLE and
+        player:getCharVar("GREEN_R_LETTER_USED") == 1
+    then
         player:startEvent(105)
-    elseif SnakeOnThePlains == QUEST_ACCEPTED and utils.mask.isFull(player:getCharVar("SEALED_DOORS"), 3) then
+    elseif
+        snakeOnThePlains == QUEST_ACCEPTED and
+        utils.mask.isFull(player:getCharVar("SEALED_DOORS"), 3)
+    then
         player:startEvent(106)
-    elseif SnakeOnThePlains == QUEST_ACCEPTED and player:hasKeyItem(xi.ki.ZONPAZIPPAS_ALLPURPOSE_PUTTY) then
-        local PuttyUsed = 0
+    elseif
+        snakeOnThePlains == QUEST_ACCEPTED and
+        player:hasKeyItem(xi.ki.ZONPA_ZIPPAS_ALL_PURPOSE_PUTTY)
+    then
+        local puttyUsed = 0
+
         if utils.mask.getBit(player:getCharVar("SEALED_DOORS"), 0) then
-            PuttyUsed = PuttyUsed +1
+            puttyUsed = puttyUsed + 1
         end
+
         if utils.mask.getBit(player:getCharVar("SEALED_DOORS"), 1) then
-            PuttyUsed = PuttyUsed +1
+            puttyUsed = puttyUsed + 1
         end
+
         if utils.mask.getBit(player:getCharVar("SEALED_DOORS"), 2) then
-            PuttyUsed = PuttyUsed +1
+            puttyUsed = puttyUsed + 1
         end
-        player:startEvent(104, 0, 0, 0, 0, 0, 0, 0, PuttyUsed)
-    elseif SnakeOnThePlains == QUEST_COMPLETED and Allegiance == 3 then
+
+        player:startEvent(104, 0, 0, 0, 0, 0, 0, 0, puttyUsed)
+    elseif snakeOnThePlains == QUEST_COMPLETED and allegiance == 3 then
         player:startEvent(107)
     else
         player:startEvent(121)
@@ -58,23 +71,23 @@ end
 entity.onEventFinish = function(player, csid, option)
     if csid == 103 and option == 0 then
         player:addQuest(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SNAKE_ON_THE_PLAINS)
-        player:addKeyItem(xi.ki.ZONPAZIPPAS_ALLPURPOSE_PUTTY)
+        player:addKeyItem(xi.ki.ZONPA_ZIPPAS_ALL_PURPOSE_PUTTY)
         player:setCharVar("GREEN_R_LETTER_USED", 1)
         player:delKeyItem(xi.ki.GREEN_RECOMMENDATION_LETTER)
-        player:messageSpecial(ID.text.KEYITEM_OBTAINED, xi.ki.ZONPAZIPPAS_ALLPURPOSE_PUTTY)
+        player:messageSpecial(ID.text.KEYITEM_OBTAINED, xi.ki.ZONPA_ZIPPAS_ALL_PURPOSE_PUTTY)
     elseif csid == 103 and option == 1 then
         player:setCharVar("GREEN_R_LETTER_USED", 1)
         player:delKeyItem(xi.ki.GREEN_RECOMMENDATION_LETTER)
     elseif csid == 104 and option == 1 then
         player:delQuest(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SNAKE_ON_THE_PLAINS)
-        player:delKeyItem(xi.ki.ZONPAZIPPAS_ALLPURPOSE_PUTTY)
+        player:delKeyItem(xi.ki.ZONPA_ZIPPAS_ALL_PURPOSE_PUTTY)
         player:setCharVar("SEALED_DOORS", 0)
     elseif csid == 105 and option == 0 then
         player:addQuest(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SNAKE_ON_THE_PLAINS)
-        player:addKeyItem(xi.ki.ZONPAZIPPAS_ALLPURPOSE_PUTTY)
+        player:addKeyItem(xi.ki.ZONPA_ZIPPAS_ALL_PURPOSE_PUTTY)
         player:setCharVar("GREEN_R_LETTER_USED", 1)
         player:delKeyItem(xi.ki.GREEN_RECOMMENDATION_LETTER)
-        player:messageSpecial(ID.text.KEYITEM_OBTAINED, xi.ki.ZONPAZIPPAS_ALLPURPOSE_PUTTY)
+        player:messageSpecial(ID.text.KEYITEM_OBTAINED, xi.ki.ZONPA_ZIPPAS_ALL_PURPOSE_PUTTY)
     elseif csid == 106 and option == 0 then
         -- Is first join, so add Sprinter's Shoes and bronze medal
         if player:getCharVar("Campaign_Nation") == 0 then

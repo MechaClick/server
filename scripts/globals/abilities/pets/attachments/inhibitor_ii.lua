@@ -2,38 +2,27 @@
 -- Attachment: Inhibitor II
 -----------------------------------
 require("scripts/globals/automaton")
-require("scripts/globals/status")
 -----------------------------------
-local attachment_object = {}
+local attachmentObject = {}
 
-attachment_object.onEquip = function(pet)
-    updateModPerformance(pet, xi.mod.STORETP, 'inhibitor_ii_mod', 10)
-    pet:addMod(xi.mod.AUTO_TP_EFFICIENCY, 900)
+attachmentObject.onEquip = function(pet, attachment)
+    xi.automaton.onAttachmentEquip(pet, attachment)
 end
 
-attachment_object.onUnequip = function(pet)
-    updateModPerformance(pet, xi.mod.STORETP, 'inhibitor_ii_mod', 0)
-    pet:delMod(xi.mod.AUTO_TP_EFFICIENCY, 900)
+attachmentObject.onUnequip = function(pet, attachment)
+    xi.automaton.onAttachmentUnequip(pet, attachment)
 end
 
-attachment_object.onManeuverGain = function(pet, maneuvers)
-    attachment_object.onUpdate(pet, maneuvers)
+attachmentObject.onManeuverGain = function(pet, attachment, maneuvers)
+    xi.automaton.onManeuverGain(pet, attachment, maneuvers)
 end
 
-attachment_object.onManeuverLose = function(pet, maneuvers)
-    attachment_object.onUpdate(pet, maneuvers - 1)
+attachmentObject.onManeuverLose = function(pet, attachment, maneuvers)
+    xi.automaton.onManeuverLose(pet, attachment, maneuvers)
 end
 
-attachment_object.onUpdate = function(pet, maneuvers)
-    if maneuvers == 0 then
-        updateModPerformance(pet, xi.mod.STORETP, 'inhibitor_ii_mod', 10)
-    elseif maneuvers == 1 then
-        updateModPerformance(pet, xi.mod.STORETP, 'inhibitor_ii_mod', 25)
-    elseif maneuvers == 2 then
-        updateModPerformance(pet, xi.mod.STORETP, 'inhibitor_ii_mod', 40)
-    elseif maneuvers == 3 then
-        updateModPerformance(pet, xi.mod.STORETP, 'inhibitor_ii_mod', 65)
-    end
+attachmentObject.onUpdate = function(pet, attachment, maneuvers)
+    xi.automaton.updateAttachmentModifier(pet, attachment, maneuvers)
 end
 
-return attachment_object
+return attachmentObject

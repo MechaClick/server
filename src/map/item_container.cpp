@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../common/showmsg.h"
+#include "../common/logging.h"
 
 #include <cstring>
 
@@ -44,7 +44,7 @@ CItemContainer::~CItemContainer()
 {
     for (uint8 SlotID = 0; SlotID <= m_size; ++SlotID)
     {
-        delete m_ItemList[SlotID];
+        destroy(m_ItemList[SlotID]);
     }
 }
 
@@ -65,7 +65,7 @@ uint8 CItemContainer::GetFreeSlotsCount() const
 
 /************************************************************************
  *                                                                       *
- *  Установка размера контейнера                                         *
+ *  Setting the size of the container                                    *
  *                                                                       *
  ************************************************************************/
 
@@ -77,16 +77,16 @@ uint16 CItemContainer::GetBuff() const
 uint8 CItemContainer::AddBuff(int8 buff)
 {
     m_buff += buff;
-    return SetSize(std::min<uint8>((uint8)m_buff, 80)); // ограничение в 80 ячеек для персонажа
+    return SetSize(std::clamp<uint8>((uint8)m_buff, 0, 80)); // Limit in 0-80 cells for character
 }
 
 /************************************************************************
  *                                                                       *
- *  Установка размера контейнера                                         *
+ *  Setting the size of the container                                    *
  *                                                                       *
  ************************************************************************/
 
-// контейнер не несет ответственности за то, что предметы могут остаться за пределами размера
+// The container is not responsible for the fact that items can remain outside the size.
 
 uint8 CItemContainer::SetSize(uint8 size)
 {
@@ -98,7 +98,7 @@ uint8 CItemContainer::SetSize(uint8 size)
             return m_size;
         }
     }
-    ShowDebug(CL_CYAN "ItemContainer <%u>: Bad new container size %u\n" CL_RESET, m_id, size);
+    ShowDebug("ItemContainer <%u>: Bad new container size %u", m_id, size);
     return -1;
 }
 
@@ -122,7 +122,7 @@ uint8 CItemContainer::AddSize(int8 size)
             return m_size;
         }
     }
-    ShowDebug(CL_CYAN "ItemContainer <%u>: Bad new container size %u\n" CL_RESET, m_id, newsize);
+    ShowDebug("ItemContainer <%u>: Bad new container size %u", m_id, newsize);
     return -1;
 }
 
@@ -149,16 +149,16 @@ uint8 CItemContainer::InsertItem(CItem* PItem)
             return SlotID;
         }
     }
-    ShowDebug("ItemContainer: Container is full\n");
+    ShowDebug("ItemContainer: Container is full");
 
-    // delete PItem;//todo: what if the item is a valid item??
+    // destroy(PItem); //TODO: what if the item is a valid item??
     return ERROR_SLOTID;
 }
 
 /************************************************************************
- *																		*
- *  Добавляем предмет в указанную ячейку. nullptr удаляет предмет			*
- *																		*
+ *                                                                        *
+ *  Добавляем предмет в указанную ячейку. nullptr удаляет предмет            *
+ *                                                                        *
  ************************************************************************/
 
 uint8 CItemContainer::InsertItem(CItem* PItem, uint8 SlotID)
@@ -183,9 +183,9 @@ uint8 CItemContainer::InsertItem(CItem* PItem, uint8 SlotID)
         m_ItemList[SlotID] = PItem;
         return SlotID;
     }
-    ShowDebug("ItemContainer: SlotID %i is out of range\n", SlotID);
+    ShowDebug("ItemContainer: SlotID %i is out of range", SlotID);
 
-    delete PItem;
+    destroy(PItem);
     return ERROR_SLOTID;
 }
 
@@ -251,7 +251,7 @@ void CItemContainer::Clear()
 {
     for (uint8 SlotID = 0; SlotID <= m_size; ++SlotID)
     {
-        delete m_ItemList[SlotID];
+        destroy(m_ItemList[SlotID]);
         m_ItemList[SlotID] = nullptr;
     }
 }

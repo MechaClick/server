@@ -3,16 +3,13 @@
 --  Mob: Onryo
 -- Involved in Quest: Yomi Okuri
 -----------------------------------
-require("scripts/globals/keyitems")
------------------------------------
 local entity = {}
 
-entity.onMobDeath = function(mob, player, isKiller)
+entity.onMobInitialize = function(mob)
+    mob:setMobMod(xi.mobMod.IDLE_DESPAWN, 180)
+end
 
-    if (player:hasKeyItem(xi.ki.YOMOTSU_HIRASAKA)) then
-        player:addCharVar("OkuriNMKilled", 1)
-    end
-
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

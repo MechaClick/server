@@ -10,7 +10,6 @@ require("scripts/globals/quests")
 -----------------------------------
 local entity = {}
 
-
 --    player:startEvent(110) -- standar dialog
 --    player:startEvent(115) -- i have enough for now, come later
 --    player:startEvent(114) -- get me x as soon as you can
@@ -19,7 +18,10 @@ local entity = {}
 --    player:startEvent(112) -- repeat quest
 
 entity.onTrade = function(player, npc, trade)
-    if player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE) == QUEST_ACCEPTED or player:getCharVar("QuestAPotterPrefeRepeat_var") == 1 then
+    if
+        player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE) == QUEST_ACCEPTED or
+        player:getCharVar("QuestAPotterPrefeRepeat_var") == 1
+    then
         if npcUtil.tradeHas(trade, 569) then
             player:startEvent(113) -- quest done!
         end
@@ -27,12 +29,18 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    if player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE) == QUEST_AVAILABLE and player:getFameLevel(WINDURST) > 5 then
+    if
+        player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE) == QUEST_AVAILABLE and
+        player:getFameLevel(xi.quest.fame_area.WINDURST) > 5
+    then
         player:startEvent(111, 569) -- start quest A Potter's Preference
     elseif player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE) == QUEST_ACCEPTED then
         player:startEvent(114, 569) -- get me dish_of_gusgen_clay  as soon as you can
     elseif player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE) == QUEST_COMPLETED then
-        if player:getCharVar("QuestAPotterPrefeCompDay_var")+7 < VanadielDayOfTheYear() or player:getCharVar("QuestAPotterPrefeCompYear_var") < VanadielYear() then
+        if
+            player:getCharVar("QuestAPotterPrefeCompDay_var") + 7 < VanadielDayOfTheYear() or
+            player:getCharVar("QuestAPotterPrefeCompYear_var") < VanadielYear()
+        then
             -- seven days after copletition, allow to do the quest again
             player:startEvent(112) -- repeat quest
         else
@@ -51,9 +59,8 @@ entity.onEventFinish = function(player, csid, option)
         player:addQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_POTTER_S_PREFERENCE)
     elseif csid == 113 then --quest completed
         player:confirmTrade()
-        player:addFame(WINDURST, 120)
-        player:addGil(GIL_RATE*2160)
-        player:messageSpecial(ID.text.GIL_OBTAINED, GIL_RATE*2160)
+        player:addFame(xi.quest.fame_area.WINDURST, 120)
+        npcUtil.giveCurrency(player, 'gil', 2160)
         player:setCharVar("QuestAPotterPrefeRepeat_var", 0)
         player:setCharVar("QuestAPotterPrefeCompDay_var", VanadielDayOfTheYear())
         player:setCharVar("QuestAPotterPrefeCompYear_var", VanadielYear())

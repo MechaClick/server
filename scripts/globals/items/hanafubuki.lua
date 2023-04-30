@@ -1,18 +1,18 @@
 -----------------------------------
 -- ID: 18427
 -- Item: Hanafubuki
--- Item Effect: TP +10
+-- Item Effect: TP +100
 -- Durration: Instant
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     local result = 0
     return result
 end
 
-item_object.onItemUse = function(target)
+itemObject.onItemUse = function(target)
     target:addTP(100)
 end
 
-return item_object
+return itemObject

@@ -4,14 +4,14 @@
 -- Type: Adoulin Fame Checking NPC
 -- !pos -61.044 -0.150 -5.239 257
 -----------------------------------
-require('scripts/globals/log_ids')
+require('scripts/globals/quests')
 -----------------------------------
 
 local entity = {}
 
 entity.onTrigger = function(player, npc)
     local imprimatursSpent = 0 -- TODO: Confirm this
-    local adoulinFame = player:getFameLevel(ADOULIN)
+    local adoulinFame = player:getFameLevel(xi.quest.fame_area.ADOULIN)
 
     -- TODO: Hook these up
     local pioneersRank = 0
@@ -22,9 +22,9 @@ entity.onTrigger = function(player, npc)
     local mummersRank = 0
 
     player:startEvent(562,
-                      imprimatursSpent, adoulinFame,
-                      pioneersRank, peacekeepersRank, couriersRank,
-                      scoutsRank, inventorsRank, mummersRank)
+        imprimatursSpent, adoulinFame,
+        pioneersRank, peacekeepersRank, couriersRank,
+        scoutsRank, inventorsRank, mummersRank)
 end
 
 return entity

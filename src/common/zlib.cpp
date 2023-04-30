@@ -1,13 +1,13 @@
 ﻿#include "../common/zlib.h"
-#include "../common/showmsg.h"
+#include "../common/logging.h"
 #include <cassert>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
 
-#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) || (defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN) ||                          \
-    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) ||                \
+#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) || (defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN) ||           \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) || \
     defined(__MIBSEB__)
 #define XI_BIG_ENDIAN 1
 #else
@@ -62,12 +62,12 @@ static void swap32_if_be(const uint32* v, const size_t memb)
 #endif
 }
 
-static bool read_to_vector(const std::string& file, std::vector<uint32>& vec)
+static bool read_to_vector(std::string const& file, std::vector<uint32>& vec)
 {
     std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(file.c_str(), "rb"), &fclose);
     if (!fp)
     {
-        ShowFatalError("zlib: can't open file <%s>\n", file.c_str());
+        ShowCritical("zlib: can't open file <%s>", file.c_str());
         return false;
     }
 
@@ -78,7 +78,7 @@ static bool read_to_vector(const std::string& file, std::vector<uint32>& vec)
     vec.resize(size / sizeof(uint32));
     if (fread(vec.data(), sizeof(uint32), vec.size(), fp.get()) != vec.size())
     {
-        ShowFatalError("zlib: can't read file <%s>: %s\n", file.c_str(), strerror(errno));
+        ShowCritical("zlib: can't read file <%s>: %s", file.c_str(), strerror(errno));
         return false;
     }
 
@@ -132,13 +132,13 @@ static int32 zlib_compress_sub(const uint8* b32, const uint32 read, const uint32
 
     if (zlib_compressed_size(elem) > sizeof(uint32))
     {
-        ShowWarning("zlib_compress_sub: element exceeds 4 bytes (%u)\n", elem);
+        ShowWarning("zlib_compress_sub: element exceeds 4 bytes (%u)", elem);
         return -1;
     }
 
     if (zlib_compressed_size(read + elem) > out_sz)
     {
-        ShowWarning("zlib_compress_sub: ran out of space (%u : %u : %u)\n", read, elem, out_sz);
+        ShowWarning("zlib_compress_sub: ran out of space (%u : %u : %u)", read, elem, out_sz);
         return -1;
     }
 
@@ -178,7 +178,7 @@ int32 zlib_compress(const int8* in, const uint32 in_sz, int8* out, const uint32 
         else if (in_sz + 1 >= out_sz)
         {
             // Ran if input doesn't fit output, outputs garbage(?)
-            ShowWarning("zlib_compress: ran out of space, outputting garbage(?) (%u : %u : %u : %u)\n", read, elem, max_sz, in[i]);
+            ShowWarning("zlib_compress: ran out of space, outputting garbage(?) (%u : %u : %u : %u)", read, elem, max_sz, in[i]);
             memset(out, 0, (out_sz / 4) + (in_sz & 3));
             memset(out + 1, in_sz, in_sz / 4);
             memset(out + 1 + in_sz / 4, (in_sz + 1) * 8, in_sz & 3);
@@ -186,7 +186,7 @@ int32 zlib_compress(const int8* in, const uint32 in_sz, int8* out, const uint32 
         }
         else
         {
-            ShowWarning("zlib_compress: ran out of space (%u : %u : %u : %u)\n", read, elem, max_sz, in[i]);
+            ShowWarning("zlib_compress: ran out of space (%u : %u : %u : %u)", read, elem, max_sz, in[i]);
             return -1;
         }
     }
@@ -205,7 +205,7 @@ int32 zlib_decompress(const int8* in, const uint32 in_sz, int8* out, const uint3
 
     if (in[0] != 1)
     {
-        ShowWarning("zlib_decompress: invalid compressed data\n");
+        ShowWarning("zlib_decompress: invalid compressed data");
         return -1;
     }
 
@@ -229,7 +229,7 @@ int32 zlib_decompress(const int8* in, const uint32 in_sz, int8* out, const uint3
 
         if (w >= out_sz)
         {
-            ShowWarning("zlib_decompress: ran out of space (%u : %u)\n", in_sz, out_sz);
+            ShowWarning("zlib_decompress: ran out of space (%u : %u)", in_sz, out_sz);
             return -1;
         }
     }

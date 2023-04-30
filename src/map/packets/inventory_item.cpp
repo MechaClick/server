@@ -19,20 +19,20 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
-#include "../../common/utils.h"
+#include "inventory_item.h"
+
+#include "common/socket.h"
+#include "common/utils.h"
+#include "common/vana_time.h"
 
 #include <cstring>
 
-#include "inventory_item.h"
-
-#include "../utils/itemutils.h"
-#include "../vana_time.h"
+#include "utils/itemutils.h"
 
 CInventoryItemPacket::CInventoryItemPacket(CItem* PItem, uint8 LocationID, uint8 SlotID)
 {
-    this->type = 0x20;
-    this->size = 0x16;
+    this->setType(0x20);
+    this->setSize(0x2C);
 
     ref<uint8>(0x0E) = LocationID;
     ref<uint8>(0x0F) = SlotID;

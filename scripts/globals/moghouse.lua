@@ -1,6 +1,7 @@
 -----------------------------------
 -- Mog House related functions
 -----------------------------------
+require('scripts/globals/items')
 require("scripts/globals/npc_util")
 require("scripts/globals/quests")
 require("scripts/globals/settings")
@@ -15,13 +16,18 @@ xi.moghouse = xi.moghouse or {}
 -----------------------------------
 -- Mog Locker constants
 -----------------------------------
-MOGLOCKER_START_TS = 1009810800 -- unix timestamp for 2001/12/31 15:00
-MOGLOCKER_ALZAHBI_VALID_DAYS = 7
-MOGLOCKER_ALLAREAS_VALID_DAYS = 5
-MOGLOCKER_ACCESS_TYPE_ALZAHBI = 0
-MOGLOCKER_ACCESS_TYPE_ALLAREAS = 1
-MOGLOCKER_PLAYERVAR_ACCESS_TYPE = "mog-locker-access-type"
-MOGLOCKER_PLAYERVAR_EXPIRY_TIMESTAMP = "mog-locker-expiry-timestamp"
+local mogLockerStartTimestamp   = 1009810800 -- unix timestamp for 2001/12/31 15:00
+local mogLockerTimestampVarName = "mog-locker-expiry-timestamp"
+
+xi.moghouse.MOGLOCKER_ALZAHBI_VALID_DAYS    = 7
+xi.moghouse.MOGLOCKER_ALLAREAS_VALID_DAYS   = 5
+xi.moghouse.MOGLOCKER_PLAYERVAR_ACCESS_TYPE = "mog-locker-access-type"
+
+xi.moghouse.lockerAccessType =
+{
+    ALZAHBI  = 0,
+    ALLAREAS = 1,
+}
 
 xi.moghouse.moghouseZones =
 {
@@ -49,245 +55,217 @@ xi.moghouse.moghouseZones =
     xi.zone.EASTERN_ADOULIN,      -- 257
 }
 
+xi.moghouse.moghouse2FUnlockCSs =
+{
+    [xi.zone.SOUTHERN_SAN_DORIA] = 3535,
+    [xi.zone.NORTHERN_SAN_DORIA] = 904,
+    [xi.zone.PORT_SAN_DORIA]     = 820,
+    [xi.zone.BASTOK_MINES]       = 610,
+    [xi.zone.BASTOK_MARKETS]     = 604,
+    [xi.zone.PORT_BASTOK]        = 456,
+    [xi.zone.WINDURST_WATERS]    = 1086,
+    [xi.zone.WINDURST_WALLS]     = 547,
+    [xi.zone.PORT_WINDURST]      = 903,
+    [xi.zone.WINDURST_WOODS]     = 885,
+}
+
 xi.moghouse.isInMogHouseInHomeNation = function(player)
     if not player:isInMogHouse() then
         return false
     end
 
     local currentZone = player:getZoneID()
-    local nation = player:getNation()
+    local nation      = player:getNation()
+
+    -- TODO: Simplify nested conditions
     if nation == xi.nation.BASTOK then
-        if currentZone >= xi.zone.BASTOK_MINES and currentZone <= xi.zone.METALWORKS then
+        if
+            currentZone >= xi.zone.BASTOK_MINES and
+            currentZone <= xi.zone.PORT_BASTOK
+        then
             return true
         end
     elseif nation == xi.nation.SANDORIA then
-        if currentZone >= xi.zone.SOUTHERN_SAN_DORIA and currentZone <= xi.zone.CHATEAU_DORAGUILLE then
+        if
+            currentZone >= xi.zone.SOUTHERN_SAN_DORIA and
+            currentZone <= xi.zone.PORT_SAN_DORIA
+        then
             return true
         end
-    else -- Windurst
-        if currentZone >= xi.zone.WINDURST_WATERS and currentZone <= xi.zone.WINDURST_WOODS then
+    else
+        if
+            currentZone >= xi.zone.WINDURST_WATERS and
+            currentZone <= xi.zone.WINDURST_WOODS
+        then
             return true
         end
     end
+
     return false
 end
 
-function moogleTrade(player, npc, trade)
+xi.moghouse.set2ndFloorStyle = function(player, style)
+    -- 0x0080: This bit and the next track which 2F decoration style is being used (0: SANDORIA, 1: BASTOK, 2: WINDURST, 3: PATIO)
+    -- 0x0100: ^ As above
+    local mhflag = player:getMoghouseFlag()
+    utils.mask.setBit(mhflag, 0x0080, utils.mask.getBit(style, 0))
+    utils.mask.setBit(mhflag, 0x0100, utils.mask.getBit(style, 1))
+    player:setMoghouseFlag(mhflag)
+end
+
+xi.moghouse.onMoghouseZoneIn = function(player, prevZone)
+    local cs = -1
+
+    player:eraseAllStatusEffect()
+    player:setPos(0, 0, 0, 192)
+
+    -- Moghouse data (bit-packed)
+    -- 0x0001: SANDORIA exit quest flag
+    -- 0x0002: BASTOK exit quest flag
+    -- 0x0004: WINDURST exit quest flag
+    -- 0x0008: JEUNO exit quest flag
+    -- 0x0010: WEST_AHT_URHGAN exit quest flag
+    -- 0x0020: Unlocked Moghouse2F flag
+    -- 0x0040: Moghouse 2F tracker flag (0: default, 1: using 2F)
+    -- 0x0080: This bit and the next track which 2F decoration style is being used (0: SANDORIA, 1: BASTOK, 2: WINDURST, 3: PATIO)
+    -- 0x0100: ^ As above
+    local mhflag = player:getMoghouseFlag()
+
+    local growingFlowers   = bit.band(mhflag, 0x0001) > 0
+    local aLadysHeart      = bit.band(mhflag, 0x0002) > 0
+    local flowerChild      = bit.band(mhflag, 0x0004) > 0
+    local unlocked2ndFloor = bit.band(mhflag, 0x0020) > 0
+    local using2ndFloor    = bit.band(mhflag, 0x0040) > 0
+
+    -- NOTE: You can test these quest conditions with:
+    -- Reset: !exec player:setMoghouseFlag(0)
+    -- Complete quests: !exec player:setMoghouseFlag(7)
+    if
+        xi.moghouse.isInMogHouseInHomeNation(player) and
+        growingFlowers and
+        aLadysHeart and
+        flowerChild and
+        not unlocked2ndFloor and
+        not using2ndFloor
+    then
+        cs = xi.moghouse.moghouse2FUnlockCSs[player:getZoneID()]
+
+        player:setMoghouseFlag(mhflag + 0x0020) -- Set unlock flag now, rather than in onEventFinish
+
+        local nation = player:getNation()
+        xi.moghouse.set2ndFloorStyle(player, nation)
+    end
+
+    return cs
+end
+
+xi.moghouse.moogleTrade = function(player, npc, trade)
     if player:isInMogHouse() then
-        local numBronze = trade:getItemQty(2184)
+        local numBronze = trade:getItemQty(xi.items.IMPERIAL_BRONZE_PIECE)
+
         if numBronze > 0 then
-            if addMogLockerExpiryTime(player, numBronze) then
-                -- remove bronze
+            if xi.moghouse.addMogLockerExpiryTime(player, numBronze) then
                 player:tradeComplete()
-                -- send event
-                player:messageSpecial(zones[player:getZoneID()].text.MOG_LOCKER_OFFSET + 2, getMogLockerExpiryTimestamp(player))
+                player:messageSpecial(zones[player:getZoneID()].text.MOG_LOCKER_OFFSET + 2, xi.moghouse.getMogLockerExpiryTimestamp(player))
             end
         end
-
-        local giveMoogleABreak = player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.GIVE_A_MOOGLE_A_BREAK)
-        local theMooglePicnic = player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.THE_MOOGLE_PICNIC)
-        local moogleInTheWild = player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.MOOGLES_IN_THE_WILD)
-        if giveMoogleABreak == QUEST_ACCEPTED and npcUtil.tradeHas(trade, {17161, 13457}) then
-            player:startEvent(30007)
-        elseif theMooglePicnic == QUEST_ACCEPTED and npcUtil.tradeHas(trade, {17402, 615}) then
-            player:startEvent(30011)
-        elseif moogleInTheWild == QUEST_ACCEPTED and npcUtil.tradeHas(trade, {13593, 12474}) then
-            player:startEvent(30015)
-        end
-
-        return true
     end
-    return false
 end
 
-function moogleTrigger(player, npc)
+xi.moghouse.moogleTrigger = function(player, npc)
     if player:isInMogHouse() then
-        local lockerTs = getMogLockerExpiryTimestamp(player)
+        local lockerTs = xi.moghouse.getMogLockerExpiryTimestamp(player)
+
         if lockerTs ~= nil then
-            if lockerTs == -1 then -- expired
-                player:messageSpecial(zones[player:getZoneID()].text.MOG_LOCKER_OFFSET + 1, 2184) -- 2184 is imperial bronze piece item id
+            if lockerTs == -1 then -- Expired
+                player:messageSpecial(zones[player:getZoneID()].text.MOG_LOCKER_OFFSET + 1, xi.items.IMPERIAL_BRONZE_PIECE)
             else
                 player:messageSpecial(zones[player:getZoneID()].text.MOG_LOCKER_OFFSET, lockerTs)
             end
         end
 
-        local homeNationFameLevel = player:getFameLevel(player:getNation())
-        local giveMoogleABreak = player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.GIVE_A_MOOGLE_A_BREAK)
-        local theMooglePicnic = player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.THE_MOOGLE_PICNIC)
-        local moogleInTheWild = player:getQuestStatus(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.MOOGLES_IN_THE_WILD)
-
-        if player:getCharVar("MoghouseExplication") == 1 then
-            player:startEvent(30000)
-
-        elseif player:getLocalVar("QuestSeen") == 0 and giveMoogleABreak == QUEST_AVAILABLE and homeNationFameLevel >= 3 and
-               player:getCharVar("[MS1]BedPlaced") == 1 then
-            player:startEvent(30005, 0, 0, 0, 5, 0, 17161, 13457)
-        elseif player:getLocalVar("QuestSeen") == 0 and giveMoogleABreak == QUEST_ACCEPTED and player:getCharVar("MogSafeProgress") == 1 then
-            player:startEvent(30006, 0, 0, 0, 0, 0, 17161, 13457)
-        elseif player:getLocalVar("QuestSeen") == 0 and giveMoogleABreak == QUEST_ACCEPTED and player:getCharVar("MogSafeProgress") == 2 then
-            player:startEvent(30008)
-
-        elseif player:getLocalVar("QuestSeen") == 0 and theMooglePicnic == QUEST_AVAILABLE and homeNationFameLevel >= 5 and
-                giveMoogleABreak == QUEST_COMPLETED and player:getCharVar("[MS2]BedPlaced") == 1 then
-            player:startEvent(30009, 0, 0, 0, 4, 0, 17402, 615)
-        elseif player:getLocalVar("QuestSeen") == 0 and theMooglePicnic == QUEST_ACCEPTED and player:getCharVar("MogSafeProgress") == 1 then
-            player:startEvent(30010, 0, 0, 0, 0, 0, 17402, 615)
-        elseif player:getLocalVar("QuestSeen") == 0 and theMooglePicnic == QUEST_ACCEPTED and player:getCharVar("MogSafeProgress") == 2 then
-            player:startEvent(30012)
-
-        elseif player:getLocalVar("QuestSeen") == 0 and moogleInTheWild == QUEST_AVAILABLE and homeNationFameLevel >= 7 and
-                theMooglePicnic == QUEST_COMPLETED and player:getCharVar("[MS3]BedPlaced") == 1 then
-            player:startEvent(30013, 0, 0, 0, 6, 0, 13593, 12474)
-        elseif player:getLocalVar("QuestSeen") == 0 and moogleInTheWild == QUEST_ACCEPTED and player:getCharVar("MogSafeProgress") == 1 then
-            player:startEvent(30014, 0, 0, 0, 0, 0, 13593, 12474)
-        elseif player:getLocalVar("QuestSeen") == 0 and moogleInTheWild == QUEST_ACCEPTED and player:getCharVar("MogSafeProgress") == 2 then
-            player:startEvent(30016)
-
-        else
-            player:sendMenu(1)
-        end
-        return true
+        player:sendMenu(1)
     end
-    return false
 end
 
-function moogleEventUpdate(player, csid, option)
-    if player:isInMogHouse() then
-        return true
-    end
-    return false
+xi.moghouse.moogleEventUpdate = function(player, csid, option)
 end
 
-function moogleEventFinish(player, csid, option)
-    if player:isInMogHouse() then
-        if csid == 30000 then
-            player:setCharVar("MoghouseExplication", 0)
-
-        elseif csid == 30005 and option == 1 then
-            player:addQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.GIVE_A_MOOGLE_A_BREAK)
-            player:setLocalVar("QuestSeen", 1)
-            player:setCharVar("[MS1]BedPlaced", 0)
-            player:setCharVar("MogSafeProgress", 1)
-        elseif csid == 30005 and option == 2 then
-            player:setLocalVar("QuestSeen", 1)
-        elseif csid == 30006 then
-            player:setLocalVar("QuestSeen", 1)
-        elseif csid == 30007 then
-            player:tradeComplete()
-            player:setCharVar("MogSafeProgress", 2)
-        elseif csid == 30008 then
-            player:completeQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.GIVE_A_MOOGLE_A_BREAK)
-            player:changeContainerSize(xi.inv.MOGSAFE, 10)
-            player:addTitle(xi.title.MOGS_KIND_MASTER)
-            player:setCharVar("MogSafeProgress", 0)
-
-        elseif csid == 30009 and option == 1 then
-            player:addQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.THE_MOOGLE_PICNIC)
-            player:setLocalVar("QuestSeen", 1)
-            player:setCharVar("[MS2]BedPlaced", 0)
-            player:setCharVar("MogSafeProgress", 1)
-        elseif csid == 30009 and option == 2 then
-            player:setLocalVar("QuestSeen", 1)
-        elseif csid == 30010 then
-            player:setLocalVar("QuestSeen", 1)
-        elseif csid == 30011 then
-            player:tradeComplete()
-            player:setCharVar("MogSafeProgress", 2)
-        elseif csid == 30012 then
-            player:completeQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.THE_MOOGLE_PICNIC)
-            player:changeContainerSize(xi.inv.MOGSAFE, 10)
-            player:addTitle(xi.title.MOGS_EXCEPTIONALLY_KIND_MASTER)
-            player:setCharVar("MogSafeProgress", 0)
-
-        elseif csid == 30013 and option == 1 then
-            player:addQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.MOOGLES_IN_THE_WILD)
-            player:setLocalVar("QuestSeen", 1)
-            player:setCharVar("[MS3]BedPlaced", 0)
-            player:setCharVar("MogSafeProgress", 1)
-        elseif csid == 30013 and option == 2 then
-            player:setLocalVar("QuestSeen", 1)
-        elseif csid == 30014 then
-            player:setLocalVar("QuestSeen", 1)
-        elseif csid == 30015 then
-            player:tradeComplete()
-            player:setCharVar("MogSafeProgress", 2)
-        elseif csid == 30016 then
-            player:completeQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.MOOGLES_IN_THE_WILD)
-            player:changeContainerSize(xi.inv.MOGSAFE, 10)
-            player:addTitle(xi.title.MOGS_LOVING_MASTER)
-            player:setCharVar("MogSafeProgress", 0)
-        end
-
-        return true
-    end
-    return false
+xi.moghouse.moogleEventFinish = function(player, csid, option)
 end
 
 -- Unlocks a mog locker for a player. Returns the 'expired' timestamp (-1)
-function unlockMogLocker(player)
-    player:setCharVar(MOGLOCKER_PLAYERVAR_EXPIRY_TIMESTAMP, -1)
-    local currentSize = player:getContainerSize(xi.inv.MOGLOCKER)
-    if currentSize == 0 then -- we do this check in case some servers auto-set 80 slots for mog locker items
+xi.moghouse.unlockMogLocker = function(player)
+    player:setCharVar(mogLockerTimestampVarName, -1)
+
+    -- Safety check in case some servers auto-set 80 slots for mog locker items.
+    if player:getContainerSize(xi.inv.MOGLOCKER) == 0 then
         player:changeContainerSize(xi.inv.MOGLOCKER, 30)
     end
+
     return -1
 end
 
 -- Sets the mog locker access type (all area or alzahbi only). Returns the new access type.
-function setMogLockerAccessType(player, accessType)
-    player:setCharVar(MOGLOCKER_PLAYERVAR_ACCESS_TYPE, accessType)
+xi.moghouse.setMogLockerAccessType = function(player, accessType)
+    player:setCharVar(xi.moghouse.MOGLOCKER_PLAYERVAR_ACCESS_TYPE, accessType)
+
     return accessType
 end
 
 -- Gets the mog locker access type (all area or alzahbi only). Returns the new access type.
-function getMogLockerAccessType(player)
-    return player:getCharVar(MOGLOCKER_PLAYERVAR_ACCESS_TYPE)
-end
-
--- Adds time to your mog locker, given the number of bronze coins.
--- The amount of time per bronze is affected by the access type
--- The expiry time itself is the number of seconds past 2001/12/31 15:00
--- Returns true if time was added successfully, false otherwise.
-function addMogLockerExpiryTime(player, numBronze)
-    local accessType = getMogLockerAccessType(player)
-    local numDaysPerBronze = 5
-    if accessType == MOGLOCKER_ACCESS_TYPE_ALZAHBI then
-        numDaysPerBronze = 7
-    end
-
-    local currentTs = getMogLockerExpiryTimestamp(player)
-    if currentTs == nil then
-        -- print("Unable to add time: player hasn't unlocked mog locker.")
-        return false
-    end
-
-    if currentTs == -1 then
-        currentTs = os.time() - MOGLOCKER_START_TS
-    end
-
-    local timeIncrease = 60 * 60 * 24 * numDaysPerBronze * numBronze
-    local newTs = currentTs + timeIncrease
-
-    player:setCharVar(MOGLOCKER_PLAYERVAR_EXPIRY_TIMESTAMP, newTs)
-    -- send an invent size packet to enable the items if they weren't
-    player:changeContainerSize(xi.inv.MOGLOCKER, 0)
-    return true
+xi.moghouse.getMogLockerAccessType = function(player)
+    return player:getCharVar(xi.moghouse.MOGLOCKER_PLAYERVAR_ACCESS_TYPE)
 end
 
 -- Gets the expiry time for your locker. A return value of -1 is expired. A return value of nil means mog locker hasn't been unlocked.
-function getMogLockerExpiryTimestamp(player)
-    local expiryTime = player:getCharVar(MOGLOCKER_PLAYERVAR_EXPIRY_TIMESTAMP)
+xi.moghouse.getMogLockerExpiryTimestamp = function(player)
+    local expiryTime = player:getCharVar(mogLockerTimestampVarName)
 
-    if (expiryTime == 0) then
+    if expiryTime == 0 then
         return nil
     end
 
-    local now = os.time() - MOGLOCKER_START_TS
+    local now = os.time() - mogLockerStartTimestamp
+
     if now > expiryTime then
-        player:setCharVar(MOGLOCKER_PLAYERVAR_EXPIRY_TIMESTAMP, -1)
+        player:setCharVar(mogLockerTimestampVarName, -1)
+
         return -1
     end
 
     return expiryTime
 end
 
+-- Adds time to your mog locker, given the number of bronze coins.
+-- The amount of time per bronze is affected by the access type
+-- The expiry time itself is the number of seconds past 2001/12/31 15:00
+-- Returns true if time was added successfully, false otherwise.
+xi.moghouse.addMogLockerExpiryTime = function(player, numBronze)
+    local accessType       = xi.moghouse.getMogLockerAccessType(player)
+    local numDaysPerBronze = 5
+
+    if accessType == xi.moghouse.lockerAccessType.ALZAHBI then
+        numDaysPerBronze = 7
+    end
+
+    local currentTs = xi.moghouse.getMogLockerExpiryTimestamp(player)
+
+    if currentTs == nil then
+        return false
+    end
+
+    if currentTs == -1 then
+        currentTs = os.time() - mogLockerStartTimestamp
+    end
+
+    local timeIncrease = 60 * 60 * 24 * numDaysPerBronze * numBronze
+    local newTs        = currentTs + timeIncrease
+
+    player:setCharVar(mogLockerTimestampVarName, newTs)
+
+    -- Send an invent size packet to enable the items if they weren't.
+    player:changeContainerSize(xi.inv.MOGLOCKER, 0)
+
+    return true
+end

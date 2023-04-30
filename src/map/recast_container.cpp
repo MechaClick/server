@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../common/showmsg.h"
+#include "../common/logging.h"
 #include "../common/timer.h"
 
 #include "packets/inventory_finish.h"
@@ -177,13 +177,15 @@ void CRecastContainer::Del(RECASTTYPE type, uint16 id)
     }
     else
     {
-        PRecastList->erase(std::remove_if(PRecastList->begin(), PRecastList->end(), [&id](auto& recast) { return recast.ID == id; }), PRecastList->end());
+        PRecastList->erase(std::remove_if(PRecastList->begin(), PRecastList->end(), [&id](auto& recast)
+                                          { return recast.ID == id; }),
+                           PRecastList->end());
     }
 }
 
 /************************************************************************
  *                                                                       *
- *  Deletes a recast by index				                            *
+ *  Deletes a recast by index                                           *
  *                                                                       *
  ************************************************************************/
 
@@ -210,7 +212,14 @@ bool CRecastContainer::Has(RECASTTYPE type, uint16 id)
 {
     RecastList_t* PRecastList = GetRecastList(type);
 
-    return std::find_if(PRecastList->begin(), PRecastList->end(), [&id](auto& recast) { return recast.ID == id; }) != PRecastList->end();
+    // clang-format off
+    auto maybeRecast = std::find_if(PRecastList->begin(), PRecastList->end(), [&id](auto& recast)
+    {
+        return recast.ID == id;
+    });
+    // clang-format on
+
+    return maybeRecast != PRecastList->end();
 }
 
 /************************************************************************
@@ -263,7 +272,7 @@ void CRecastContainer::Check()
     {
         RecastList_t* PRecastList = GetRecastList(type);
 
-        for (uint16 i = 0; i < PRecastList->size(); ++i)
+        for (std::size_t i = 0; i < PRecastList->size(); ++i)
         {
             Recast_t* recast = &PRecastList->at(i);
 

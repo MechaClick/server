@@ -44,25 +44,32 @@ entity.onTrigger = function(player, npc)
     local mLvl = player:getMainLvl()
     local mJob = player:getMainJob()
 
-    if theThreeMagi == QUEST_AVAILABLE and mJob == xi.job.BLM and mLvl >= AF1_QUEST_LEVEL then
+    if
+        theThreeMagi == QUEST_AVAILABLE and
+        mJob == xi.job.BLM and
+        mLvl >= xi.settings.main.AF1_QUEST_LEVEL
+    then
         player:startEvent(260, 0, 613, 0, 0, 0, 1104) -- Start Quest "The Three Magi" --- NOTE: 5th parameter is "Meteorites" but he doesn't exist ---
     elseif theThreeMagi == QUEST_ACCEPTED then
         player:startEvent(261, 0, 0, 0, 0, 0, 1104) -- During Quest "The Three Magi"
     elseif
         theThreeMagi == QUEST_COMPLETED and
         recollections == QUEST_AVAILABLE and
-        (mJob == xi.job.BLM and mLvl < AF2_QUEST_LEVEL or mJob ~= xi.job.BLM)
+        (mJob == xi.job.BLM and mLvl < xi.settings.main.AF2_QUEST_LEVEL or mJob ~= xi.job.BLM)
     then
         player:startEvent(268) -- New standard dialog after "The Three Magi"
     elseif
         theThreeMagi == QUEST_COMPLETED and
         mJob == xi.job.BLM and
-        mLvl >= AF2_QUEST_LEVEL and
+        mLvl >= xi.settings.main.AF2_QUEST_LEVEL and
         not player:needToZone() and
         recollections == QUEST_AVAILABLE
     then
         player:startEvent(270, 0, 1105) -- Start Quest "Recollections"
-    elseif recollections == QUEST_ACCEPTED and player:hasKeyItem(xi.ki.FOE_FINDER_MK_I) then
+    elseif
+        recollections == QUEST_ACCEPTED and
+        player:hasKeyItem(xi.ki.FOE_FINDER_MK_I)
+    then
         player:startEvent(275) -- Finish Quest "Recollections"
     elseif
         recollections == QUEST_COMPLETED and
@@ -102,11 +109,11 @@ entity.onEventFinish = function(player, csid, option)
             local choosetitle = player:getCharVar("theThreeMagiSupport")
 
             if choosetitle == 3 then
-                player:addTitle(xi.title.PROFESSOR_KORUMORU_SUPPORTER)
+                player:addTitle(xi.title.PROFESSOR_KORU_MORU_SUPPORTER)
             elseif choosetitle == 2 then
                 player:addTitle(xi.title.DOCTOR_SHANTOTTO_SUPPORTER)
             else
-                player:addTitle(xi.title.DOCTOR_YORANORAN_SUPPORTER)
+                player:addTitle(xi.title.DOCTOR_YORAN_ORAN_SUPPORTER)
             end
 
             player:tradeComplete()
@@ -114,7 +121,7 @@ entity.onEventFinish = function(player, csid, option)
             player:messageSpecial(ID.text.ITEM_OBTAINED, 17423) -- Casting Wand
             player:needToZone(true)
             player:setCharVar("theThreeMagiSupport", 0)
-            player:addFame(WINDURST, 20)
+            player:addFame(xi.quest.fame_area.WINDURST, 20)
             player:completeQuest(xi.quest.log_id.WINDURST, xi.quest.id.windurst.THE_THREE_MAGI)
         end
     elseif csid == 270 then
@@ -130,7 +137,7 @@ entity.onEventFinish = function(player, csid, option)
             player:delKeyItem(xi.ki.FOE_FINDER_MK_I)
             player:addItem(14092)
             player:messageSpecial(ID.text.ITEM_OBTAINED, 14092) -- wizards sabots
-            player:addFame(WINDURST, 40)
+            player:addFame(xi.quest.fame_area.WINDURST, 40)
             player:completeQuest(xi.quest.log_id.WINDURST, xi.quest.id.windurst.RECOLLECTIONS)
         end
     elseif csid == 276 then

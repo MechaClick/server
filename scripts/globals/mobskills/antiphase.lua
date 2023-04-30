@@ -5,22 +5,19 @@
 -- Type: Enfeebling
 -- Utsusemi/Blink absorb: Ignores shadows
 -----------------------------------
-require("scripts/globals/monstertpmoves")
-require("scripts/globals/settings")
+require("scripts/globals/mobskills")
 require("scripts/globals/status")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
-    local typeEffect = xi.effect.SILENCE
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
+    skill:setMsg(xi.mobskills.mobStatusEffectMove(mob, target, xi.effect.SILENCE, 1, 0, 60))
 
-    skill:setMsg(MobStatusEffectMove(mob, target, typeEffect, 1, 0, 60))
-
-    return typeEffect
+    return xi.effect.SILENCE
 end
 
-return mobskill_object
+return mobskillObject

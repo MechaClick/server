@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include "../entities/charentity.h"
 #include "../trade_container.h"
@@ -27,8 +27,8 @@
 
 CSynthMessagePacket::CSynthMessagePacket(CCharEntity* PChar, SYNTH_MESSAGE messageID, uint16 itemID, uint8 quantity)
 {
-    id(0x6F);
-    length(0x38);
+    this->setType(0x6F);
+    this->setSize(0x38);
 
     ref<uint8>(0x04) = messageID;
 
@@ -59,12 +59,12 @@ CSynthMessagePacket::CSynthMessagePacket(CCharEntity* PChar, SYNTH_MESSAGE messa
 
     for (uint8 slotID = 1; slotID <= 8; ++slotID) // recipe materials
     {
-        uint16 itemID                          = PChar->CraftContainer->getItemID(slotID);
-        ref<uint16>(0x24 + ((slotID - 1) * 2)) = itemID;
+        uint16 slotItemID                      = PChar->CraftContainer->getItemID(slotID);
+        ref<uint16>(0x24 + ((slotID - 1) * 2)) = slotItemID;
 
         if (PChar->CraftContainer->getQuantity(slotID) == 0)
         {
-            ref<uint16>(0x0A + ((slotID - 1) * 2)) = itemID;
+            ref<uint16>(0x0A + ((slotID - 1) * 2)) = slotItemID;
         }
     }
 }

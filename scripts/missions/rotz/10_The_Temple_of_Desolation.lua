@@ -7,9 +7,9 @@
 -- _6z0  : !pos 0 -12 48 251
 -----------------------------------
 require('scripts/globals/interaction/mission')
-require("scripts/globals/keyitems")
+require('scripts/globals/keyitems')
 require('scripts/globals/missions')
-require("scripts/globals/titles")
+require('scripts/globals/titles')
 require('scripts/globals/zone')
 -----------------------------------
 
@@ -17,13 +17,12 @@ local mission = Mission:new(xi.mission.log_id.ZILART, xi.mission.id.zilart.THE_T
 
 mission.reward =
 {
+    title       = xi.title.SEALER_OF_THE_PORTAL_OF_THE_GODS,
     nextMission = { xi.mission.log_id.ZILART, xi.mission.id.zilart.THE_HALL_OF_THE_GODS },
-    title = xi.title.SEALER_OF_THE_PORTAL_OF_THE_GODS,
 }
 
 mission.sections =
 {
-    -- Section: Mission Active
     {
         check = function(player, currentMission, missionStatus, vars)
             return currentMission == mission.missionId
@@ -31,7 +30,8 @@ mission.sections =
 
         [xi.zone.NORG] =
         {
-            ['Kamui'] = mission:progressEvent(11),
+            ['Gilgamesh'] = mission:event(10),
+            ['Kamui']     = mission:event(11),
         },
 
         [xi.zone.HALL_OF_THE_GODS] =

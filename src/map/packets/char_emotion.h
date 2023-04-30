@@ -22,7 +22,7 @@
 #ifndef _CCHAREMOTIONPACKET_H
 #define _CCHAREMOTIONPACKET_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 #include "basic.h"
 
@@ -76,6 +76,7 @@ enum class Emote : uint8
     DANCE2     = 66,
     DANCE3     = 67,
     DANCE4     = 68,
+    BELL       = 73,
     JOB        = 74,
     AIM        = 96
 };

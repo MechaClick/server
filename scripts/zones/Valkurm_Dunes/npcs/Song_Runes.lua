@@ -17,7 +17,10 @@ end
 
 entity.onTrigger = function(player, npc)
     -- PATH OF THE BARD (Bard Flag)
-    if (player:getQuestStatus(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.PATH_OF_THE_BARD) == QUEST_AVAILABLE and player:getCharVar("PathOfTheBard_Event") == 1) then
+    if
+        player:getQuestStatus(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.PATH_OF_THE_BARD) == QUEST_AVAILABLE and
+        player:getCharVar("PathOfTheBard_Event") == 1
+    then
         player:startEvent(2)
 
     -- DEFAULT DIALOG
@@ -30,14 +33,13 @@ entity.onEventUpdate = function(player, csid, option)
 end
 
 entity.onEventFinish = function(player, csid, option)
-    if (csid == 2) then
-        player:addGil(GIL_RATE*3000)
-        player:messageSpecial(ID.text.GIL_OBTAINED, GIL_RATE*3000)
+    if csid == 2 then
+        npcUtil.giveCurrency(player, 'gil', 3000)
         player:addTitle(xi.title.WANDERING_MINSTREL)
         player:unlockJob(xi.job.BRD) -- Bard
         player:messageSpecial(ID.text.UNLOCK_BARD)  --You can now become a bard!
         player:setCharVar("PathOfTheBard_Event", 0)
-        player:addFame(JEUNO, 30)
+        player:addFame(xi.quest.fame_area.JEUNO, 30)
         player:completeQuest(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.PATH_OF_THE_BARD)
     end
 end

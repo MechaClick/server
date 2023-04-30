@@ -30,7 +30,7 @@ CREATE TABLE `bcnm_info` (
   `rules` smallint(5) unsigned NOT NULL DEFAULT '0',
   `isMission` tinyint(1) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`bcnmId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 AVG_ROW_LENGTH=56;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 AVG_ROW_LENGTH=56;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -286,6 +286,8 @@ INSERT INTO `bcnm_info` VALUES (1304,37,'central_temenos_2nd_floor','nobody',0,2
 INSERT INTO `bcnm_info` VALUES (1305,37,'central_temenos_3rd_floor','nobody',0,2700,2700,0,18,0,7,0);
 INSERT INTO `bcnm_info` VALUES (1306,37,'central_temenos_4th_floor','nobody',0,3600,3600,0,18,0,7,0);
 INSERT INTO `bcnm_info` VALUES (1307,37,'central_temenos_4th_floor_ii','nobody',0,3600,3600,0,18,0,7,0);
+INSERT INTO `bcnm_info` VALUES (2721,85,'purple_the_new_black','nobody',0,1800,1800,0,6,0,5,1);
+
 /*!40000 ALTER TABLE `bcnm_info` ENABLE KEYS */;
 UNLOCK TABLES;
 commit;

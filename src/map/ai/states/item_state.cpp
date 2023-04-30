@@ -77,7 +77,8 @@ CItemState::CItemState(CCharEntity* PEntity, uint16 targid, uint8 loc, uint8 slo
         throw CStateInitException(std::make_unique<CMessageBasicPacket>(m_PEntity, m_PEntity, 0, 0, 56));
     }
 
-    auto* PTarget = m_PEntity->IsValidTarget(targid, m_PItem->getValidTarget(), m_errorMsg);
+    UpdateTarget(PEntity->IsValidTarget(targid, m_PItem->getValidTarget(), m_errorMsg));
+    auto* PTarget = GetTarget();
 
     if (!PTarget || m_errorMsg)
     {
@@ -104,11 +105,9 @@ CItemState::CItemState(CCharEntity* PEntity, uint16 targid, uint8 loc, uint8 slo
     m_PEntity->UContainer->SetType(UCONTAINER_USEITEM);
     m_PEntity->UContainer->SetItem(0, m_PItem);
 
-    CState::UpdateTarget(m_targid);
-
     m_startPos      = m_PEntity->loc.p;
     m_castTime      = std::chrono::milliseconds(m_PItem->getActivationTime());
-    m_animationTime = std::chrono::milliseconds(PItem->getAnimationTime());
+    m_animationTime = std::chrono::milliseconds(m_PItem->getAnimationTime());
 
     action_t action;
     action.id         = m_PEntity->id;
@@ -126,13 +125,43 @@ CItemState::CItemState(CCharEntity* PEntity, uint16 targid, uint8 loc, uint8 slo
     actionTarget.messageID  = 28;
     actionTarget.knockback  = 0;
 
-    m_PEntity->PAI->EventHandler.triggerListener("ITEM_START", CLuaBaseEntity(PTarget), CLuaItem(m_PItem), &action);
+    m_PEntity->PAI->EventHandler.triggerListener("ITEM_START", CLuaBaseEntity(PTarget), CLuaItem(m_PItem), CLuaAction(&action));
     m_PEntity->loc.zone->PushPacket(m_PEntity, CHAR_INRANGE_SELF, new CActionPacket(action));
 
     m_PItem->setSubType(ITEM_LOCKED);
 
     m_PEntity->pushPacket(new CInventoryAssignPacket(m_PItem, INV_NOSELECT));
     m_PEntity->pushPacket(new CInventoryFinishPacket());
+}
+
+void CItemState::UpdateTarget(CBaseEntity* target)
+{
+    if (target != nullptr)
+    {
+        UpdateTarget(target->targid);
+    }
+}
+
+void CItemState::UpdateTarget(uint16 targid)
+{
+    CState::UpdateTarget(targid);
+    CState::SetTarget(targid);
+
+    // Special case for Soultrapper usage:
+    // Valid to use on mobs that are:
+    //     - unclaimed
+    //     - claimed by you
+    //     - claimed by someone else
+    // This is handled this way to avoid bringing in a new very specialized targetting flag
+    // just for soultrapping.
+    if (m_PItem->isSoultrapper())
+    {
+        // Reset possible "already claimed" error from previous lookup
+        m_errorMsg.reset();
+
+        // Call CBattleEntity's simpler IsValidTarget()
+        CState::UpdateTarget(m_PEntity->CBattleEntity::IsValidTarget(m_targid, m_PItem->getValidTarget(), m_errorMsg));
+    }
 }
 
 bool CItemState::Update(time_point tick)
@@ -152,7 +181,7 @@ bool CItemState::Update(time_point tick)
         {
             FinishItem(action);
         }
-        m_PEntity->PAI->EventHandler.triggerListener("ITEM_USE", CLuaBaseEntity(m_PEntity), CLuaItem(m_PItem), &action);
+        m_PEntity->PAI->EventHandler.triggerListener("ITEM_USE", CLuaBaseEntity(m_PEntity), CLuaItem(m_PItem), CLuaAction(&action));
         m_PEntity->loc.zone->PushPacket(m_PEntity, CHAR_INRANGE_SELF, new CActionPacket(action));
         Complete();
     }
@@ -160,7 +189,7 @@ bool CItemState::Update(time_point tick)
     {
         if (m_PEntity->objtype == TYPE_PC)
         {
-            CCharEntity* PChar = static_cast<CCharEntity*>(m_PEntity);
+            CCharEntity* PChar = m_PEntity;
             PChar->m_charHistory.itemsUsed++;
         }
         m_PEntity->PAI->EventHandler.triggerListener("ITEM_STATE_EXIT", CLuaBaseEntity(m_PEntity), CLuaItem(m_PItem));
@@ -204,17 +233,18 @@ void CItemState::TryInterrupt(CBattleEntity* PTarget)
 
     if (PTarget)
     {
-        PTarget = m_PEntity->IsValidTarget(PTarget->targid, m_PItem->getValidTarget(), m_errorMsg);
+        UpdateTarget(m_PEntity->IsValidTarget(PTarget->targid, m_PItem->getValidTarget(), m_errorMsg));
     }
     else
     {
-        PTarget = m_PEntity->IsValidTarget(m_targid, m_PItem->getValidTarget(), m_errorMsg);
+        UpdateTarget(m_PEntity->IsValidTarget(m_targid, m_PItem->getValidTarget(), m_errorMsg));
     }
 
     uint16 msg = 445; // you cannot use items at this time
 
     if (HasMoved() || m_PEntity->StatusEffectContainer->HasPreventActionEffect())
     {
+        msg           = MSGBASIC_ITEM_FAILS_TO_ACTIVATE;
         m_interrupted = true;
     }
     else if (battleutils::IsParalyzed(m_PEntity))
@@ -222,11 +252,11 @@ void CItemState::TryInterrupt(CBattleEntity* PTarget)
         msg           = MSGBASIC_IS_PARALYZED;
         m_interrupted = true;
     }
-    else if (!PTarget)
+    else if (!GetTarget())
     {
         m_interrupted = true;
     }
-    else if (battleutils::IsIntimidated(m_PEntity, static_cast<CBattleEntity*>(PTarget)))
+    else if (battleutils::IsIntimidated(m_PEntity, static_cast<CBattleEntity*>(GetTarget())))
     {
         msg           = MSGBASIC_IS_INTIMIDATED;
         m_interrupted = true;

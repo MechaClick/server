@@ -19,23 +19,23 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "auction_house.h"
+
+#include "common/socket.h"
+#include "common/vana_time.h"
 
 #include <cstring>
 
-#include "auction_house.h"
-
-#include "../entities/charentity.h"
-#include "../map.h"
-#include "../utils/itemutils.h"
-#include "../vana_time.h"
+#include "entities/charentity.h"
+#include "map.h"
+#include "utils/itemutils.h"
 
 bool IsAuctionOpen = true; // Trading is allowed at the auction
 
 CAuctionHousePacket::CAuctionHousePacket(uint8 action)
 {
-    this->type = 0x4C;
-    this->size = 0x1E;
+    this->setType(0x4C);
+    this->setSize(0x3C);
 
     ref<uint8>(0x04) = action;
     ref<uint8>(0x05) = 0xFF;
@@ -49,20 +49,20 @@ CAuctionHousePacket::CAuctionHousePacket(uint8 action)
 
 CAuctionHousePacket::CAuctionHousePacket(uint8 action, CItem* PItem, uint8 quantity, uint32 price)
 {
-    this->type = 0x4C;
-    this->size = 0x1E;
+    this->setType(0x4C);
+    this->setSize(0x3C);
 
     uint32 auctionFee = 0;
     if (quantity == 0) // This is a stack..Yes, zero for stacks.. Why is this being called quantity?
     {
-        auctionFee = (uint32)(map_config.ah_base_fee_stacks + (price * map_config.ah_tax_rate_stacks / 100));
+        auctionFee = (uint32)(settings::get<uint32>("map.AH_BASE_FEE_STACKS") + (price * settings::get<float>("map.AH_TAX_RATE_STACKS") / 100));
     }
     else // This is a single item.
     {
-        auctionFee = (uint32)(map_config.ah_base_fee_single + (price * map_config.ah_tax_rate_single / 100));
+        auctionFee = (uint32)(settings::get<uint32>("map.AH_BASE_FEE_SINGLE") + (price * settings::get<float>("map.AH_TAX_RATE_SINGLE") / 100));
     }
 
-    auctionFee = std::clamp<uint32>(auctionFee, 0, map_config.ah_max_fee);
+    auctionFee = std::clamp<uint32>(auctionFee, 0, settings::get<uint32>("map.AH_MAX_FEE"));
 
     ref<uint8>(0x04)  = action;
     ref<uint8>(0x05)  = 0xFF;
@@ -80,8 +80,8 @@ CAuctionHousePacket::CAuctionHousePacket(uint8 action, CItem* PItem, uint8 quant
 // e.g. client history, client probes a slot number which you give the correct itemId+price
 CAuctionHousePacket::CAuctionHousePacket(uint8 action, uint8 slot, CCharEntity* PChar)
 {
-    this->type = 0x4C;
-    this->size = 0x1E;
+    this->setType(0x4C);
+    this->setSize(0x3C);
 
     ref<uint8>(0x04) = action;
     ref<uint8>(0x05) = slot; // Serial number of the subject
@@ -101,21 +101,23 @@ CAuctionHousePacket::CAuctionHousePacket(uint8 action, uint8 slot, CCharEntity* 
     }
 }
 
-CAuctionHousePacket::CAuctionHousePacket(uint8 action, uint8 message, uint16 itemid, uint32 price)
+CAuctionHousePacket::CAuctionHousePacket(uint8 action, uint8 message, uint16 itemid, uint32 price, uint8 quantity, uint8 stacksize)
 {
-    this->type = 0x4C;
-    this->size = 0x1E;
+    this->setType(0x4C);
+    this->setSize(0x3C);
 
     ref<uint8>(0x04)  = action;
     ref<uint8>(0x06)  = message;
     ref<uint32>(0x08) = price;
     ref<uint16>(0x0C) = itemid;
+    // Following previous nomenclature, "quantity == 0" indicates a stack. This might be 0 = stack 1 = single flag.
+    ref<uint16>(0x10) = quantity == 0 ? stacksize : 1;
 }
 
 CAuctionHousePacket::CAuctionHousePacket(uint8 action, uint8 message, CCharEntity* PChar, uint8 slot, bool keepItem)
 {
-    this->type = 0x4C;
-    this->size = 0x1E;
+    this->setType(0x4C);
+    this->setSize(0x3C);
 
     ref<uint8>(0x04) = action;
     ref<uint8>(0x05) = slot;
@@ -127,7 +129,7 @@ CAuctionHousePacket::CAuctionHousePacket(uint8 action, uint8 message, CCharEntit
         ref<uint8>(0x14) = 0x03;
         ref<uint8>(0x16) = 0x01; // Value is changed, the purpose is unknown UNKNOWN
 
-        memcpy(data + (0x18), PChar->GetName(), PChar->name.size());
+        memcpy(data + (0x18), PChar->GetName().c_str(), PChar->GetName().size());
 
         ref<uint16>(0x28) = PChar->m_ah_history.at(slot).itemid;    // Id sell items item id
         ref<uint8>(0x2A)  = 1 - PChar->m_ah_history.at(slot).stack; // Number of items stack size

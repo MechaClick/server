@@ -8,30 +8,28 @@
 -----------------------------------
 require("scripts/globals/settings")
 require("scripts/globals/status")
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
-    if (mob:getFamily() == 316 and mob:getModelId() == 1746) then
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
+    if mob:getFamily() == 316 and mob:getModelId() == 1746 then
         return 0
     else
         return 1
     end
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local dmgmod = 1
-    local info = MobMagicalMove(mob, target, skill, mob:getWeaponDmg()*2.5, xi.magic.ele.WIND, dmgmod, TP_NO_EFFECT)
-    local dmg = MobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.WIND, MOBPARAM_WIPE_SHADOWS)
+    local info = xi.mobskills.mobMagicalMove(mob, target, skill, mob:getWeaponDmg() * 2.5, xi.magic.ele.WIND, dmgmod, xi.mobskills.magicalTpBonus.NO_EFFECT)
+    local dmg = xi.mobskills.mobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.WIND, xi.mobskills.shadowBehavior.WIPE_SHADOWS)
 
     target:dispelStatusEffect()
     target:takeDamage(dmg, mob, xi.attackType.MAGICAL, xi.damageType.WIND)
 
-    --printf("[TP MOVE] Zone: %u Monster: %u Mob lvl: %u TP: %u TP Move: %u Damage: %u on Player: %u Level: %u HP: %u", mob:getZoneID(), mob:getID(), mob:getMainLvl(), skill:getTP(), skill:getID(), dmg, target:getID(), target:getMainLvl(), target:getMaxHP())
-
     return dmg
 end
 
-return mobskill_object
+return mobskillObject

@@ -22,7 +22,7 @@
 #ifndef _LUASPELL_H
 #define _LUASPELL_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 #include "luautils.h"
 
 class CSpell;
@@ -38,7 +38,10 @@ public:
         return m_PLuaSpell;
     }
 
+    friend std::ostream& operator<<(std::ostream& out, const CLuaSpell& spell);
+
     void   setMsg(uint16 messageID);
+    void   setModifier(uint8 modifier);
     void   setAoE(uint8 aoe);
     void   setFlag(uint8 flags);
     void   setRadius(float radius);
@@ -55,8 +58,10 @@ public:
     uint16 getMPCost();
     uint8  getSkillType();
     uint8  getSpellGroup();
+    uint8  getSpellFamily();
     uint8  getFlag();
     uint32 getCastTime();
+    uint32 getPrimaryTargetID();
 
     static void Register();
 };

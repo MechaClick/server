@@ -1,48 +1,34 @@
 -----------------------------------
---
 -- Zone: Talacca_Cove (57)
---
 -----------------------------------
-local ID = require("scripts/zones/Talacca_Cove/IDs")
-require("scripts/globals/keyitems")
-require("scripts/globals/missions")
-require("scripts/globals/settings")
-require("scripts/globals/titles")
+local ID = require('scripts/zones/Talacca_Cove/IDs')
 -----------------------------------
-local zone_object = {}
+local zoneObject = {}
 
-zone_object.onInitialize = function(zone)
+zoneObject.onInitialize = function(zone)
 end
 
-zone_object.onZoneIn = function(player, prevZone)
+zoneObject.onZoneIn = function(player, prevZone)
     local cs = -1
 
-    if (player:getCurrentMission(TOAU) == xi.mission.id.toau.TESTING_THE_WATERS and player:getCharVar("AhtUrganStatus") == 1) then
-        player:setPos(-88.879, -7.318, -109.233, 173)
-        cs = 106
-    elseif (player:getXPos() == 0 and player:getYPos() == 0 and player:getZPos() == 0) then
+    if
+        player:getXPos() == 0 and
+        player:getYPos() == 0 and
+        player:getZPos() == 0
+    then
         player:setPos(64.007, -9.281, -99.988, 88)
     end
+
     return cs
 end
 
-zone_object.onRegionEnter = function(player, region)
+zoneObject.onTriggerAreaEnter = function(player, triggerArea)
 end
 
-zone_object.onEventUpdate = function(player, csid, option)
+zoneObject.onEventUpdate = function(player, csid, option)
 end
 
-zone_object.onEventFinish = function(player, csid, option)
-
-    if (csid == 106) then
-        player:completeMission(xi.mission.log_id.TOAU, xi.mission.id.toau.TESTING_THE_WATERS)
-        player:delKeyItem(xi.ki.EPHRAMADIAN_GOLD_COIN)
-        player:addKeyItem(xi.ki.PERCIPIENT_EYE)
-        player:messageSpecial(ID.text.KEYITEM_OBTAINED, xi.ki.PERCIPIENT_EYE)
-        player:setTitle(xi.title.TREASURE_TROVE_TENDER)
-        player:setCharVar("AhtUrganStatus", 0)
-        player:addMission(xi.mission.log_id.TOAU, xi.mission.id.toau.LEGACY_OF_THE_LOST)
-    end
+zoneObject.onEventFinish = function(player, csid, option)
 end
 
-return zone_object
+return zoneObject

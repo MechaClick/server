@@ -33,6 +33,15 @@
 #include "../trait.h"
 #include "baseentity.h"
 
+enum DEATH_TYPE
+{
+    NONE        = 0,
+    PHYSICAL    = 1,
+    MAGICAL     = 2,
+    WS_PHYSICAL = 3,
+    WS_MAGICAL  = 4,
+};
+
 enum class ECOSYSTEM : uint8
 {
     ECO_ERROR      = 0,
@@ -50,7 +59,7 @@ enum class ECOSYSTEM : uint8
     EMPTY          = 12,
     HUMANOID       = 13,
     LIZARD         = 14,
-    LUMORIAN       = 15,
+    LUMINIAN       = 15,
     LUMINION       = 16,
     PLANTOID       = 17,
     UNCLASSIFIED   = 18,
@@ -152,7 +161,8 @@ enum SUBSKILLTYPE
     SUBSKILL_CNN      = 2,
     SUBSKILL_SHURIKEN = 3,
 
-    SUBSKILL_ANI = 10,
+    SUBSKILL_ANIMATOR    = 10,
+    SUBSKILL_ANIMATOR_II = 11,
 
     SUBSKILL_SHEEP      = 21,
     SUBSKILL_HARE       = 22,
@@ -261,16 +271,45 @@ enum class DAMAGE_TYPE : uint16
     DARK      = 13
 };
 
-enum class REACTION
+// This enum class is a set of bitfields that modify messages sent to the client.
+// There are helpers (PARRY/EVADE) because it is not inuitive
+// These flag names may not match SE's intent perfectly, but seem to work well.
+
+// For example
+// A guard is HIT + GUARDED
+// A parry is HIT + MISS + GUARDED
+// A block is HIT + BLOCK
+// It also seems weaponskills and job abilities set ABILITY in addition to these flags.
+// All of these flags are also seen in weaponskills.
+enum class REACTION : uint8
 {
-    NONE  = 0x00, // No Reaction
-    MISS  = 0x01, // Miss
-    PARRY = 0x03, // Block with weapons (MISS + PARRY)
-    BLOCK = 0x04, // Block with shield
-    HIT   = 0x08, // Hit
-    EVADE = 0x09, // Evasion (MISS + HIT)
-    GUARD = 0x14  // mnk guard (20 dec)
+    NONE    = 0x00, // No Reaction
+    MISS    = 0x01, // Miss
+    GUARDED = 0x02, // Bit to indicate guard, used individually to indicate guard during WS packet as well
+    PARRY   = 0x03, // Block with weapons (MISS + GUARDED)
+    BLOCK   = 0x04, // Block with shield, bit to indicate blocked during WS packet as well
+    HIT     = 0x08, // Hit
+    EVADE   = 0x09, // Evasion (MISS + HIT)
+    ABILITY = 0x10, // Observed on JA and WS
 };
+
+// These operators are used to combine bits that may not have a discrete value upon combining.
+inline REACTION operator|(REACTION a, REACTION b)
+{
+    return (REACTION)((uint8)a | (uint8)b);
+}
+
+inline REACTION operator&(REACTION a, REACTION b)
+{
+    return (REACTION)((uint8)a & (uint8)b);
+}
+
+inline REACTION operator|=(REACTION& a, REACTION b)
+{
+    a = a | b;
+
+    return a;
+}
 
 enum class SPECEFFECT
 {
@@ -280,6 +319,15 @@ enum class SPECEFFECT
     RAISE        = 0x11,
     RECOIL       = 0x20,
     CRITICAL_HIT = 0x22
+};
+
+enum class MODIFIER
+{
+    NONE        = 0x00,
+    COVER       = 0x01,
+    RESIST      = 0x02,
+    MAGIC_BURST = 0x04, // Currently known to be used for Swipe/Lunge only
+    IMMUNOBREAK = 0x08,
 };
 
 enum SUBEFFECT
@@ -295,7 +343,9 @@ enum SUBEFFECT
     SUBEFFECT_DARKNESS_DAMAGE  = 8,  // 1-00010   17
     SUBEFFECT_SLEEP            = 9,  // 110010    19
     SUBEFFECT_POISON           = 10, // 1-01010   21
-    SUBEFFECT_PARALYSIS        = 11,
+    SUBEFFECT_ADDLE            = 11, // Verified shared group 1
+    SUBEFFECT_AMNESIA          = 11, // Verified shared group 1
+    SUBEFFECT_PARALYSIS        = 11, // Verified shared group 1
     SUBEFFECT_BLIND            = 12, // 1-00110   25
     SUBEFFECT_SILENCE          = 13,
     SUBEFFECT_PETRIFY          = 14,
@@ -303,13 +353,14 @@ enum SUBEFFECT
     SUBEFFECT_STUN             = 16,
     SUBEFFECT_CURSE            = 17,
     SUBEFFECT_DEFENSE_DOWN     = 18, // 1-01001   37
-    SUBEFFECT_EVASION_DOWN     = 18, // Same subeffect as DEFENSE_DOWN
-    SUBEFFECT_ATTACK_DOWN      = 18, // Same subeffect as DEFENSE_DOWN
+    SUBEFFECT_EVASION_DOWN     = 18, // Verified shared group 2
+    SUBEFFECT_ATTACK_DOWN      = 18, // Verified shared group 2
+    SUBEFFECT_SLOW             = 18, // Verified shared group 2
     SUBEFFECT_DEATH            = 19,
     SUBEFFECT_SHIELD           = 20,
     SUBEFFECT_HP_DRAIN         = 21, // 1-10101   43  This is retail correct animation
-    SUBEFFECT_MP_DRAIN         = 22, // This is retail correct animation
-    SUBEFFECT_TP_DRAIN         = 22, // Pretty sure this is correct, but might use same animation as HP drain.
+    SUBEFFECT_MP_DRAIN         = 22, // Verified shared group 3
+    SUBEFFECT_TP_DRAIN         = 22, // Verified shared group 3
     SUBEFFECT_HASTE            = 23,
     // There are no additional attack effect animations beyond 23. Some effects share subeffect/animations.
 
@@ -366,7 +417,9 @@ enum TARGETTYPE
     TARGET_PLAYER_DEAD             = 0x20,
     TARGET_NPC                     = 0x40, // скорее всего подразумевается mob, выглядящий как npc и воюющий на стороне персонажа
     TARGET_PLAYER_PARTY_PIANISSIMO = 0x80,
-    TARGET_PET                     = 0x100
+    TARGET_PET                     = 0x100,
+    TARGET_PLAYER_PARTY_ENTRUST    = 0x200,
+    TARGET_IGNORE_BATTLEID         = 0x400, // Can hit targets that do not have the same battle ID
 };
 
 enum SKILLCHAIN_ELEMENT
@@ -412,6 +465,9 @@ enum IMMUNITY : uint16
     IMMUNITY_REQUIEM     = 0x400,  // 1024
     IMMUNITY_LIGHT_SLEEP = 0x800,  // 2048
     IMMUNITY_DARK_SLEEP  = 0x1000, // 4096
+    IMMUNITY_ASPIR       = 0x2000, // 8192
+    IMMUNITY_TERROR      = 0x4000, // 16384
+    IMMUNITY_DISPEL      = 0x8000, // 32768
 };
 
 struct apAction_t
@@ -431,17 +487,17 @@ struct apAction_t
     uint16         spikesMessage;    // 10 bits
 
     apAction_t()
+    : reaction(REACTION::NONE)
+    , speceffect(SPECEFFECT::NONE)
+    , additionalEffect(SUBEFFECT_NONE)
+    , spikesEffect(SUBEFFECT_NONE)
     {
         ActionTarget     = nullptr;
-        reaction         = REACTION::NONE;
         animation        = 0;
-        speceffect       = SPECEFFECT::NONE;
         param            = 0;
         messageID        = 0;
-        additionalEffect = SUBEFFECT_NONE;
         addEffectParam   = 0;
         addEffectMessage = 0;
-        spikesEffect     = SUBEFFECT_NONE;
         spikesParam      = 0;
         spikesMessage    = 0;
         knockback        = 0;
@@ -449,9 +505,9 @@ struct apAction_t
 };
 
 /************************************************************************
- *																		*
- *  TP хранится то пому же принципу, что и skill, т.е. 6,4% = 64			*
- *																		*
+ *                                                                      *
+ *  TP хранится то пому же принципу, что и skill, т.е. 6,4% = 64        *
+ *                                                                      *
  ************************************************************************/
 
 struct health_t
@@ -525,6 +581,9 @@ public:
     void SetMLevel(uint8 mlvl); // уровень главной профессии
     void SetSLevel(uint8 slvl); // уровень дополнительной профессии
 
+    void  SetDeathType(uint8 type);
+    uint8 GetDeathType();
+
     uint8 GetHPP() const;   // количество hp в процентах
     int32 GetMaxHP() const; // максимальное количество hp
     uint8 GetMPP() const;   // количество mp в процентах
@@ -532,7 +591,7 @@ public:
     void  UpdateHealth();   // пересчет максимального количества hp и mp, а так же корректировка их текущих значений
 
     int16  GetWeaponDelay(bool tp);       // returns delay of combined weapons
-    uint8  GetMeleeRange() const;         // returns the distance considered to be within melee range of the entity
+    float  GetMeleeRange() const;         // returns the distance considered to be within melee range of the entity
     int16  GetRangedWeaponDelay(bool tp); // returns delay of ranged weapon + ammo where applicable
     int16  GetAmmoDelay();                // returns delay of ammo (for cooldown between shots)
     uint16 GetMainWeaponDmg();            // returns total main hand DMG
@@ -650,10 +709,13 @@ public:
     virtual void           OnDisengage(CAttackState&);
     /* Casting */
     virtual void OnCastFinished(CMagicState&, action_t&);
-    virtual void OnCastInterrupted(CMagicState&, action_t&, MSGBASIC_ID msg);
+    virtual void OnCastInterrupted(CMagicState&, action_t&, MSGBASIC_ID msg, bool blockedCast);
     /* Weaponskill */
     virtual void OnWeaponSkillFinished(CWeaponSkillState& state, action_t& action);
     virtual void OnChangeTarget(CBattleEntity* PTarget);
+
+    // Used to set an action to an "interrupted" state
+    void setActionInterrupted(action_t& action, CBattleEntity* PTarget, uint16 messageID, uint16 actionID);
 
     virtual void OnAbility(CAbilityState&, action_t&)
     {
@@ -671,6 +733,9 @@ public:
     void     SetBattleStartTime(time_point);
     duration GetBattleTime();
 
+    void   setBattleID(uint16 battleID);
+    uint16 getBattleID();
+
     virtual void Tick(time_point) override;
     virtual void PostTick() override;
 
@@ -684,10 +749,11 @@ public:
     time_point charmTime; // to hold the time entity is charmed
     bool       isCharmed; // is the battle entity charmed?
 
-    uint8           m_ModelSize;  // размер модели сущности, для расчета дальности физической атаки
-    ECOSYSTEM       m_EcoSystem;  // эко-система сущности
-    CItemEquipment* m_Weapons[4]; // четыре основных ячейки, используемыж для хранения оружия (только оружия)
-    bool            m_dualWield;  // True/false depending on if the entity is using two weapons
+    float           m_ModelRadius; // The radius of the entity model, for calculating the range of a physical attack
+    ECOSYSTEM       m_EcoSystem;   // Entity eco system
+    CItemEquipment* m_Weapons[4];  // Four main slots used to store weapons (weapons only)
+    bool            m_dualWield;   // True/false depending on if the entity is using two weapons
+    DEATH_TYPE      m_DeathType;
 
     TraitList_t TraitList; // список постянно активных способностей в виде указателей
 
@@ -714,6 +780,7 @@ private:
     uint8      m_slvl; // ТЕКУЩИЙ уровень дополнительной профессии
     uint16     m_battleTarget{ 0 };
     time_point m_battleStartTime;
+    uint16     m_battleID = 0; // Current battle the entity is participating in. Battle ID must match in order for entities to interact with each other.
 
     std::unordered_map<Mod, int16, EnumClassHash>                                                m_modStat;     // массив модификаторов
     std::unordered_map<Mod, int16, EnumClassHash>                                                m_modStatSave; // saved state

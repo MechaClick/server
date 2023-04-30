@@ -3,14 +3,16 @@
 -- Geohelix Schema
 -- Teaches the black magic Geohelix
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(278)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.GEOHELIX)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(278)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.GEOHELIX)
 end
 
-return item_object
+return itemObject

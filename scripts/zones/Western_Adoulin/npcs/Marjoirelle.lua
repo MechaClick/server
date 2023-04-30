@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Western Adoulin
 --  NPC: Majoirelle
--- Type: Standard NPC and Quest NPC
 --  Involved With Quest: 'Order Up'
 -- !pos 127 4 -81 256
 -----------------------------------
@@ -14,15 +13,12 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local Order_Up = player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.ORDER_UP)
-    local Order_Marjoirelle = utils.mask.getBit(player:getCharVar("Order_Up_NPCs"), 8)
+    local orderUp = player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.ORDER_UP)
+    local orderMarjoirelle = utils.mask.getBit(player:getCharVar("Order_Up_NPCs"), 8)
 
-    if Order_Up == QUEST_ACCEPTED and not Order_Marjoirelle then
+    if orderUp == QUEST_ACCEPTED and not orderMarjoirelle then
         -- Progresses Quest: 'Order Up'
         player:startEvent(68)
-    else
-        -- Standard Dialogue
-        player:startEvent(538)
     end
 end
 

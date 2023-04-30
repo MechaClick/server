@@ -29,7 +29,7 @@ xi.mix.jobSpecial.config(mob, {
 xi.mix.jobSpecial.config(mob, {
     specials =
     {
-        {id = xi.jsa.MEIKYO_SHISUI, cooldown = 60, hpp = 100},
+        { id = xi.jsa.MEIKYO_SHISUI, cooldown = 60, hpp = 100 },
     },
 })
 
@@ -37,7 +37,7 @@ xi.mix.jobSpecial.config(mob, {
 xi.mix.jobSpecial.config(mob, {
     specials =
     {
-        {id = xi.jsa.MIGHTY_STRIKES, duration = 10, hpp = 100},
+        { id = xi.jsa.MIGHTY_STRIKES, duration = 10, hpp = 100 },
     },
 })
 
@@ -50,8 +50,8 @@ xi.mix.jobSpecial.config(mob, {
     chance = 50,
     specials =
     {
-        {id = xi.jsa.MANAFONT, hpp = 75},
-        {id = xi.jsa.CHAINSPELL, hpp = 25},
+        { id = xi.jsa.MANAFONT, hpp = 75 },
+        { id = xi.jsa.CHAINSPELL, hpp = 25 },
     },
 })
 
@@ -60,9 +60,9 @@ xi.mix.jobSpecial.config(mob, {
     between = 20,
     specials =
     {
-        {id = xi.jsa.MANAFONT, cooldown = 0, hpp = 100},
-        {id = xi.jsa.CHAINSPELL, cooldown = 0, hpp = 100},
-        {id = xi.jsa.BENEDICTION, cooldown = 0, hpp = 100},
+        { id = xi.jsa.MANAFONT, cooldown = 0, hpp = 100 },
+        { id = xi.jsa.CHAINSPELL, cooldown = 0, hpp = 100 },
+        { id = xi.jsa.BENEDICTION, cooldown = 0, hpp = 100 },
     },
 })
 
@@ -94,7 +94,8 @@ xi.mix.jobSpecial = xi.mix.jobSpecial or {}
 
 g_mixins = g_mixins or {}
 
-local job2hr = {
+local job2hr =
+{
     [xi.job.WAR] = xi.jsa.MIGHTY_STRIKES,
     [xi.job.MNK] = xi.jsa.HUNDRED_FISTS,
     [xi.job.WHM] = xi.jsa.BENEDICTION,
@@ -241,11 +242,18 @@ local abilitiesReady = function(mob)
     local now = os.time()
     local readyTime = mob:getLocalVar("[jobSpecial]readyInitial")
 
-    if readyTime > 0 and now > readyTime and now > mob:getLocalVar("[jobSpecial]cooldown") then
+    if
+        readyTime > 0 and
+        now > readyTime and
+        now > mob:getLocalVar("[jobSpecial]cooldown")
+    then
         local numAbilities = mob:getLocalVar("[jobSpecial]numAbilities")
 
         for i = 1, numAbilities do
-            if now > mob:getLocalVar("[jobSpecial]cooldown_" .. i) and mob:getHPP() <= mob:getLocalVar("[jobSpecial]hpp_" .. i)  then
+            if
+                now > mob:getLocalVar("[jobSpecial]cooldown_" .. i) and
+                mob:getHPP() <= mob:getLocalVar("[jobSpecial]hpp_" .. i)
+            then
                 table.insert(abilities, i)
             end
         end
@@ -254,15 +262,14 @@ local abilitiesReady = function(mob)
     return abilities
 end
 
-
 --[[ ----------------------------------------------------------------
     mob listeners
 ---------------------------------------------------------------- --]]
 
 g_mixins.job_special = function(jobSpecialMob)
-
-    -- at spawn, give mob its default main job 2hr, which it'll use at 40-60% HP.
+    -- At spawn, give mob its default main job 2hr, which it'll use at 40-60% HP.
     -- these defaults can be overwritten by using xi.mix.jobSpecial.config() in onMobSpawn.
+
     jobSpecialMob:addListener("SPAWN", "JOB_SPECIAL_SPAWN", function(mob)
         local ability = nil
         local mJob = mob:getMainJob()

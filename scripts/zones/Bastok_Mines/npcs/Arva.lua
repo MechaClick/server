@@ -2,18 +2,18 @@
 -- Area: Bastok Mines
 --  NPC: Arva
 -- Adventurer's Assistant
--- Working 100%
 -----------------------------------
-require("scripts/globals/settings")
 local ID = require("scripts/zones/Bastok_Mines/IDs")
+require("scripts/globals/settings")
 -----------------------------------
 local entity = {}
 
 entity.onTrade = function(player, npc, trade)
-    if (trade:getItemCount() == 1 and trade:hasItemQty(536, 1) == true) then
+    if
+        trade:getItemCount() == 1 and
+        trade:hasItemQty(536, 1)
+    then
         player:startEvent(4)
-        player:addGil(GIL_RATE*50)
-        player:tradeComplete()
     end
 end
 
@@ -25,8 +25,9 @@ entity.onEventUpdate = function(player, csid, option)
 end
 
 entity.onEventFinish = function(player, csid, option)
-    if (csid == 4) then
-        player:messageSpecial(ID.text.GIL_OBTAINED, GIL_RATE*50)
+    if csid == 4 then
+        player:tradeComplete()
+        npcUtil.giveCurrency(player, 'gil', 50)
     end
 end
 

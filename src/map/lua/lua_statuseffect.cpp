@@ -19,8 +19,8 @@
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
-#include "../../common/timer.h"
+#include "common/logging.h"
+#include "common/timer.h"
 
 #include "../status_effect.h"
 #include "lua_statuseffect.h"
@@ -32,7 +32,7 @@ CLuaStatusEffect::CLuaStatusEffect(CStatusEffect* StatusEffect)
 {
     if (StatusEffect == nullptr)
     {
-        ShowError("CLuaStatusEffect created with nullptr instead of valid CStatusEffect*!\n");
+        ShowError("CLuaStatusEffect created with nullptr instead of valid CStatusEffect*!");
     }
 }
 
@@ -84,7 +84,7 @@ uint32 CLuaStatusEffect::getStartTime()
 /************************************************************************
  *                                                                       *
  * Returns remaining ticks until expiry                                  *
- *																		*
+ *                                                                        *
  ************************************************************************/
 
 uint32 CLuaStatusEffect::getLastTick()
@@ -211,6 +211,11 @@ void CLuaStatusEffect::unsetFlag(uint32 flag)
     m_PLuaStatusEffect->UnsetFlag(flag);
 }
 
+uint16 CLuaStatusEffect::getIcon()
+{
+    return m_PLuaStatusEffect->GetIcon();
+}
+
 //======================================================//
 
 void CLuaStatusEffect::Register()
@@ -239,6 +244,13 @@ void CLuaStatusEffect::Register()
     SOL_REGISTER("getFlag", CLuaStatusEffect::getFlag);
     SOL_REGISTER("setFlag", CLuaStatusEffect::setFlag);
     SOL_REGISTER("unsetFlag", CLuaStatusEffect::unsetFlag);
+    SOL_REGISTER("getIcon", CLuaStatusEffect::getIcon);
+}
+
+std::ostream& operator<<(std::ostream& os, const CLuaStatusEffect& effect)
+{
+    std::string id = effect.GetStatusEffect() ? std::to_string(effect.GetStatusEffect()->GetStatusID()) : "nullptr";
+    return os << "CLuaStatusEffect(" << id << ")";
 }
 
 //======================================================//

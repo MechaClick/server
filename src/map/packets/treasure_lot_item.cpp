@@ -19,8 +19,8 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
-#include "../../common/utils.h"
+#include "common/socket.h"
+#include "common/utils.h"
 
 #include <cstring>
 
@@ -30,8 +30,8 @@
 
 CTreasureLotItemPacket::CTreasureLotItemPacket(uint8 slotID, ITEMLOTTYPE MessageType)
 {
-    this->type = 0xD3;
-    this->size = 0x1E;
+    this->setType(0xD3);
+    this->setSize(0x3C);
 
     ref<uint8>(0x14) = slotID;
     ref<uint8>(0x15) = MessageType;
@@ -39,8 +39,8 @@ CTreasureLotItemPacket::CTreasureLotItemPacket(uint8 slotID, ITEMLOTTYPE Message
 
 CTreasureLotItemPacket::CTreasureLotItemPacket(CBaseEntity* PWinner, uint8 slotID, uint16 Lot, ITEMLOTTYPE MessageType)
 {
-    this->type = 0xD3;
-    this->size = 0x1E;
+    this->setType(0xD3);
+    this->setSize(0x3C);
 
     ref<uint32>(0x04) = PWinner->id;
     ref<uint16>(0x0C) = PWinner->targid;
@@ -49,20 +49,20 @@ CTreasureLotItemPacket::CTreasureLotItemPacket(CBaseEntity* PWinner, uint8 slotI
     ref<uint8>(0x14) = slotID;
     ref<uint8>(0x15) = MessageType;
 
-    memcpy(data + (0x16), PWinner->GetName(), PWinner->name.size());
+    memcpy(data + (0x16), PWinner->GetName().c_str(), PWinner->GetName().size());
 }
 
 CTreasureLotItemPacket::CTreasureLotItemPacket(CBaseEntity* PHighestLotter, uint16 HighestLot, CBaseEntity* PLotter, uint8 SlotID, uint16 Lot)
 {
-    this->type = 0xD3;
-    this->size = 0x1E;
+    this->setType(0xD3);
+    this->setSize(0x3C);
 
     if (PHighestLotter)
     {
         ref<uint32>(0x04) = PHighestLotter->id;
         ref<uint16>(0x0C) = PHighestLotter->targid;
         ref<uint16>(0x0E) = HighestLot;
-        memcpy(data + 0x16, PHighestLotter->GetName(), PHighestLotter->name.size());
+        memcpy(data + 0x16, PHighestLotter->GetName().c_str(), PHighestLotter->GetName().size());
     }
 
     ref<uint32>(0x08) = PLotter->id;
@@ -71,5 +71,5 @@ CTreasureLotItemPacket::CTreasureLotItemPacket(CBaseEntity* PHighestLotter, uint
     // ref<uint8>(data,(0x12)) = Lot;
     ref<uint8>(0x14) = SlotID;
 
-    memcpy(data + 0x26, PLotter->GetName(), PLotter->name.size());
+    memcpy(data + 0x26, PLotter->GetName().c_str(), PLotter->GetName().size());
 }

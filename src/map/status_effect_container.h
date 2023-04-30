@@ -70,6 +70,14 @@ public:
     CStatusEffect* GetStatusEffect(EFFECT StatusID);
     CStatusEffect* GetStatusEffect(EFFECT StatusID, uint32 SubID);
 
+    std::vector<EFFECT> GetStatusEffectsInIDRange(EFFECT start, EFFECT end);
+
+    uint8  GetStatusEffectCountInIDRange(EFFECT start, EFFECT end);
+    EFFECT GetNewestStatusEffectInIDRange(EFFECT start, EFFECT end);
+    void   RemoveOldestStatusEffectInIDRange(EFFECT start, EFFECT end);
+    void   RemoveNewestStatusEffectInIDRange(EFFECT start, EFFECT end);
+    void   RemoveAllStatusEffectsInIDRange(EFFECT start, EFFECT end);
+
     void UpdateStatusIcons(); // пересчитываем иконки эффектов
     void CheckEffectsExpiry(time_point tick);
     void TickEffects(time_point tick);
@@ -87,13 +95,22 @@ public:
     bool HasCorsairEffect(uint32 charid);
     void Fold(uint32 charid);
 
-    uint8 GetActiveManeuvers();
+    uint8 GetActiveManeuverCount();
     void  RemoveOldestManeuver();
     void  RemoveAllManeuvers();
 
+    std::vector<EFFECT> GetAllRuneEffects();
+
+    uint8  GetActiveRuneCount();
+    EFFECT GetHighestRuneEffect();
+    EFFECT GetNewestRuneEffect();
+    void   RemoveOldestRune();
+    void   RemoveNewestRune();
+    void   RemoveAllRunes();
+
     void WakeUp(); // remove sleep effects
     bool IsAsleep();
-    bool HasPreventActionEffect(); // checks if owner has an effect that prevents actions, like stun, petrify, sleep etc
+    bool HasPreventActionEffect(bool ignoreCharm = false); // checks if owner has an effect that prevents actions, like stun, petrify, sleep etc
 
     uint16 GetConfrontationEffect();                        // gets confrontation number (bcnm, confrontation, campaign, reive mark)
     void   CopyConfrontationEffect(CBattleEntity* PEntity); // copies confrontation status (pet summoning, etc)

@@ -20,7 +20,7 @@ CREATE TABLE `despoil_effects` (
   `itemId` smallint(5) unsigned NOT NULL,
   `effectId` smallint(5) unsigned NOT NULL,
   PRIMARY KEY (`itemId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -29,13 +29,13 @@ CREATE TABLE `despoil_effects` (
 
 LOCK TABLES `despoil_effects` WRITE;
 /*!40000 ALTER TABLE `despoil_effects` DISABLE KEYS */;
-INSERT INTO `despoil_effects` VALUES (644,149);		-- Mythril Ore, Defense Down
-INSERT INTO `despoil_effects` VALUES (842,146); 	-- Giant Bird Feather, Accuracy Down
-INSERT INTO `despoil_effects` VALUES (881,149); 	-- Crab Shell, Defense Down
-INSERT INTO `despoil_effects` VALUES (955,167);		-- Golem Shard, Magic Defense Down
-INSERT INTO `despoil_effects` VALUES (2334,175);	-- Poroggo Hat, Magic Attack Down
-INSERT INTO `despoil_effects` VALUES (4376,147);	-- Meat Jerky, Attack Down
-INSERT INTO `despoil_effects` VALUES (4400,13);		-- Land Crab Meat, Slow
+INSERT INTO `despoil_effects` VALUES (644,149);        -- Mythril Ore, Defense Down
+INSERT INTO `despoil_effects` VALUES (842,146);     -- Giant Bird Feather, Accuracy Down
+INSERT INTO `despoil_effects` VALUES (881,149);     -- Crab Shell, Defense Down
+INSERT INTO `despoil_effects` VALUES (955,167);        -- Golem Shard, Magic Defense Down
+INSERT INTO `despoil_effects` VALUES (2334,175);    -- Poroggo Hat, Magic Attack Down
+INSERT INTO `despoil_effects` VALUES (4376,147);    -- Meat Jerky, Attack Down
+INSERT INTO `despoil_effects` VALUES (4400,13);        -- Land Crab Meat, Slow
 /*!40000 ALTER TABLE `despoil_effects` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

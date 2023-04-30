@@ -8,21 +8,24 @@ require("scripts/globals/conquest")
 require("scripts/globals/zone")
 require("scripts/globals/msg")
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target, param, caster)
-    if (target:getNation() ~= xi.nation.WINDURST) then
+itemObject.onItemCheck = function(target, user)
+    if target:getNation() ~= xi.nation.WINDURST then
         return xi.msg.basic.ITEM_CANNOT_USE_ON
     end
 
     -- If target's current region is not a conquest region or not a nation city involved with conquest
-    if (target:getCurrentRegion() > xi.region.JEUNO) then
+    if target:getCurrentRegion() > xi.region.JEUNO then
         return xi.msg.basic.ITEM_UNABLE_TO_USE
     end
 
     -- Can only use on targets within party or self
-    if (target:getID() ~= caster:getID()) then
-        if (caster:getPartyLeader() == nil or target:getPartyLeader():getID() ~= caster:getPartyLeader():getID()) then
+    if target:getID() ~= user:getID() then
+        if
+            user:getPartyLeader() == nil or
+            target:getPartyLeader():getID() ~= user:getPartyLeader():getID()
+        then
             return xi.msg.basic.ITEM_CANNOT_USE_ON
         end
     end
@@ -30,9 +33,9 @@ item_object.onItemCheck = function(target, param, caster)
     return 0
 end
 
-item_object.onItemUse = function(target)
+itemObject.onItemUse = function(target)
     target:delStatusEffectsByFlag(xi.effectFlag.INFLUENCE, true)
     target:addStatusEffect(xi.effect.SIGNET, 0, 0, 18000)
 end
 
-return item_object
+return itemObject

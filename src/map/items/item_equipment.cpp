@@ -29,15 +29,16 @@ CItemEquipment::CItemEquipment(uint16 id)
 {
     setType(ITEM_EQUIPMENT);
 
-    m_jobs         = 0;
-    m_modelID      = 0;
-    m_removeSlotID = 0;
-    m_shieldSize   = 0;
-    m_scriptType   = 0;
-    m_reqLvl       = 255;
-    m_iLvl         = 0;
-    m_equipSlotID  = 255;
-    m_absorption   = 0;
+    m_jobs          = 0;
+    m_modelID       = 0;
+    m_removeSlotID  = 0;
+    m_shieldSize    = 0;
+    m_scriptType    = 0;
+    m_reqLvl        = 255;
+    m_iLvl          = 0;
+    m_equipSlotID   = 255;
+    m_absorption    = 0;
+    m_superiorLevel = 0;
 }
 
 CItemEquipment::~CItemEquipment()
@@ -122,38 +123,30 @@ uint8 CItemEquipment::getSlotType() const
     return result;
 }
 
-/************************************************************************
- *																		*
- *  Процент урона, блокируемого щитом                                    *
- *																		*
- ************************************************************************/
+uint8 CItemEquipment::getSuperiorLevel()
+{
+    return m_superiorLevel;
+}
 
+void CItemEquipment::setSuperiorLevel(uint8 level)
+{
+    m_superiorLevel = level;
+}
+
+// percentage of damage blocked by shield
 uint8 CItemEquipment::getShieldAbsorption() const
 {
     return m_absorption;
 }
 
-/************************************************************************
- *																		*
- *  Проверяем, является ли проедмет щитом                                *
- *																		*
- ************************************************************************/
-
+// check if item is a shield via shield size
 bool CItemEquipment::IsShield() const
 {
     return m_shieldSize > 0 && m_shieldSize <= 6;
 }
 
-/************************************************************************
- *																		*
- *  Проверяем необходимость выполнения скрипта для экипировки при		*
- *  возникновении какого-либо из событий (экипировка, смена зоны и т.п.)	*
- *																		*
- *  Функция возвращает типы событий на которые предмет реагирует, что	*
- *  избавляет нас от необходимости проверять	предмет во всех событиях	*
- *																		*
- ************************************************************************/
-
+// return script type for events such as gear change, zone change, etc
+// the function returns the type of event which saves us from having to check in all events
 uint16 CItemEquipment::getScriptType() const
 {
     return m_scriptType;
@@ -164,12 +157,7 @@ void CItemEquipment::setScriptType(uint16 ScriptType)
     m_scriptType = ScriptType;
 }
 
-/************************************************************************
- *                                                                       *
- *  Добавляем модификатор к предмету                                     *
- *                                                                       *
- ************************************************************************/
-
+// add item modifier
 void CItemEquipment::addModifier(CModifier modifier)
 {
     if (IsShield() && modifier.getModID() == Mod::DEF)
@@ -200,7 +188,7 @@ void CItemEquipment::addModifier(CModifier modifier)
     modList.push_back(modifier);
 }
 
-int16 CItemEquipment::getModifier(Mod mod)
+int16 CItemEquipment::getModifier(Mod mod) const
 {
     for (auto& i : modList)
     {
@@ -223,11 +211,41 @@ void CItemEquipment::addLatent(LATENT ConditionsID, uint16 ConditionsValue, Mod 
     latentList.push_back(latent);
 }
 
-/************************************************************************
- *                                                                       *
- *                                                                       *
- *                                                                       *
- ************************************************************************/
+bool CItemEquipment::delModifier(Mod mod, int16 modValue)
+{
+    // clang-format off
+    auto it = std::find_if(modList.begin(), modList.end(), [mod, modValue](const CModifier& compare)
+    {
+        return compare.getModID() == mod && compare.getModAmount() == modValue;
+    });
+    // clang-format on
+
+    if (it == modList.end())
+    {
+        return false;
+    }
+
+    modList.erase(it);
+    return true;
+}
+
+bool CItemEquipment::delPetModifier(Mod mod, PetModType petType, int16 modValue)
+{
+    // clang-format off
+    auto it = std::find_if(petModList.begin(), petModList.end(), [mod, petType, modValue](const CPetModifier& compare)
+    {
+        return compare.getModID() == mod && compare.getPetModType() == petType && compare.getModAmount() == modValue;
+    });
+    // clang-format on
+
+    if (it == petModList.end())
+    {
+        return false;
+    }
+
+    petModList.erase(it);
+    return true;
+}
 
 void CItemEquipment::setTrialNumber(uint16 trial)
 {
@@ -245,7 +263,7 @@ void CItemEquipment::setTrialNumber(uint16 trial)
 
     trial &= 0x7FFF; // Trial is only 15 bits long
     ref<uint16>(m_extra, 0x0A) &= ~0x7FFF;
-    ref<uint16>(m_extra, 0x0A) |= (uint16)trial;
+    ref<uint16>(m_extra, 0x0A) |= trial;
 }
 
 uint16 CItemEquipment::getTrialNumber()
@@ -305,17 +323,17 @@ void CItemEquipment::SetAugmentMod(uint16 type, uint8 value)
     // obtain augment info by querying the db
     const char* fmtQuery = "SELECT augmentId, multiplier, modId, `value`, `isPet`, `petType` FROM augments WHERE augmentId = %u";
 
-    int32 ret = Sql_Query(SqlHandle, fmtQuery, type);
+    int32 ret = sql->Query(fmtQuery, type);
 
-    while (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+    while (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
     {
-        uint8 multiplier = (uint8)Sql_GetUIntData(SqlHandle, 1);
-        Mod   modId      = static_cast<Mod>(Sql_GetUIntData(SqlHandle, 2));
-        int16 modValue   = (int16)Sql_GetIntData(SqlHandle, 3);
+        uint8 multiplier = (uint8)sql->GetUIntData(1);
+        Mod   modId      = static_cast<Mod>(sql->GetUIntData(2));
+        int16 modValue   = (int16)sql->GetIntData(3);
 
         // type is 0 unless mod is for pets
-        uint8      isPet   = (uint8)Sql_GetUIntData(SqlHandle, 4);
-        PetModType petType = static_cast<PetModType>(Sql_GetIntData(SqlHandle, 5));
+        uint8      isPet   = (uint8)sql->GetUIntData(4);
+        PetModType petType = static_cast<PetModType>(sql->GetIntData(5));
 
         // apply modifier to item. increase modifier power by 'value' (default magnitude 1 for most augments) if multiplier isn't specified
         // otherwise increase modifier power using the multiplier

@@ -8,7 +8,8 @@ require("scripts/globals/npc_util")
 -----------------------------------
 local entity = {}
 
-local stock = {
+local stock =
+{
     16119,  -- Nomad Cap
     16118,  -- Moogle Cap
     18401,  -- Moogle Rod
@@ -19,7 +20,8 @@ local stock = {
     10293,  -- Chocobo Shirt
 }
 
-local festiveItemVars = {
+local festiveItemVars =
+{
     [1] = "festiveMoogleNomadCap",
     [2] = "festiveMoogleMoogleCap",
     [3] = "festiveMoogleMoogleRod",
@@ -38,10 +40,11 @@ local function getFestiveItems(player)
             table.insert(festiveItemsAvailable, stock[i])
         end
     end
+
     return festiveItemsAvailable
 end
 
-entity.onTrade = function(player,npc,trade)
+entity.onTrade = function(player, npc, trade)
     --TODO: trade of pells for prize
 end
 

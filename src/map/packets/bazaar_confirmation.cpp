@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
@@ -30,20 +30,20 @@
 
 CBazaarConfirmationPacket::CBazaarConfirmationPacket(CCharEntity* PChar, uint8 SlotID, uint8 Quantity)
 {
-    this->type = 0x09; // 0x109
-    this->size = 0x13;
+    this->setType(0x109);
+    this->setSize(0x26);
 
     ref<uint32>(0x04) = PChar->id;
     ref<uint8>(0x08)  = Quantity;
     ref<uint8>(0x20)  = SlotID;
 
-    memcpy(data + (0x10), PChar->GetName(), PChar->name.size());
+    memcpy(data + (0x10), PChar->GetName().c_str(), PChar->GetName().size());
 }
 
 CBazaarConfirmationPacket::CBazaarConfirmationPacket(CCharEntity* PChar, CItem* PItem)
 {
-    this->type = 0x0A; // 0x10A
-    this->size = 0x11;
+    this->setType(0x10A);
+    this->setSize(0x22);
 
     if (PItem)
     {
@@ -51,5 +51,5 @@ CBazaarConfirmationPacket::CBazaarConfirmationPacket(CCharEntity* PChar, CItem* 
         ref<uint16>(0x08) = PItem->getID();
     }
 
-    memcpy(data + (0x0A), PChar->GetName(), PChar->name.size());
+    memcpy(data + (0x0A), PChar->GetName().c_str(), PChar->GetName().size());
 }

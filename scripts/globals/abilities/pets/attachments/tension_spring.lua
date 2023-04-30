@@ -2,41 +2,27 @@
 -- Attachment: Tension Spring
 -----------------------------------
 require("scripts/globals/automaton")
-require("scripts/globals/status")
 -----------------------------------
-local attachment_object = {}
+local attachmentObject = {}
 
-attachment_object.onEquip = function(pet)
-    attachment_object.onUpdate(pet, 0)
+attachmentObject.onEquip = function(pet, attachment)
+    xi.automaton.onAttachmentEquip(pet, attachment)
 end
 
-attachment_object.onUnequip = function(pet)
-    updateModPerformance(pet, xi.mod.ATTP, 'tension_attp', 0)
-    updateModPerformance(pet, xi.mod.RATTP, 'tension_rattp', 0)
+attachmentObject.onUnequip = function(pet, attachment)
+    xi.automaton.onAttachmentUnequip(pet, attachment)
 end
 
-attachment_object.onManeuverGain = function(pet, maneuvers)
-    attachment_object.onUpdate(pet, maneuvers)
+attachmentObject.onManeuverGain = function(pet, attachment, maneuvers)
+    xi.automaton.onManeuverGain(pet, attachment, maneuvers)
 end
 
-attachment_object.onManeuverLose = function(pet, maneuvers)
-    attachment_object.onUpdate(pet, maneuvers - 1)
+attachmentObject.onManeuverLose = function(pet, attachment, maneuvers)
+    xi.automaton.onManeuverLose(pet, attachment, maneuvers)
 end
 
-attachment_object.onUpdate = function(pet, maneuvers)
-    if maneuvers == 0 then
-        updateModPerformance(pet, xi.mod.ATTP, 'tension_attp', 3)
-        updateModPerformance(pet, xi.mod.RATTP, 'tension_rattp', 3)
-    elseif maneuvers == 1 then
-        updateModPerformance(pet, xi.mod.ATTP, 'tension_attp', 6)
-        updateModPerformance(pet, xi.mod.RATTP, 'tension_rattp', 6)
-    elseif maneuvers == 2 then
-        updateModPerformance(pet, xi.mod.ATTP, 'tension_attp', 9)
-        updateModPerformance(pet, xi.mod.RATTP, 'tension_rattp', 9)
-    elseif maneuvers == 3 then
-        updateModPerformance(pet, xi.mod.ATTP, 'tension_attp', 12)
-        updateModPerformance(pet, xi.mod.RATTP, 'tension_rattp', 12)
-    end
+attachmentObject.onUpdate = function(pet, attachment, maneuvers)
+    xi.automaton.updateAttachmentModifier(pet, attachment, maneuvers)
 end
 
-return attachment_object
+return attachmentObject

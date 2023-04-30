@@ -1,13 +1,15 @@
 -----------------------------------
 -- Drenched! It Began with a Raindrop
 -- A Moogle Kupo d'Etat M2
------------------------------------
 -- !addmission 10 1
+-- ORCISH_PLATE_ARMOR : !additem 2757
+-- QUADAV_BACKSCALE   : !additem 2758
+-- YAGUDO_CAULK       : !additem 2759
 -----------------------------------
-require("scripts/globals/items")
+require('scripts/globals/items')
 require('scripts/globals/missions')
 require('scripts/globals/moghouse')
-require("scripts/globals/npc_util")
+require('scripts/globals/npc_util')
 require('scripts/globals/interaction/mission')
 require('scripts/globals/zone')
 -----------------------------------
@@ -26,7 +28,7 @@ mission.sections[1] = {} -- REMEMBER: Lua is 1-indexed!
 
 mission.sections[1].check = function(player, currentMission, missionStatus, vars)
     return currentMission == mission.missionId and
-           xi.moghouse.isInMogHouseInHomeNation(player)
+        xi.moghouse.isInMogHouseInHomeNation(player)
 end
 
 local moogleTriggerEvent =
@@ -34,13 +36,10 @@ local moogleTriggerEvent =
     ['Moogle'] =
     {
         onTrade = function(player, npc, trade)
-            if npcUtil.tradeHasExactly(trade, {
-                    xi.items.ORCISH_PLATE_ARMOR,
-                    xi.items.QUADAV_BACKSCALE,
-                    xi.items.YAGUDO_CAULK
-                })
+            if
+                npcUtil.tradeHasExactly(trade, { xi.items.ORCISH_PLATE_ARMOR, xi.items.QUADAV_BACKSCALE, xi.items.YAGUDO_CAULK })
             then
-                player:progressEvent(30024)
+                return mission:progressEvent(30024)
             end
         end,
     },
@@ -48,7 +47,9 @@ local moogleTriggerEvent =
     onEventFinish =
     {
         [30024] = function(player, csid, option, npc)
-            mission:complete(player)
+            if mission:complete(player) then
+                player:confirmTrade()
+            end
         end,
     },
 }

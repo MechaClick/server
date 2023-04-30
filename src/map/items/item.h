@@ -22,10 +22,10 @@
 #ifndef _CITEM_H
 #define _CITEM_H
 
-#include "../../common/cbasetypes.h"
-#include "../../common/mmo.h"
+#include "common/cbasetypes.h"
+#include "common/mmo.h"
 
-// основной тип предмета m_type
+// The main type of item m_type
 
 enum ITEM_TYPE
 {
@@ -40,7 +40,7 @@ enum ITEM_TYPE
     ITEM_LINKSHELL  = 0x80
 };
 
-// дополнительный тип предмета m_subtype
+// Additional type of object m_subtype
 
 enum ITEM_SUBTYPE
 {
@@ -51,7 +51,7 @@ enum ITEM_SUBTYPE
     ITEM_UNLOCKED  = 0xFE
 };
 
-// флаги предметов
+// Flags of objects
 
 enum ITEM_FLAG
 {
@@ -82,6 +82,7 @@ public:
     uint16 getID() const;
     uint16 getSubID() const;
     uint16 getFlag() const;
+    uint8  getAppraisalID() const;
     uint8  getAHCat() const;
     uint32 getReserve() const;
     uint32 getQuantity() const;
@@ -100,6 +101,7 @@ public:
     void setSubID(uint16);
     void setSubType(uint8);
     void setFlag(uint16);
+    void setAppraisalID(uint8 appraisailID);
     void setAHCat(uint8);
     void setReserve(uint32);
     void setQuantity(uint32);
@@ -110,17 +112,23 @@ public:
     void setSlotID(uint8 SlotID);
     void setSent(bool sent);
 
-    const int8* getName();
-    void        setName(int8* name);
+    const std::string& getName();
+    void               setName(std::string name);
 
-    const int8* getSender();
-    void        setSender(int8* sender);
+    const std::string& getSender();
+    void               setSender(std::string sender);
 
-    const int8* getReceiver();
-    void        setReceiver(int8* receiver);
+    const std::string& getReceiver();
+    void               setReceiver(std::string receiver);
 
-    virtual const int8* getSignature();
-    virtual void        setSignature(int8* signature);
+    virtual const std::string getSignature();
+    virtual void              setSignature(std::string signature);
+
+    bool isSoultrapper() const;
+    void setSoulPlateData(std::string const& name, uint16 mobFamily, uint8 zeni, uint16 skillIndex, uint8 fp);
+    auto getSoulPlateData() -> std::tuple<std::string, uint16, uint8, uint16, uint8>;
+
+    bool isMannequin() const;
 
     static constexpr uint32_t extra_size = 0x18;
     uint8                     m_extra[extra_size]; // any extra data pertaining to item (augments, furniture location, etc)
@@ -133,22 +141,22 @@ private:
     uint16 m_subid;
     uint8  m_type;
     uint8  m_subtype;
-    uint32 m_quantity;  // текущее количество предметов
-    uint32 m_reserve;   // зарезервированное количество предметов
-    uint32 m_stackSize; // максимальное количество предметов
+    uint32 m_quantity; // Current number of items
+    uint32 m_reserve;
+    uint32 m_stackSize; // The maximum number of items
     uint32 m_BasePrice;
-    uint32 m_CharPrice; // стоимость предмета в bazaar
-    uint8  m_ahCat;     // категоряи предмета на укционе
+    uint32 m_CharPrice; // The cost of the subject in Bazaar
+    uint8  m_ahCat;     // auction category
     uint16 m_flag;
 
-    uint8 m_slotID;     // ячейка предмета в хранилище
-    uint8 m_locationID; // номер хранилища предмета
+    uint8 m_slotID;     // Cell of the object in the storage
+    uint8 m_locationID; // storage number
 
     bool m_sent;
 
-    string_t m_name;
-    string_t m_send;
-    string_t m_recv;
+    std::string m_name;
+    std::string m_send;
+    std::string m_recv;
 };
 
 #endif

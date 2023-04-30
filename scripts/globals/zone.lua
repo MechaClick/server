@@ -4,9 +4,6 @@
 -- related to area specific things
 --
 -----------------------------------
-require('scripts/globals/settings')
-require('scripts/globals/common')
------------------------------------
 
 xi = xi or {}
 
@@ -231,6 +228,7 @@ xi.zone =
     RUAUN_GARDENS                   = 130,
     MORDION_GAOL                    = 131,
     ABYSSEA_LA_THEINE               = 132,
+    OUTER_RAKAZNAR_U2               = 133,
     DYNAMIS_BEAUCEDINE              = 134,
     DYNAMIS_XARCABARD               = 135,
     BEAUCEDINE_GLACIER_S            = 136,
@@ -286,6 +284,7 @@ xi.zone =
     DYNAMIS_BASTOK                  = 186,
     DYNAMIS_WINDURST                = 187,
     DYNAMIS_JEUNO                   = 188,
+    OUTER_RAKAZNAR_U3               = 189,
     KING_RANPERRES_TOMB             = 190,
     DANGRUF_WADI                    = 191,
     INNER_HORUTOTO_RUINS            = 192,
@@ -323,6 +322,7 @@ xi.zone =
     KAZHAM_JEUNO_AIRSHIP            = 226,
     SHIP_BOUND_FOR_SELBINA_PIRATES  = 227,
     SHIP_BOUND_FOR_MHAURA_PIRATES   = 228,
+    THRONE_ROOM_V                   = 229,
     SOUTHERN_SAN_DORIA              = 230,
     NORTHERN_SAN_DORIA              = 231,
     PORT_SAN_DORIA                  = 232,
@@ -368,9 +368,10 @@ xi.zone =
     DHO_GATES                       = 272,
     WOH_GATES                       = 273,
     OUTER_RAKAZNAR                  = 274,
-    OUTER_RAKAZNAR_U                = 275,
+    OUTER_RAKAZNAR_U1               = 275,
     RAKAZNAR_INNER_COURT            = 276,
     RAKAZNAR_TURRIS                 = 277,
+    GWORA_CORRIDOR                  = 278,
     WALK_OF_ECHOES_P2               = 279,
     MOG_GARDEN                      = 280,
     LEAFALLIA                       = 281,
@@ -420,12 +421,25 @@ xi.expansionRegion.ORIGINAL_ROTZ = set{
     xi.region.DYNAMIS,
 }
 
+xi.expansionRegion.ABYSSEA = set{
+    xi.region.ABYSSEA_KONSCHTAT,
+    xi.region.ABYSSEA_TAHRONGI,
+    xi.region.ABYSSEA_LA_THEINE,
+    xi.region.ABYSSEA_ATTOHWA,
+    xi.region.ABYSSEA_MISAREAUX,
+    xi.region.ABYSSEA_VUNKERL,
+    xi.region.ABYSSEA_ALTEPA,
+    xi.region.ABYSSEA_ULEGUERAND,
+    xi.region.ABYSSEA_GRAUBERG,
+    xi.region.ABYSSEA_EMPYREAL_PARADOX,
+}
+
 -----------------------------------
 -- SetExplorerMoogles
 -----------------------------------
 
 function SetExplorerMoogles(moogle)
-    if EXPLORER_MOOGLE_LV ~= 0 then
+    if xi.settings.main.EXPLORER_MOOGLE_LV ~= 0 then
         local npc = GetNPCByID(moogle)
         if npc == nil then
             printf("'SetExplorerMoogles' Error trying to load undefined npc (%d)", moogle)

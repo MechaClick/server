@@ -4,19 +4,21 @@
 -- When used, you will obtain one partial stack of Dogbolt +5
 -----------------------------------
 require("scripts/globals/msg")
+require("scripts/globals/items")
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     local result = 0
     if target:getFreeSlotsCount() == 0 then
         result = xi.msg.basic.ITEM_NO_USE_INVENTORY
     end
+
     return result
 end
 
-item_object.onItemUse = function(target)
-    target:addItem(18194, math.random(99))
+itemObject.onItemUse = function(target)
+    target:addItem(xi.items.DOGBOLT_P5, math.random(10, 20))
 end
 
-return item_object
+return itemObject

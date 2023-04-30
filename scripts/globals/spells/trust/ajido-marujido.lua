@@ -6,20 +6,18 @@ require("scripts/globals/magic")
 require("scripts/globals/status")
 require("scripts/globals/trust")
 -----------------------------------
-local spell_object = {}
+local spellObject = {}
 
-local message_page_offset = 8
-
-spell_object.onMagicCastingCheck = function(caster, target, spell)
+spellObject.onMagicCastingCheck = function(caster, target, spell)
     return xi.trust.canCast(caster, spell)
 end
 
-spell_object.onSpellCast = function(caster, target, spell)
+spellObject.onSpellCast = function(caster, target, spell)
     return xi.trust.spawn(caster, spell)
 end
 
-spell_object.onMobSpawn = function(mob)
-    xi.trust.teamworkMessage(mob, message_page_offset, {
+spellObject.onMobSpawn = function(mob)
+    xi.trust.teamworkMessage(mob, {
         [xi.magic.spell.SHANTOTTO] = xi.trust.message_offset.TEAMWORK_1,
         [xi.magic.spell.STAR_SIBYL] = xi.trust.message_offset.TEAMWORK_2,
         [xi.magic.spell.KORU_MORU] = xi.trust.message_offset.TEAMWORK_3,
@@ -40,12 +38,12 @@ spell_object.onMobSpawn = function(mob)
                         ai.r.MA, ai.s.HIGHEST, xi.magic.spellFamily.NONE, 60)
 end
 
-spell_object.onMobDespawn = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DESPAWN)
+spellObject.onMobDespawn = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DESPAWN)
 end
 
-spell_object.onMobDeath = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DEATH)
+spellObject.onMobDeath = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DEATH)
 end
 
-return spell_object
+return spellObject

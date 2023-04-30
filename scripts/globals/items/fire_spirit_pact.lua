@@ -3,14 +3,16 @@
 -- Fire Spirit Pact
 -- Teaches the summoning magicFire Spirit
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(288)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.FIRE_SPIRIT)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(288)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.FIRE_SPIRIT)
 end
 
-return item_object
+return itemObject

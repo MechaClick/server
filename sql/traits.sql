@@ -27,7 +27,7 @@ CREATE TABLE `traits` (
   `content_tag` varchar(7) DEFAULT NULL,
   `meritid` smallint(5) NOT NULL DEFAULT 0,
   PRIMARY KEY (`traitid`,`job`,`level`,`rank`,`modifier`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -323,7 +323,7 @@ INSERT INTO `traits` VALUES (41,'arcana killer',8,86,2,232,10,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (42,'demon killer',12,40,1,234,8,NULL,0);
 INSERT INTO `traits` VALUES (42,'demon killer',12,86,2,234,10,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (43,'dragon killer',14,25,1,233,8,NULL,0);
-INSERT INTO `traits` VALUES (43,'dragon killer',14,86,1,233,10,'ABYSSEA',0);
+INSERT INTO `traits` VALUES (43,'dragon killer',14,86,2,233,10,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (48,'resist sleep',7,20,1,240,10,NULL,0);
 INSERT INTO `traits` VALUES (48,'resist sleep',7,40,2,240,15,NULL,0);
 INSERT INTO `traits` VALUES (48,'resist sleep',7,60,3,240,20,NULL,0);
@@ -506,7 +506,7 @@ INSERT INTO `traits` VALUES (100,'tactical parry',19,91,3,486,40,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (100,'tactical parry',19,97,4,486,50,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (100,'tactical parry',22,40,1,486,20,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (100,'tactical parry',22,60,2,486,30,'ABYSSEA',0);
-INSERT INTO `traits` VALUES (100,'tactical parry',22,97,3,486,40,'ABYSSEA',0);
+INSERT INTO `traits` VALUES (100,'tactical parry',22,85,3,486,40,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (101,'tactical guard',2,77,1,899,30,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (101,'tactical guard',2,87,2,899,45,'ABYSSEA',0);
 INSERT INTO `traits` VALUES (101,'tactical guard',2,97,3,899,60,'ABYSSEA',0);
@@ -706,6 +706,13 @@ INSERT INTO `traits` VALUES (127,'smite',8,95,5,898,76,'SOA',0);
 INSERT INTO `traits` VALUES (127,'smite',14,40,1,898,25,'SOA',0);
 INSERT INTO `traits` VALUES (127,'smite',14,80,2,898,38,'SOA',0);
 INSERT INTO `traits` VALUES (127,'smite',18,60,1,898,25,'SOA',0);
+
+INSERT INTO `traits` VALUES (134,'ws damage boost',14,45,1,840,7,'ROV',0);
+INSERT INTO `traits` VALUES (134,'ws damage boost',14,55,2,840,10,'ROV',0);
+INSERT INTO `traits` VALUES (134,'ws damage boost',14,65,3,840,13,'ROV',0);
+INSERT INTO `traits` VALUES (134,'ws damage boost',14,75,4,840,16,'ROV',0);
+INSERT INTO `traits` VALUES (134,'ws damage boost',14,85,5,840,19,'ROV',0);
+INSERT INTO `traits` VALUES (134,'ws damage boost',14,95,6,840,21,'ROV',0);
 
 /*!40000 ALTER TABLE `traits` ENABLE KEYS */;
 UNLOCK TABLES;

@@ -3,14 +3,16 @@
 -- Klimaform Schema
 -- Teaches the black magic Klimaform
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(287)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.KLIMAFORM)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(287)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.KLIMAFORM)
 end
 
-return item_object
+return itemObject

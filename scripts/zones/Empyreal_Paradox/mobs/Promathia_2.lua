@@ -11,8 +11,9 @@ require("scripts/globals/magic")
 local entity = {}
 
 entity.onMobInitialize = function(mob)
-    mob:addMod(xi.mod.REGAIN, 50)
+    mob:addMod(xi.mod.REGAIN, 75)
     mob:addMod(xi.mod.UFASTCAST, 50)
+    mob:setMobMod(xi.mobMod.MAGIC_COOL, 15)
 end
 
 entity.onMobSpawn = function(mob)
@@ -41,9 +42,15 @@ entity.onMobFight = function(mob, target)
     if mob:getAnimationSub() == 3 and not mob:hasStatusEffect(xi.effect.STUN) then
         mob:setAnimationSub(0)
         mob:stun(1500)
-    elseif mob:getAnimationSub() == 2 and not mob:hasStatusEffect(xi.effect.MAGIC_SHIELD) then
+    elseif
+        mob:getAnimationSub() == 2 and
+        not mob:hasStatusEffect(xi.effect.MAGIC_SHIELD)
+    then
         mob:setAnimationSub(0)
-    elseif mob:getAnimationSub() == 1 and not mob:hasStatusEffect(xi.effect.PHYSICAL_SHIELD) then
+    elseif
+        mob:getAnimationSub() == 1 and
+        not mob:hasStatusEffect(xi.effect.PHYSICAL_SHIELD)
+    then
         mob:setAnimationSub(0)
     end
 
@@ -75,7 +82,7 @@ entity.onMagicCastingCheck = function(mob, target, spell)
     end
 end
 
-entity.onMobDeath = function(mob, player, isKiller)
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

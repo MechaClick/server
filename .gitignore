@@ -16,6 +16,8 @@ TestResults
 
 # Build results
 build/
+lbuild/
+out/
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -71,7 +73,7 @@ cmake-*
 *.ncrunch*
 .*crunch*.local.xml
 
-# Installshield output folder 
+# Installshield output folder
 [Ee]xpress
 
 # DocProject is a documentation generator add-in
@@ -130,12 +132,10 @@ UpgradeLog*.XML
 *.app
 
 # Generated executables
-/topaz_connect
-/topaz_game
-/topaz_search
-/topaz_connect_64
-/topaz_game_64
-/topaz_search_64
+/xi_connect
+/xi_map
+/xi_search
+/xi_world
 
 # Generated files, mostly autotools-related
 .deps
@@ -168,7 +168,7 @@ log/leaks.txt
 .metadata/**
 .project
 .vs
-/win32/.vs/topaz/v15
+/win32/.vs/xi/v15
 
 # VS Code
 .vscode
@@ -199,9 +199,41 @@ cmake_install.cmake
 /conf/server_message.conf
 /conf/server_message_fr.conf
 
+# non-default settings script files containing server specific things
+/scripts/settings/main.lua
+/settings/*.lua
+
 # Tool/misc configs
 /tools/config.yaml
 ip.txt
 
 # Tracy download
 ext/tracy/
+tracy.tar.gz
+
+# Valgrind
+*.memcheck.log
+*.callgrind.log
+callgrind.out.*
+memcheck.out.*
+
+# Memory dumps
+*.dmp
+
+# Auto-generated files
+/src/common/version.cpp
+
+# Module init file
+modules/init.txt
+
+# Doxygen
+doxygen/
+
+# Docker (not supported)
+Dockerfile
+docker-compose*
+
+# dSYM folders for Mac OS debugging
+xi_map.dSYM
+xi_connect.dSYM
+xi_search.dSYM

@@ -11,11 +11,9 @@ local ID = require("scripts/zones/Al_Zahbi/IDs")
 local entity = {}
 
 entity.onTrade = function(player, npc, trade)
-    local guildMember = isGuildMember(player, 7)
-
-    if guildMember == 1 then
+    if xi.crafting.hasJoinedGuild(player, xi.crafting.guild.LEATHERCRAFT) then
         if trade:hasItemQty(2184, 1) and trade:getItemCount() == 1 then
-            if player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) == false then
+            if not player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) then
                 player:tradeComplete()
                 player:startEvent(227, 8, 0, 0, 0, 188, 0, 5, 0)
             else
@@ -26,14 +24,13 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local guildMember = isGuildMember(player, 7)
-    local SkillLevel = player:getSkillLevel(xi.skill.LEATHERCRAFT)
+    local skillLevel = player:getSkillLevel(xi.skill.LEATHERCRAFT)
 
-    if guildMember == 1 then
-        if player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) == false then
-            player:startEvent(226, 8, SkillLevel, 0, 511, 188, 0, 5, 2184)
+    if xi.crafting.hasJoinedGuild(player, xi.crafting.guild.LEATHERCRAFT) then
+        if not player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) then
+            player:startEvent(226, 8, skillLevel, 0, 511, 188, 0, 5, 2184)
         else
-            player:startEvent(226, 8, SkillLevel, 0, 511, 188, 7127, 5, 2184)
+            player:startEvent(226, 8, skillLevel, 0, 511, 188, 7127, 5, 2184)
         end
     else
         player:startEvent(226, 0, 0, 0, 0, 0, 0, 5, 0) -- Standard Dialogue

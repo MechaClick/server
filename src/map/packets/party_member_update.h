@@ -22,15 +22,9 @@
 #ifndef _CPARTYMEMBERUPDATEPACKET_H
 #define _CPARTYMEMBERUPDATEPACKET_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 #include "basic.h"
-
-/************************************************************************
- *																		*
- *  																		*
- *																		*
- ************************************************************************/
 
 class CCharEntity;
 class CTrustEntity;
@@ -41,7 +35,7 @@ class CPartyMemberUpdatePacket : public CBasicPacket
 public:
     CPartyMemberUpdatePacket(CCharEntity* PChar, uint8 MemberNumber, uint16 memberflags, uint16 zoneid);
     CPartyMemberUpdatePacket(CTrustEntity* PTrust, uint8 MemberNumber);
-    CPartyMemberUpdatePacket(uint32 id, const int8* name, uint16 memberFlags, uint8 MemberNumber, uint16 ZoneID);
+    CPartyMemberUpdatePacket(uint32 id, const std::string& name, uint16 memberFlags, uint8 MemberNumber, uint16 ZoneID);
 };
 
 #endif

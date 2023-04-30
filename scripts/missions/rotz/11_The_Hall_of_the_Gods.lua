@@ -6,10 +6,12 @@
 -- _700 (Oaken Door) : !pos 97 -7 -12 252
 -----------------------------------
 require('scripts/globals/interaction/mission')
-require("scripts/globals/keyitems")
+require('scripts/globals/keyitems')
 require('scripts/globals/missions')
-require("scripts/globals/titles")
+require('scripts/globals/titles')
 require('scripts/globals/zone')
+-----------------------------------
+local hallID = require('scripts/zones/Hall_of_the_Gods/IDs')
 -----------------------------------
 
 local mission = Mission:new(xi.mission.log_id.ZILART, xi.mission.id.zilart.THE_HALL_OF_THE_GODS)
@@ -21,11 +23,15 @@ mission.reward =
 
 mission.sections =
 {
-    -- Section: Mission Active
     {
         check = function(player, currentMission, missionStatus, vars)
             return currentMission == mission.missionId
         end,
+
+        [xi.zone.HALL_OF_THE_GODS] =
+        {
+            ['_6z0'] = mission:messageSpecial(hallID.text.DEPRESSION_A_CLUE),
+        },
 
         [xi.zone.NORG] =
         {

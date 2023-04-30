@@ -4,18 +4,27 @@
 -- Involved in Quests: Riding on the Clouds
 -- !pos -20 -4 -74 232
 -----------------------------------
-require("scripts/globals/keyitems")
-require("scripts/globals/npc_util")
-require("scripts/globals/quests")
------------------------------------
 local entity = {}
 
+local pathNodes =
+{
+    { x = -19.298, y = -4.000, z = -74.169, wait = 3000 },
+    { x = -20.027, z = -74.828 },
+    { x = -20.577, z = -74.736 },
+    { x = -20.567, z = -73.723 },
+    { x = -20.134, z = -73.353 },
+    { x = -19.298, z = -74.169, wait = 3000 },
+    { x = -20.577, z = -74.736, wait = 3000 },
+    { x = -20.134, z = -73.353, wait = 3000 },
+}
+
+entity.onSpawn = function(npc)
+    npc:initNpcAi()
+    npc:setPos(xi.path.first(pathNodes))
+    npc:pathThrough(pathNodes, xi.path.flag.PATROL)
+end
+
 entity.onTrade = function(player, npc, trade)
-    if player:getQuestStatus(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.RIDING_ON_THE_CLOUDS) == QUEST_ACCEPTED and player:getCharVar("ridingOnTheClouds_1") == 7 and npcUtil.tradeHas(trade, 1127) then
-        player:setCharVar("ridingOnTheClouds_1", 0)
-        npcUtil.giveKeyItem(player, xi.ki.SCOWLING_STONE)
-        player:confirmTrade()
-    end
 end
 
 entity.onTrigger = function(player, npc)

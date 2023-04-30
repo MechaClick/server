@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include "char_health.h"
 
@@ -28,8 +28,8 @@
 
 CCharHealthPacket::CCharHealthPacket(CCharEntity* PChar)
 {
-    this->type = 0xDF;
-    this->size = 0x12;
+    this->setType(0xDF);
+    this->setSize(0x28);
 
     ref<uint32>(0x04) = PChar->id;
 
@@ -48,13 +48,15 @@ CCharHealthPacket::CCharHealthPacket(CCharEntity* PChar)
         ref<uint8>(0x21) = PChar->GetMLevel();
         ref<uint8>(0x22) = PChar->GetSJob();
         ref<uint8>(0x23) = PChar->GetSLevel();
+        ref<uint8>(0x24) = 0; // Master Level
+        ref<uint8>(0x25) = 0; // Master Breaker
     }
 }
 
 CCharHealthPacket::CCharHealthPacket(CTrustEntity* PTrust)
 {
-    this->type = 0xDF;
-    this->size = 0x12;
+    this->setType(0xDF);
+    this->setSize(0x24);
 
     ref<uint32>(0x04) = PTrust->id;
 

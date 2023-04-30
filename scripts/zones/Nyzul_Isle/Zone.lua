@@ -1,48 +1,56 @@
 -----------------------------------
---
 -- Zone: Nyzul_Isle
---
 -----------------------------------
-local ID = require("scripts/zones/Nyzul_Isle/IDs")
-require("scripts/globals/missions")
+local ID = require('scripts/zones/Nyzul_Isle/IDs')
+require('scripts/globals/missions')
 -----------------------------------
-local zone_object = {}
+local zoneObject = {}
 
-zone_object.onInitialize = function(zone)
+zoneObject.onInitialize = function(zone)
 end
 
-zone_object.onInstanceZoneIn = function(player, instance)
-    local cs = -1
+zoneObject.onInstanceZoneIn = function(player, instance)
+    if player:getInstance() == nil then
+        player:setPos(0, 0, 0, 0, 72)
+        return
+    end
 
     local pos = player:getPos()
-    if (pos.x == 0 and pos.y == 0 and pos.z == 0) then
+    if pos.x == 0 and pos.y == 0 and pos.z == 0 then
         local entrypos = instance:getEntryPos()
         player:setPos(entrypos.x, entrypos.y, entrypos.z, entrypos.rot)
     end
-    if (player:getCurrentMission(TOAU) == xi.mission.id.toau.PATH_OF_DARKNESS) then
-        cs = 51
-    end
 
-    player:addTempItem(5348)
+    player:entityVisualPacket("1pa1")
+    player:entityVisualPacket("1pb1")
+    player:entityVisualPacket("2pb1")
+end
+
+-- NOTE: This is called after onInstanceZoneIn for the fade in cutscene.  onInstanceZoneIn
+-- does not consider event returns.
+zoneObject.onZoneIn = function(player, prevZone)
+    local cs = -1
+
+    -- This event is common to all zone in, and is fade from black
+    cs = 51
 
     return cs
 end
 
-zone_object.onRegionEnter = function(player, region)
+zoneObject.onTriggerAreaEnter = function(player, triggerArea)
 end
 
-zone_object.onEventUpdate = function(player, csid, option)
+zoneObject.onEventUpdate = function(player, csid, option)
 end
 
-zone_object.onEventFinish = function(player, csid, option)
-
+zoneObject.onEventFinish = function(player, csid, option)
     if csid == 1 then
-        player:setPos(0, 0, 0, 0, 72)
+        player:setPos(0, 0, 0, 0, xi.zone.ALZADAAL_UNDERSEA_RUINS)
     end
 end
 
-zone_object.onInstanceLoadFailed = function()
-    return 72
+zoneObject.onInstanceLoadFailed = function()
+    return xi.zone.ALZADAAL_UNDERSEA_RUINS
 end
 
-return zone_object
+return zoneObject

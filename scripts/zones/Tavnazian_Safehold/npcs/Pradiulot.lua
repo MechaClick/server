@@ -18,10 +18,13 @@ entity.onTrigger = function(player, npc)
 
     if unforgiven == QUEST_ACCEPTED and player:getCharVar("UnforgivenVar") == 1 then
         player:startEvent(204) -- Dialogue for final stage of Unforgiven Quest
-    elseif unforgiven == QUEST_COMPLETED and player:getCharVar("UnforgivenVar") == 2 then
+    elseif
+        unforgiven == QUEST_COMPLETED and
+        player:getCharVar("UnforgivenVar") == 2
+    then
         player:startEvent(206) -- Dialogue after completing quest (optional)
     else
-        player:startEvent(371) -- Default Dialogue
+        player:startEvent(371) -- Default Dialogue TODO: Dialogue default is 192 before Unforgiven, so this might change
     end
 end
 
@@ -33,8 +36,8 @@ entity.onEventFinish = function(player, csid, option)
         player:setCharVar("UnforgivenVar", 2)
         player:addKeyItem(xi.ki.MAP_OF_TAVNAZIA)
         player:messageSpecial(ID.text.KEYITEM_OBTAINED, xi.ki.MAP_OF_TAVNAZIA) -- Map of Tavnazia
-        player:addExp(2000 * EXP_RATE)
-        player:addGil(2000 * GIL_RATE)
+        player:addExp(2000 * xi.settings.main.EXP_RATE)
+        player:addGil(2000 * xi.settings.main.GIL_RATE)
         player:completeQuest(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.UNFORGIVEN)
     elseif csid == 206 then
         player:setCharVar("UnforgivenVar", 0)

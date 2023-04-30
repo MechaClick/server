@@ -5,15 +5,15 @@
 -- Quelveuiat          : !pos -3.177 -22.750 -25.970 26
 -- qm_hard_days_knight : !pos -38.605 -9.022 -290.700 24
 -----------------------------------
-require("scripts/globals/items")
-require("scripts/globals/keyitems")
-require("scripts/globals/npc_util")
-require("scripts/globals/quests")
-require("scripts/globals/titles")
-require("scripts/globals/zone")
+require('scripts/globals/items')
+require('scripts/globals/keyitems')
+require('scripts/globals/npc_util')
+require('scripts/globals/quests')
+require('scripts/globals/titles')
+require('scripts/globals/zone')
 require('scripts/globals/interaction/quest')
 -----------------------------------
-local lufaiseID = require("scripts/zones/Lufaise_Meadows/IDs")
+local lufaiseID = require('scripts/zones/Lufaise_Meadows/IDs')
 -----------------------------------
 
 local quest = Quest:new(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.A_HARD_DAYS_KNIGHT)
@@ -92,7 +92,7 @@ quest.sections =
 
             ['Splinterspine_Grukjuk'] =
             {
-                onMobDeath = function(mob, player, isKiller, noKiller)
+                onMobDeath = function(mob, player, optParams)
                     quest:setVar(player, 'Prog', 1)
                 end,
             },
@@ -109,17 +109,32 @@ quest.sections =
             ['Quelveuiat'] =
             {
                 onTrade = function(player, npc, trade)
+                    -- TODO: Needs verification for single-trade events
                     if not player:hasKeyItem(xi.ki.TEMPLE_KNIGHT_KEY) then
                         if
                             npcUtil.tradeHasExactly(trade, xi.items.SEALION_CREST_KEY) or
                             npcUtil.tradeHasExactly(trade, xi.items.CORAL_CREST_KEY)
                         then
                             return quest:progressEvent(631, trade:getItemId())
-                        elseif npcUtil.tradeHasExactly(trade, {xi.items.SEALION_CREST_KEY, xi.items.CORAL_CREST_KEY}) then
+                        elseif npcUtil.tradeHasExactly(trade, { xi.items.SEALION_CREST_KEY, xi.items.CORAL_CREST_KEY }) then
                             quest:setVar(player, 'Prog', 2)
                             return quest:progressEvent(631, xi.items.SEALION_CREST_KEY, xi.items.CORAL_CREST_KEY)
                         end
                     end
+                end,
+
+                onTrigger = function(player, npc)
+                    local itemCount = 0
+                    local itemTable = { 0, 0 }
+
+                    for itemId = xi.items.SEALION_CREST_KEY, xi.items.CORAL_CREST_KEY do
+                        if player:findItem(itemId) then
+                            itemCount = itemCount + 1
+                            itemTable[itemCount] = itemId
+                        end
+                    end
+
+                    return quest:progressEvent(631, itemTable[1], itemTable[2])
                 end,
             },
 

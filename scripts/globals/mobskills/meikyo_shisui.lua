@@ -1,18 +1,18 @@
 -----------------------------------
 -- Meikyo Shisui
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/status")
 require("scripts/globals/msg")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
-    MobBuffMove(mob, xi.effect.MEIKYO_SHISUI, 1, 0, 30)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
+    xi.mobskills.mobBuffMove(mob, xi.effect.MEIKYO_SHISUI, 1, 0, 30)
 
     skill:setMsg(xi.msg.basic.USES)
 
@@ -21,4 +21,4 @@ mobskill_object.onMobWeaponSkill = function(target, mob, skill)
     return xi.effect.MEIKYO_SHISUI
 end
 
-return mobskill_object
+return mobskillObject

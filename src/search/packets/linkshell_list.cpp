@@ -19,9 +19,9 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
-#include "../../common/socket.h"
-#include "../../common/utils.h"
+#include "common/logging.h"
+#include "common/socket.h"
+#include "common/utils.h"
 
 #include "../data_loader.h"
 #include "search_list.h"
@@ -32,17 +32,14 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #include "linkshell_list.h"
 
 CLinkshellListPacket::CLinkshellListPacket(uint32 linkshellid, uint32 Total)
+: m_offset(192)
 {
-    m_linkshellid = linkshellid;
-    m_offset      = 192;
-
     memset(m_data, 0, sizeof(m_data));
 
-    ref<uint8>(m_data, (0x0A)) = 0x80;
+    ref<uint8>(m_data, (0x0A)) = 0x00; // is final packet
     ref<uint8>(m_data, (0x0B)) = 0x82; // packet type
 
-    // ref<uint8>(m_data,(0x0E)) = 0x00;                       // Number of characters per packet
-    ref<uint8>(m_data, (0x0E)) = Total;
+    ref<uint16>(m_data, (0x0E)) = Total; // // Total overall results
 }
 
 /************************************************************************
@@ -51,17 +48,22 @@ CLinkshellListPacket::CLinkshellListPacket(uint32 linkshellid, uint32 Total)
  *                                                                       *
  ************************************************************************/
 
-void CLinkshellListPacket::AddPlayer(SearchEntity* PPlayer)
+bool CLinkshellListPacket::AddPlayer(SearchEntity* PPlayer)
 {
     uint32 size_offset = m_offset / 8;
+    if ((sizeof(m_data) - size_offset) < (20 + 67))
+    {
+        return false; // not enough space available, worst case.
+    }
+
     m_offset += 8;
 
     m_offset = packBitsLE(m_data, SEARCH_NAME, m_offset, 5);
 
-    m_offset    = packBitsLE(m_data, strlen((const char*)PPlayer->name), m_offset, 4);
-    auto length = strlen((const char*)PPlayer->name);
+    auto length = std::min(PPlayer->name.size(), size_t(15));
+    m_offset    = packBitsLE(m_data, length, m_offset, 4);
 
-    for (uint8 c = 0; c < length; ++c)
+    for (std::size_t c = 0; c < length; ++c)
     {
         m_offset = packBitsLE(m_data, PPlayer->name[c], m_offset, 7);
     }
@@ -106,10 +108,10 @@ void CLinkshellListPacket::AddPlayer(SearchEntity* PPlayer)
     m_offset = packBitsLE(m_data, SEARCH_UNK0x0E, m_offset, 5);
     m_offset = packBitsLE(m_data, 0, m_offset, 32);
 
-    if (PPlayer->comment != 0)
+    if (PPlayer->seacom_type != 0)
     {
         m_offset = packBitsLE(m_data, SEARCH_COMMENT, m_offset, 5);
-        m_offset = packBitsLE(m_data, PPlayer->comment, m_offset, 32);
+        m_offset = packBitsLE(m_data, PPlayer->seacom_type, m_offset, 32);
     }
 
     m_offset = packBitsLE(m_data, SEARCH_FLAGS2, m_offset, 5);
@@ -125,7 +127,21 @@ void CLinkshellListPacket::AddPlayer(SearchEntity* PPlayer)
 
     ref<uint8>(m_data, size_offset) = m_offset / 8 - size_offset - 1; // Entity data size
     ref<uint16>(m_data, (0x08))     = m_offset / 8;                   // Size of the data to send
-    delete PPlayer;
+
+    destroy(PPlayer);
+
+    return true;
+}
+
+/************************************************************************
+ *                                                                       *
+ *  Set the packet as final in the results                               *
+ *                                                                       *
+ ************************************************************************/
+
+void CLinkshellListPacket::SetFinal()
+{
+    ref<uint8>(m_data, (0x0A)) = 0x80; // is final packet
 }
 
 /************************************************************************

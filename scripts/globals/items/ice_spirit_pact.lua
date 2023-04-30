@@ -3,14 +3,16 @@
 -- Ice Spirit Pact
 -- Teaches the summoning magic ice Spirit
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(289)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.ICE_SPIRIT)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(289)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.ICE_SPIRIT)
 end
 
-return item_object
+return itemObject

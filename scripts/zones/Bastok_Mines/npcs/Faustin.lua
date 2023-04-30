@@ -3,8 +3,8 @@
 --  NPC: Faustin
 -- Ronfaure Regional Merchant
 -----------------------------------
-require("scripts/globals/events/harvest_festivals")
 local ID = require("scripts/zones/Bastok_Mines/IDs")
+require("scripts/globals/events/harvest_festivals")
 require("scripts/globals/conquest")
 require("scripts/globals/shop")
 -----------------------------------
@@ -27,7 +27,7 @@ entity.onTrigger = function(player, npc)
         }
 
         player:showText(npc, ID.text.FAUSTIN_OPEN_DIALOG)
-        xi.shop.general(player, stock, BASTOK)
+        xi.shop.general(player, stock, xi.quest.fame_area.BASTOK)
     end
 end
 

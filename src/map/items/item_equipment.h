@@ -22,7 +22,7 @@
 #ifndef _CITEMEQUIPMENT_H
 #define _CITEMEQUIPMENT_H
 
-#include "../../common/utils.h"
+#include "common/utils.h"
 
 #include <vector>
 
@@ -77,10 +77,11 @@ public:
     uint16 getEquipSlotId() const;
     uint16 getRemoveSlotId() const;
     uint8  getShieldAbsorption() const;
-    int16  getModifier(Mod mod);
+    int16  getModifier(Mod mod) const;
     uint8  getSlotType() const;
     uint16 getAugment(uint8 slot);
     uint16 getTrialNumber();
+    uint8  getSuperiorLevel();
 
     bool IsShield() const;
 
@@ -94,14 +95,26 @@ public:
     void setRemoveSlotId(uint16 removSlot);
     void setAugment(uint8 slot, uint16 type, uint8 value);
     void setTrialNumber(uint16);
+    void setSuperiorLevel(uint8 level);
 
     void LoadAugment(uint8 slot, uint16 augment);
     bool PushAugment(uint16 type, uint8 value);
     void ApplyAugment(uint8 slot);
 
     void addModifier(CModifier modifier);
+    void addModifier(Mod mod, int16 modValue)
+    {
+        return addModifier(CModifier(mod, modValue));
+    };
     void addPetModifier(CPetModifier modifier);
+    void addPetModifier(Mod mod, PetModType petType, int16 modValue)
+    {
+        return addPetModifier(CPetModifier(mod, petType, modValue));
+    };
     void addLatent(LATENT ConditionsID, uint16 ConditionsValue, Mod ModValue, int16 ModPower);
+
+    bool delModifier(Mod mod, int16 modValue);
+    bool delPetModifier(Mod mod, PetModType petType, int16 modValue);
 
     std::vector<CModifier>    modList;    // список модификаторов
     std::vector<CPetModifier> petModList; // mod list for pets
@@ -117,6 +130,7 @@ private:
     uint8  m_absorption;
     uint16 m_equipSlotID;
     uint16 m_removeSlotID;
+    uint8  m_superiorLevel;
 
     void SetAugmentMod(uint16 type, uint8 value);
 };

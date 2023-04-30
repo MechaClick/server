@@ -11,7 +11,7 @@ CREATE TABLE `guild_item_points` (
   `max_points` smallint(5) unsigned NOT NULL DEFAULT '0',
   `pattern` tinyint(1) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`guildid`,`itemid`,`pattern`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records
@@ -917,7 +917,7 @@ INSERT INTO `guild_item_points` VALUES (5, 12828, 5, 2160, 17280, 5); -- Raptor 
 INSERT INTO `guild_item_points` VALUES (5, 12919, 5, 2320, 17280, 5); -- Dino Trousers (2320 / 17280)
 INSERT INTO `guild_item_points` VALUES (5, 12995, 5, 1700, 16320, 6); -- Moccasins (1700 / 16320)
 INSERT INTO `guild_item_points` VALUES (5, 13050, 5, 1785, 16320, 6); -- Moccasins +1 (1785 / 16320)
-INSERT INTO `guild_item_points` VALUES (5, 12295, 5, 1280, 15120, 7); -- Leather Shield (1280 / 15120)
+INSERT INTO `guild_item_points` VALUES (5, 12294, 5, 1280, 15120, 7); -- Leather Shield (1280 / 15120)
 INSERT INTO `guild_item_points` VALUES (5, 12329, 5, 1360, 15120, 7); -- Leather Shield +1 (1360 / 15120)
 
 -- Leathercraft / Craftsman

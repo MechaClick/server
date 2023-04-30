@@ -13,7 +13,7 @@ end
 entity.onMobFight = function(mob, target)
     -- The captain gives up at <= 20% HP. Everyone disengages
     local instance = mob:getInstance()
-    if mob:getHPP() <= 20 and instance:completed() == false then
+    if mob:getHPP() <= 20 and not instance:completed() then
         instance:complete()
     end
 
@@ -21,8 +21,8 @@ entity.onMobFight = function(mob, target)
         -- Vulcan Shot
         if skillID == 254 then
             m:showText(m, ID.text.FOR_EPHRAMAD)
-            m:timer(3000, function(mTimer)
-                mobTimer:showText(mTimer, ID.text.TROUBLESOME_SQUABS)
+            m:timer(3000, function(mArg)
+                mArg:showText(mArg, ID.text.TROUBLESOME_SQUABS)
             end)
         -- Circle Blade
         elseif skillID == 938 then
@@ -46,9 +46,10 @@ entity.onMobRoam = function(mob)
             m:showText(mob, ID.text.TEST_YOUR_BLADES)
             m:timer(2000, function(mAnimation)
                 mAnimation:hideName(false)
-                mAnimation:untargetable(false)
+                mAnimation:setUntargetable(false)
             end)
         end)
+
         mob:setLocalVar("jump", 1)
     end
 end
@@ -56,7 +57,7 @@ end
 entity.onMobDisengage = function(mob, target)
 end
 
-entity.onMobDeath = function(mob, player, isKiller)
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

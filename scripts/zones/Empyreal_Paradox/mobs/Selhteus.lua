@@ -11,7 +11,8 @@ local entity = {}
 
 entity.onMobInitialize = function(mob)
     mob:addMod(xi.mod.REGAIN, 50)
-    mob:SetAutoAttackEnabled(false)
+    mob:addMod(xi.mod.CURE_POTENCY_RCVD, -100)
+    mob:setAutoAttackEnabled(false)
 end
 
 entity.onMobFight = function(mob, target)
@@ -20,6 +21,7 @@ entity.onMobFight = function(mob, target)
         local radians = (256 - targetPos.rot) * (math.pi / 128)
         mob:pathTo(targetPos.x + math.cos(radians) * 16, targetPos.y, targetPos.z + math.sin(radians) * 16)
     end
+
     local lanceTime = mob:getLocalVar("lanceTime")
     local lanceOut = mob:getLocalVar("lanceOut")
     local rejuv = mob:getLocalVar("rejuv")
@@ -33,7 +35,7 @@ entity.onMobFight = function(mob, target)
     end
 end
 
-entity.onMobDeath = function(mob, player, isKiller)
+entity.onMobDeath = function(mob, player, optParams)
     mob:messageText(mob, ID.text.SELHTEUS_TEXT)
     mob:getBattlefield():lose()
 end

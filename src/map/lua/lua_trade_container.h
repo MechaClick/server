@@ -22,7 +22,7 @@
 #ifndef _LUATRADECONTAINER_H
 #define _LUATRADECONTAINER_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 #include "luautils.h"
 
 class CTradeContainer;
@@ -37,6 +37,8 @@ public:
     {
         return m_pMyTradeContainer;
     }
+
+    friend std::ostream& operator<<(std::ostream& out, const CTradeContainer& trade);
 
     uint32 getGil();
     auto   getItem(sol::object const& SlotIDObj) -> std::optional<CLuaItem>;

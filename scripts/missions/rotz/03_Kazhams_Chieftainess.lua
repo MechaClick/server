@@ -7,7 +7,7 @@
 -- Jakoh Wahcondalo : !pos 101 -16 -115 250
 -----------------------------------
 require('scripts/globals/interaction/mission')
-require("scripts/globals/keyitems")
+require('scripts/globals/keyitems')
 require('scripts/globals/missions')
 require('scripts/globals/zone')
 -----------------------------------
@@ -29,22 +29,12 @@ mission.sections =
 
         [xi.zone.NORG] =
         {
-            ['Gilgamesh'] =
-            {
-                onTrigger = function(player, npc)
-                    -- Reminder text
-                    return mission:event(7)
-                end,
-            },
+            ['Gilgamesh']  = mission:event(7),
         },
 
-        [xi.zone.KAZHAM] = {
-            ['Jakoh_Wahcondalo'] =
-            {
-                onTrigger = function(player, npc)
-                    return mission:event(114)
-                end,
-            },
+        [xi.zone.KAZHAM] =
+        {
+            ['Jakoh_Wahcondalo'] = mission:progressEvent(114),
 
             onEventFinish =
             {

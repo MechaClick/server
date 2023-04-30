@@ -1,6 +1,5 @@
 SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
 
-
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
@@ -23,6 +22,10 @@ CREATE TABLE IF NOT EXISTS `char_storage` (
   `wardrobe2` tinyint(2) unsigned NOT NULL DEFAULT '80',
   `wardrobe3` tinyint(2) unsigned NOT NULL DEFAULT '80',
   `wardrobe4` tinyint(2) unsigned NOT NULL DEFAULT '80',
+  `wardrobe5` tinyint(2) unsigned NOT NULL DEFAULT '80',
+  `wardrobe6` tinyint(2) unsigned NOT NULL DEFAULT '80',
+  `wardrobe7` tinyint(2) unsigned NOT NULL DEFAULT '80',
+  `wardrobe8` tinyint(2) unsigned NOT NULL DEFAULT '80',
 
   PRIMARY KEY (`charid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

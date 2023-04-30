@@ -5,39 +5,38 @@
 -- Recast Time: 5 seconds
 -- Duration: Instant
 -----------------------------------
-require("scripts/globals/settings")
-require("scripts/globals/status")
 require("scripts/globals/msg")
+require("scripts/globals/status")
 -----------------------------------
-local ability_object = {}
+local abilityObject = {}
 
-ability_object.onAbilityCheck = function(player, target, ability)
-    if (player:getPet() == nil) then
+abilityObject.onAbilityCheck = function(player, target, ability)
+    if player:getPet() == nil then
         return xi.msg.basic.REQUIRES_A_PET, 0
     end
 
     return 0, 0
 end
 
-ability_object.onUseAbility = function(player, target, ability, action)
+abilityObject.onUseAbility = function(player, target, ability, action)
     local pet = player:getPet()
 
-    if (not pet:hasPreventActionEffect()) then
-      -- reduce tick speed based on level. but never less than 5 and never
-      -- more than 10.  This seems to mimic retail.  There is no formula
-      -- that I can find, but this seems close.
+    if not pet:hasPreventActionEffect() then
+        -- reduce tick speed based on level. but never less than 5 and never
+        -- more than 10.  This seems to mimic retail.  There is no formula
+        -- that I can find, but this seems close.
         local level = 0
-        if (player:getMainJob() == xi.job.BST) then
+        if player:getMainJob() == xi.job.BST then
             level = player:getMainLvl()
-        elseif (player:getSubJob() == xi.job.BST) then
+        elseif player:getSubJob() == xi.job.BST then
             level = player:getSubLvl()
         end
 
         local tick = 10 - math.ceil(math.max(0, level / 20))
-        --printf('tick: %d', tick)
+
         pet:addStatusEffectEx(xi.effect.HEALING, 0, 0, tick, 0)
         pet:setAnimation(0)
     end
 end
 
-return ability_object
+return abilityObject

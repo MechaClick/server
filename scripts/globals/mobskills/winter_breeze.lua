@@ -3,23 +3,23 @@
 --
 -- Description: AoE Dispel (Only removes one effect) and Stun
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/settings")
 require("scripts/globals/status")
 require("scripts/globals/msg")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local DISPEL = target:dispelStatusEffect()
 
-    MobStatusEffectMove(mob, target, xi.effect.STUN, 1, 0, 2)
+    xi.mobskills.mobStatusEffectMove(mob, target, xi.effect.STUN, 1, 0, 2)
 
-    if (DISPEL == xi.effect.NONE) then
+    if DISPEL == xi.effect.NONE then
         skill:setMsg(xi.msg.basic.SKILL_NO_EFFECT) -- no effect
     else
         skill:setMsg(xi.msg.basic.SKILL_ERASE)
@@ -28,4 +28,4 @@ mobskill_object.onMobWeaponSkill = function(target, mob, skill)
     return DISPEL
 end
 
-return mobskill_object
+return mobskillObject

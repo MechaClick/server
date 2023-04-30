@@ -85,14 +85,21 @@ function Container:sequence(...)
     if type(...) == 'number' then
         return Message:new(...)
     else
-        return Sequence:new({...})
+        return Sequence:new({ ... })
     end
 end
 
+function Container:noAction(...)
+    return NoAction:new(...)
+end
 
 -----------------------------------
 -- Variable helper functions
 -----------------------------------
+
+function Container:incrementVar(player, name, value)
+    return player:incrementCharVar(self.varPrefix .. name, value)
+end
 
 function Container:getVar(player, name)
     return player:getVar(self.varPrefix .. name)
@@ -104,9 +111,10 @@ end
 
 function Container:isVarBitsSet(player, name, ...)
     local sum = 0
-    for _, bitNum in ipairs({...}) do
+    for _, bitNum in ipairs({ ... }) do
         sum = sum + bit.lshift(1, bitNum)
     end
+
     return bit.band(player:getVar(self.varPrefix .. name), sum) ~= 0
 end
 
@@ -124,4 +132,23 @@ function Container:unsetVarBit(player, name, bitNum)
     if bit.band(currentValue, bitValue) ~= 0 then
         return player:setVar(self.varPrefix .. name, currentValue - bitValue)
     end
+end
+
+-- These helper functions will set or get a localVar using varPrefix to determine
+-- if zoning/logout is required.  There is no clearing support at this time, outside
+-- of legitimate methods.
+function Container:getMustZone(player)
+    return player:getLocalVar(self.varPrefix .. "mustZone") == 1 and true or false
+end
+
+function Container:setMustZone(player)
+    player:setLocalVar(self.varPrefix .. "mustZone", 1)
+end
+
+function Container:getLocalVar(player, name)
+    return player:getLocalVar(self.varPrefix .. name)
+end
+
+function Container:setLocalVar(player, name, value)
+    return player:setLocalVar(self.varPrefix .. name, value)
 end

@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Western Adoulin
 --  NPC: Grevan
--- Type: Standard NPC and Quest NPC
 -- Involved With Quest: 'Order Up'
 -- !pos 50 0 6 256
 -----------------------------------
@@ -14,10 +13,10 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local Order_Up = player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.ORDER_UP)
-    local Order_Grevan = utils.mask.getBit(player:getCharVar("Order_Up_NPCs"), 10)
+    local orderUp = player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.ORDER_UP)
+    local orderGrevan = utils.mask.getBit(player:getCharVar("Order_Up_NPCs"), 10)
 
-    if Order_Up == QUEST_ACCEPTED and not Order_Grevan then
+    if orderUp == QUEST_ACCEPTED and not orderGrevan then
         -- Progresses Quest: 'Order Up'
         player:startEvent(69)
     else
@@ -29,9 +28,6 @@ entity.onTrigger = function(player, npc)
                 -- Standard dialogue before stamping out plague in Svenja quest line
                 player:startEvent(171)
             end
-        else
-            -- Standard dialogue prior to Svenja quest line
-            player:startEvent(541)
         end
     end
 end

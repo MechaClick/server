@@ -12,11 +12,11 @@ require("scripts/globals/mobs")
 -----------------------------------
 local entity = {}
 
-entity.onMobDeath = function(mob, player, isKiller)
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 entity.onMobDespawn = function(mob)
-    xi.mob.phOnDespawn(mob, ID.mob.GIBHE_FLESHEATER_PH, 10, 1200) -- 20 minutes
+    xi.mob.phOnDespawn(mob, ID.mob.GIBHE_FLESHFEASTER_PH, 10, 1200) -- 20 minutes
 end
 
 return entity

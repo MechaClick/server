@@ -19,12 +19,17 @@
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
-#include "../../common/utils.h"
-#include "../../common/version.h"
+#include "luautils.h"
+
+#include "common/filewatcher.h"
+#include "common/logging.h"
+#include "common/utils.h"
+#include "common/vana_time.h"
+#include "common/version.h"
 
 #include <array>
 #include <filesystem>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -33,189 +38,207 @@
 #include "lua_battlefield.h"
 #include "lua_instance.h"
 #include "lua_item.h"
+#include "lua_loot.h"
 #include "lua_mobskill.h"
-#include "lua_region.h"
+#include "lua_petskill.h"
 #include "lua_spell.h"
 #include "lua_statuseffect.h"
 #include "lua_trade_container.h"
+#include "lua_trigger_area.h"
 #include "lua_zone.h"
-#include "luautils.h"
 
-#include "../ability.h"
-#include "../ai/ai_container.h"
-#include "../ai/states/ability_state.h"
-#include "../ai/states/attack_state.h"
-#include "../ai/states/death_state.h"
-#include "../ai/states/inactive_state.h"
-#include "../ai/states/item_state.h"
-#include "../ai/states/magic_state.h"
-#include "../ai/states/mobskill_state.h"
-#include "../ai/states/raise_state.h"
-#include "../ai/states/range_state.h"
-#include "../ai/states/respawn_state.h"
-#include "../ai/states/weaponskill_state.h"
-#include "../alliance.h"
-#include "../battlefield.h"
-#include "../conquest_system.h"
-#include "../daily_system.h"
-#include "../entities/automatonentity.h"
-#include "../entities/baseentity.h"
-#include "../entities/charentity.h"
-#include "../entities/mobentity.h"
-#include "../instance.h"
-#include "../items/item_puppet.h"
-#include "../map.h"
-#include "../mobskill.h"
-#include "../packets/action.h"
-#include "../packets/char_emotion.h"
-#include "../packets/char_update.h"
-#include "../packets/entity_update.h"
-#include "../packets/entity_visual.h"
-#include "../packets/menu_raisetractor.h"
-#include "../party.h"
-#include "../roe.h"
-#include "../spell.h"
-#include "../status_effect_container.h"
-#include "../timetriggers.h"
-#include "../transport.h"
-#include "../utils/battleutils.h"
-#include "../utils/charutils.h"
-#include "../utils/itemutils.h"
-#include "../utils/zoneutils.h"
-#include "../vana_time.h"
-#include "../weapon_skill.h"
+#include "ability.h"
+#include "ai/ai_container.h"
+#include "ai/states/ability_state.h"
+#include "ai/states/attack_state.h"
+#include "ai/states/death_state.h"
+#include "ai/states/inactive_state.h"
+#include "ai/states/item_state.h"
+#include "ai/states/magic_state.h"
+#include "ai/states/mobskill_state.h"
+#include "ai/states/raise_state.h"
+#include "ai/states/range_state.h"
+#include "ai/states/respawn_state.h"
+#include "ai/states/weaponskill_state.h"
+#include "alliance.h"
+#include "battlefield.h"
+#include "campaign_system.h"
+#include "conquest_system.h"
+#include "daily_system.h"
+#include "entities/automatonentity.h"
+#include "entities/baseentity.h"
+#include "entities/charentity.h"
+#include "entities/mobentity.h"
+#include "instance.h"
+#include "items/item_puppet.h"
+#include "map.h"
+#include "message.h"
+#include "mobskill.h"
+#include "packets/action.h"
+#include "packets/char_emotion.h"
+#include "packets/char_update.h"
+#include "packets/chat_message.h"
+#include "packets/entity_update.h"
+#include "packets/entity_visual.h"
+#include "packets/menu_raisetractor.h"
+#include "party.h"
+#include "petskill.h"
+#include "roe.h"
+#include "spell.h"
+#include "status_effect_container.h"
+#include "timetriggers.h"
+#include "transport.h"
+#include "utils/battleutils.h"
+#include "utils/charutils.h"
+#include "utils/instanceutils.h"
+#include "utils/itemutils.h"
+#include "utils/moduleutils.h"
+#include "utils/serverutils.h"
+#include "utils/zoneutils.h"
+#include "weapon_skill.h"
 
-// TODO: Implement FileWatch backend for OSX
-#ifndef __APPLE__
-// TODO: Fix path
-#include "../../ext/filewatch/filewatch/FileWatch.hpp"
-std::unique_ptr<filewatch::FileWatch<std::string>> watch = nullptr;
-#endif // __APPLE__
+void ReportErrorToPlayer(CBaseEntity* PEntity, std::string const& message = "") noexcept
+{
+    try
+    {
+        if (auto* PChar = dynamic_cast<CCharEntity*>(PEntity))
+        {
+            if (settings::get<uint8>("map.REPORT_LUA_ERRORS_TO_PLAYER_LEVEL") <= PChar->m_GMlevel)
+            {
+                if (!message.empty())
+                {
+                    auto        channel = MESSAGE_NS_SHOUT;
+                    std::string breaker = "================";
+                    PChar->pushPacket(new CChatMessagePacket(PChar, channel, breaker.c_str()));
+                    PChar->pushPacket(new CChatMessagePacket(PChar, channel, "!!! Lua error !!!"));
+                    for (auto const& part : split(message, "\n"))
+                    {
+                        auto str = replace(part, "\t", "    ");
+                        PChar->pushPacket(new CChatMessagePacket(PChar, channel, str.c_str()));
+                    }
+                    PChar->pushPacket(new CChatMessagePacket(PChar, channel, breaker.c_str()));
+                }
+            }
+        }
+    }
+    catch (std::exception const& e)
+    {
+        ShowError(e.what());
+    }
+}
 
 namespace luautils
 {
-    sol::state lua;
-    lua_State* LuaHandle = nullptr;
-
     bool                                  contentRestrictionEnabled;
     std::unordered_map<std::string, bool> contentEnabledMap;
 
-    std::mutex                    reloadListBottleneck;
-    std::map<std::string, uint64> toReloadList;
-    std::vector<std::string>      filteredList;
-    void                          SafeApplyFunc_ReloadList(std::function<void(std::map<std::string, uint64>&)> func)
-    {
-        std::lock_guard bottleneck(reloadListBottleneck);
-        func(toReloadList);
-    }
+    std::unique_ptr<Filewatcher> filewatcher;
 
-    /************************************************************************
-     *                                                                       *
-     *  Инициализация lua, пользовательских классов и глобальных функций     *
-     *                                                                       *
-     ************************************************************************/
+    std::unordered_map<uint32, sol::table> customMenuContext;
 
+    /**
+     * @brief Initialization of Lua user classes and global functions.
+     */
     int32 init()
     {
         TracyZoneScoped;
-        ShowStatus("luautils::init:lua initializing...");
 
-        lua = sol::state();
-        lua.open_libraries();
+        ShowInfo("luautils: Lua initializing");
 
-        // Compatability with old style
-        LuaHandle = lua.lua_state();
-
-        // Globally require bit library
-        lua.do_string("if not bit then bit = require('bit') end");
-
-        // Bind print() and math.random() globally
-        lua["print"] = sol::overload(&luautils::print<double>, &luautils::print<std::string>, &luautils::print<bool>);
-
+        // Bind math.randon(...) globally
         // clang-format off
         lua["math"]["random"] =
             sol::overload([]() { return xirand::GetRandomNumber(1.0f); },
-                          [](int n) { return xirand::GetRandomNumber<int>(1, n); },
+                          [](int n) { return xirand::GetRandomNumber<int>(1, n + 1); },
                           [](float n) { return xirand::GetRandomNumber<float>(0.0f, n); },
                           [](int n, int m) { return xirand::GetRandomNumber<int>(n, m + 1); },
                           [](float n, float m) { return xirand::GetRandomNumber<float>(n, m); });
         // clang-format on
 
-        // Get-or-create xi.core
-        auto xi      = lua["xi"].get_or_create<sol::table>();
-        auto xi_core = xi["core"].get_or_create<sol::table>();
+        lua.set_function("GarbageCollectStep", &luautils::garbageCollectStep);
+        lua.set_function("GarbageCollectFull", &luautils::garbageCollectFull);
+        lua.set_function("GetZone", &luautils::GetZone);
+        lua.set_function("GetNPCByID", &luautils::GetNPCByID);
+        lua.set_function("GetMobByID", &luautils::GetMobByID);
+        lua.set_function("GetEntityByID", &luautils::GetEntityByID);
+        lua.set_function("WeekUpdateConquest", &luautils::WeekUpdateConquest);
+        lua.set_function("GetRegionOwner", &luautils::GetRegionOwner);
+        lua.set_function("GetRegionInfluence", &luautils::GetRegionInfluence);
+        lua.set_function("GetNationRank", &luautils::GetNationRank);
+        lua.set_function("GetConquestBalance", &luautils::GetConquestBalance);
+        lua.set_function("IsConquestAlliance", &luautils::IsConquestAlliance);
+        lua.set_function("SpawnMob", &luautils::SpawnMob);
+        lua.set_function("DespawnMob", &luautils::DespawnMob);
+        lua.set_function("GetPlayerByName", &luautils::GetPlayerByName);
+        lua.set_function("GetPlayerByID", &luautils::GetPlayerByID);
+        lua.set_function("GetMagianTrial", &luautils::GetMagianTrial);
+        lua.set_function("GetMagianTrialsWithParent", &luautils::GetMagianTrialsWithParent);
+        lua.set_function("JstMidnight", &luautils::JstMidnight);
+        lua.set_function("JstWeekday", &luautils::JstWeekday);
+        lua.set_function("VanadielTime", &luautils::VanadielTime);
+        lua.set_function("VanadielTOTD", &luautils::VanadielTOTD);
+        lua.set_function("VanadielHour", &luautils::VanadielHour);
+        lua.set_function("VanadielMinute", &luautils::VanadielMinute);
+        lua.set_function("VanadielDayOfTheWeek", &luautils::VanadielDayOfTheWeek);
+        lua.set_function("VanadielDayOfTheMonth", &luautils::VanadielDayOfTheMonth);
+        lua.set_function("VanadielDayOfTheYear", &luautils::VanadielDayOfTheYear);
+        lua.set_function("VanadielYear", &luautils::VanadielYear);
+        lua.set_function("VanadielMonth", &luautils::VanadielMonth);
+        lua.set_function("VanadielUniqueDay", &luautils::VanadielUniqueDay);
+        lua.set_function("VanadielDayElement", &luautils::VanadielDayElement);
+        lua.set_function("VanadielMoonPhase", &luautils::VanadielMoonPhase);
+        lua.set_function("VanadielMoonDirection", &luautils::VanadielMoonDirection);
+        lua.set_function("VanadielRSERace", &luautils::VanadielRSERace);
+        lua.set_function("VanadielRSELocation", &luautils::VanadielRSELocation);
+        lua.set_function("SetVanadielTimeOffset", &luautils::SetVanadielTimeOffset);
+        lua.set_function("IsMoonNew", &luautils::IsMoonNew);
+        lua.set_function("IsMoonFull", &luautils::IsMoonFull);
+        lua.set_function("RunElevator", &luautils::StartElevator);
+        lua.set_function("GetElevatorState", &luautils::GetElevatorState);
+        lua.set_function("GetServerVariable", &luautils::GetServerVariable);
+        lua.set_function("SetServerVariable", &luautils::SetServerVariable);
+        lua.set_function("GetVolatileServerVariable", &luautils::GetVolatileServerVariable);
+        lua.set_function("SetVolatileServerVariable", &luautils::SetVolatileServerVariable);
+        lua.set_function("GetCharVar", &luautils::GetCharVar);
+        lua.set_function("SetCharVar", &luautils::SetCharVar);
+        lua.set_function("ClearCharVarFromAll", &luautils::ClearCharVarFromAll);
+        lua.set_function("SendEntityVisualPacket", &luautils::SendEntityVisualPacket);
+        lua.set_function("GetMobRespawnTime", &luautils::GetMobRespawnTime);
+        lua.set_function("DisallowRespawn", &luautils::DisallowRespawn);
+        lua.set_function("UpdateNMSpawnPoint", &luautils::UpdateNMSpawnPoint);
+        lua.set_function("SetDropRate", &luautils::SetDropRate);
+        lua.set_function("NearLocation", &luautils::NearLocation);
+        lua.set_function("GetFurthestValidPosition", &luautils::GetFurthestValidPosition);
+        lua.set_function("Terminate", &luautils::Terminate);
+        lua.set_function("GetReadOnlyItem", &luautils::GetReadOnlyItem);
+        lua.set_function("GetAbility", &luautils::GetAbility);
+        lua.set_function("GetSpell", &luautils::GetSpell);
+        lua.set_function("SelectDailyItem", &luautils::SelectDailyItem);
+        lua.set_function("GetContainerFilenamesList", &luautils::GetContainerFilenamesList);
+        lua.set_function("GetCachedInstanceScript", &luautils::GetCachedInstanceScript);
+        lua.set_function("GetItemIDByName", &luautils::GetItemIDByName);
+        lua.set_function("SendLuaFuncStringToZone", &luautils::SendLuaFuncStringToZone);
 
-        // Set functions in both global namespace and as part of xi.core
-        // Example:
-        // set_function("getNPCByID", &luautils::GetNPCByID);
-        // -> GetNPCByID() or xi.core.getNPCByID()
-        auto set_function = [&](std::string const& name, auto&& func) {
-            auto lowerName = name;
-            auto upperName = name;
+        // This binding specifically exists to forcefully crash the server.
+        // clang-format off
+        lua.set_function("ForceCrash", []() { crash(); });
+        // clang-format on
 
-            lowerName[0] = std::tolower(lowerName[0]);
-            upperName[0] = std::toupper(upperName[0]);
+        // clang-format off
+        lua.set_function("BuildString", []()
+        {
+            return fmt::format("{}-{}\n{}\n{}",
+                version::GetGitBranch(),
+                version::GetGitSha(),
+                version::GetGitCommitSubject(),
+                version::GetGitDate());
+        });
 
-            xi_core.set_function(lowerName, func);
-            lua.set_function(upperName, func);
-        };
-
-        set_function("garbageCollectStep", &luautils::garbageCollectStep);
-        set_function("garbageCollectFull", &luautils::garbageCollectFull);
-        set_function("GetZone", &luautils::GetZone);
-        set_function("getNPCByID", &luautils::GetNPCByID);
-        set_function("getMobByID", &luautils::GetMobByID);
-        set_function("weekUpdateConquest", &luautils::WeekUpdateConquest);
-        set_function("getRegionOwner", &luautils::GetRegionOwner);
-        set_function("getRegionInfluence", &luautils::GetRegionInfluence);
-        set_function("getNationRank", &luautils::GetNationRank);
-        set_function("getConquestBalance", &luautils::GetConquestBalance);
-        set_function("isConquestAlliance", &luautils::IsConquestAlliance);
-        set_function("spawnMob", &luautils::SpawnMob);
-        set_function("despawnMob", &luautils::DespawnMob);
-        set_function("getPlayerByName", &luautils::GetPlayerByName);
-        set_function("getPlayerByID", &luautils::GetPlayerByID);
-        set_function("getMagianTrial", &luautils::GetMagianTrial);
-        set_function("getMagianTrialsWithParent", &luautils::GetMagianTrialsWithParent);
-        set_function("jstMidnight", &luautils::JstMidnight);
-        set_function("jstWeekday", &luautils::JstWeekday);
-        set_function("vanadielTime", &luautils::VanadielTime);
-        set_function("vanadielTOTD", &luautils::VanadielTOTD);
-        set_function("vanadielHour", &luautils::VanadielHour);
-        set_function("vanadielMinute", &luautils::VanadielMinute);
-        set_function("vanadielDayOfTheWeek", &luautils::VanadielDayOfTheWeek);
-        set_function("vanadielDayOfTheMonth", &luautils::VanadielDayOfTheMonth);
-        set_function("vanadielDayOfTheYear", &luautils::VanadielDayOfTheYear);
-        set_function("vanadielYear", &luautils::VanadielYear);
-        set_function("vanadielMonth", &luautils::VanadielMonth);
-        set_function("vanadielUniqueDay", &luautils::VanadielUniqueDay);
-        set_function("vanadielDayElement", &luautils::VanadielDayElement);
-        set_function("vanadielMoonPhase", &luautils::VanadielMoonPhase);
-        set_function("vanadielMoonDirection", &luautils::VanadielMoonDirection);
-        set_function("vanadielRSERace", &luautils::VanadielRSERace);
-        set_function("vanadielRSELocation", &luautils::VanadielRSELocation);
-        set_function("setVanadielTimeOffset", &luautils::SetVanadielTimeOffset);
-        set_function("isMoonNew", &luautils::IsMoonNew);
-        set_function("isMoonFull", &luautils::IsMoonFull);
-        set_function("runElevator", &luautils::StartElevator);
-        set_function("getServerVariable", &luautils::GetServerVariable);
-        set_function("setServerVariable", &luautils::SetServerVariable);
-        set_function("clearVarFromAll", &luautils::ClearVarFromAll);
-        set_function("sendEntityVisualPacket", &luautils::SendEntityVisualPacket);
-        set_function("updateServerMessage", &luautils::UpdateServerMessage);
-        set_function("getServerVersion", &luautils::GetServerVersion);
-        set_function("getMobRespawnTime", &luautils::GetMobRespawnTime);
-        set_function("disallowRespawn", &luautils::DisallowRespawn);
-        set_function("updateNMSpawnPoint", &luautils::UpdateNMSpawnPoint);
-        set_function("setDropRate", &luautils::SetDropRate);
-        set_function("nearLocation", &luautils::NearLocation);
-        set_function("terminate", &luautils::Terminate);
-        set_function("getHealingTickDelay", &luautils::GetHealingTickDelay);
-        set_function("getReadOnlyItem", &luautils::GetReadOnlyItem);
-        set_function("getAbility", &luautils::GetAbility);
-        set_function("getSpell", &luautils::GetSpell);
-        set_function("selectDailyItem", &luautils::SelectDailyItem);
-        set_function("GetQuestAndMissionFilenamesList", &luautils::GetQuestAndMissionFilenamesList);
+        lua.set_function("GetFirstID", [](std::string const& name)
+        {
+            return "LOOKUP_" + name;
+        });
+        // clang-format on
 
         // Register Sol Bindings
         CLuaAbility::Register();
@@ -223,8 +246,10 @@ namespace luautils
         CLuaBaseEntity::Register();
         CLuaBattlefield::Register();
         CLuaInstance::Register();
+        CLuaLootContainer::Register();
         CLuaMobSkill::Register();
-        CLuaRegion::Register();
+        CLuaPetSkill::Register();
+        CLuaTriggerArea::Register();
         CLuaSpell::Register();
         CLuaStatusEffect::Register();
         CLuaTradeContainer::Register();
@@ -232,29 +257,64 @@ namespace luautils
         CLuaItem::Register();
 
         // Load globals
-        // TODO: Load these as requires
-        lua.script_file("./scripts/globals/settings.lua");
-        lua.script_file("./scripts/globals/conquest.lua");
-        lua.script_file("./scripts/globals/player.lua");
-        roeutils::init();
-        lua.script_file("./scripts/globals/roe.lua");
-        lua.script_file("./scripts/globals/gear_sets.lua");
-        lua.script_file("./scripts/globals/battlefield.lua");
-        lua.script_file("./scripts/globals/mobs.lua");
-        lua.script_file("./scripts/globals/mixins.lua");
+        // Truly global files first
+        lua.safe_script_file("./scripts/globals/common.lua");
+        roeutils::init(); // TODO: Get rid of the need to do this
+
+        // Then the rest...
+        for (auto const& entry : sorted_directory_iterator<std::filesystem::directory_iterator>("./scripts/globals"))
+        {
+            if (entry.extension() == ".lua")
+            {
+                auto relative_path_string = entry.relative_path().generic_string();
+
+                ShowTrace("Loading global script %s", relative_path_string);
+
+                auto result = lua.safe_script_file(relative_path_string);
+                if (!result.valid())
+                {
+                    sol::error err = result;
+                    ShowError(err.what());
+                }
+            }
+        }
 
         // Pet Scripts
         CacheLuaObjectFromFile("./scripts/globals/pets/automaton.lua");
         CacheLuaObjectFromFile("./scripts/globals/pets/luopan.lua");
         CacheLuaObjectFromFile("./scripts/globals/pets/wyvern.lua");
 
+        if (gLoadAllLua) // Load all lua files (for sanity testing, no need for during regular use)
+        {
+            for (auto const& entry : sorted_directory_iterator<std::filesystem::recursive_directory_iterator>("./scripts"))
+            {
+                if (entry.extension() == ".lua")
+                {
+                    auto result = lua.safe_script_file(entry.relative_path().generic_string());
+                    if (!result.valid())
+                    {
+                        sol::error err = result;
+                        ShowError(err.what());
+                    }
+                }
+            }
+        }
+
         // Handle settings
-        contentRestrictionEnabled = GetSettingsVariable("RESTRICT_CONTENT") != 0;
+        contentRestrictionEnabled = settings::get<bool>("main.RESTRICT_CONTENT");
 
-        TracyReportLuaMemory(LuaHandle);
+        moduleutils::LoadLuaModules();
 
-        ShowMessage("\t\t - " CL_GREEN "[OK]" CL_RESET "\n");
+        filewatcher = std::make_unique<Filewatcher>(std::vector<std::string>{ "scripts", "modules", "settings" });
+
+        TracyReportLuaMemory(lua.lua_state());
+
         return 0;
+    }
+
+    void cleanup()
+    {
+        moduleutils::CleanupLuaModules();
     }
 
     /************************************************************************
@@ -266,17 +326,17 @@ namespace luautils
     int32 garbageCollectStep()
     {
         TracyZoneScoped;
-        TracyReportLuaMemory(LuaHandle);
+        TracyReportLuaMemory(lua.lua_state());
 
         lua.step_gc(10); // LUA_GCSTEP 10 (performs an incremental step of garbage collection. Step size 10kb.)
 
         // NOTE: This is just requesting that an incremental step starts. There won't be a before/after change from
         //       this request!
 
-        ShowDebug(CL_CYAN "[Lua] Garbage Collected (Step)\n" CL_RESET);
-        ShowDebug(CL_CYAN "[Lua] Current State Top: %d, Total Memory Used: %dkb\n" CL_RESET, lua_gettop(LuaHandle), lua.memory_used() / 1024);
+        ShowInfo("Garbage Collected (Step)");
+        ShowInfo("Current State Top: %d, Total Memory Used: %dkb", lua_gettop(lua.lua_state()), lua.memory_used() / 1024);
 
-        TracyReportLuaMemory(LuaHandle);
+        TracyReportLuaMemory(lua.lua_state());
 
         return 0;
     }
@@ -284,7 +344,7 @@ namespace luautils
     int32 garbageCollectFull()
     {
         TracyZoneScoped;
-        TracyReportLuaMemory(LuaHandle);
+        TracyReportLuaMemory(lua.lua_state());
 
         auto before_mem_kb = lua.memory_used() / 1024;
 
@@ -292,132 +352,83 @@ namespace luautils
 
         auto after_mem_kb = lua.memory_used() / 1024;
 
-        ShowDebug(CL_CYAN "[Lua] Garbage Collected (Full)\n" CL_RESET);
-        ShowDebug(CL_CYAN "[Lua] Current State Top: %d, Total Memory Used: %dkb -> %dkb\n" CL_RESET, lua_gettop(LuaHandle), before_mem_kb, after_mem_kb);
+        ShowInfo("Garbage Collected (Full)");
+        ShowInfo("Current State Top: %d, Total Memory Used: %dkb -> %dkb", lua_gettop(lua.lua_state()), before_mem_kb, after_mem_kb);
 
-        TracyReportLuaMemory(LuaHandle);
+        TracyReportLuaMemory(lua.lua_state());
 
         return 0;
     }
 
-// TODO: Implement FileWatch backend for OSX
-#ifndef __APPLE__
-    void EnableFilewatcher()
-    {
-        // Prepare script file watcher
-        auto watchReaction = [](const std::filesystem::path& path, const filewatch::Event change_type) {
-            // If a Lua file is modified
-            if (path.extension() == ".lua" && change_type == filewatch::Event::modified)
-            {
-                TracyZoneScoped;
-                TracyZoneString(path.generic_string());
-
-                auto real_path          = "./scripts/" + path.generic_string();
-                auto modified           = std::filesystem::last_write_time(real_path).time_since_epoch().count();
-                auto modified_timestamp = static_cast<uint64>(modified);
-                SafeApplyFunc_ReloadList([&](std::map<std::string, uint64>& list) {
-                    if (list.find(real_path) == list.end())
-                    {
-                        // No entry, make one
-                        list[real_path] = modified_timestamp;
-                    }
-                    else
-                    {
-                        auto last_modified = list.at(real_path);
-                        if (last_modified < modified_timestamp)
-                        {
-                            list[real_path] = modified_timestamp;
-                            filteredList.emplace_back(real_path);
-                        }
-                    }
-                });
-            }
-        };
-        watch = std::make_unique<filewatch::FileWatch<std::string>>("./scripts/", watchReaction);
-    }
-
     void ReloadFilewatchList()
     {
-        SafeApplyFunc_ReloadList([&](std::map<std::string, uint64>& list) {
-            TracyZoneScoped;
-            for (auto& path_string : filteredList)
+        std::set<std::string> filenames; // For de-duping
+
+        std::filesystem::path path;
+        while (filewatcher->modifiedQueue.try_dequeue(path))
+        {
+            if (path.extension() == ".lua")
             {
-                CacheLuaObjectFromFile(path_string, true);
+                std::string filename = path.relative_path().generic_string();
+                filenames.insert(filename);
             }
+        }
 
-            // Erase list
-            filteredList.clear();
-        });
-    }
-#else
-    void EnableFilewatcher()
-    {
-        // Intentionally blank
+        for (auto const& filename : filenames)
+        {
+            ShowInfo("[FileWatcher] %s", filename);
+            CacheLuaObjectFromFile(filename, true);
+        }
     }
 
-    void ReloadFilewatchList()
-    {
-        // Intentionally blank
-    }
-#endif // __APPLE__
-
-    std::vector<std::string> GetQuestAndMissionFilenamesList()
+    std::vector<std::string> GetContainerFilenamesList()
     {
         TracyZoneScoped;
         std::vector<std::string> outVec;
 
-        // Scrape for files of the form: "scripts/(quests|missions)/(area|expansion)/(filename).lua"
+        // Scrape for files of the form:
+        // "scripts/quests/(area|expansion)/(filename).lua"
+        // "scripts/missions/(area|expansion)/(filename).lua"
+        // "scripts/battlefields/(zone)/(filename).lua"
         auto scrapeSubdir = [&](std::string subFolder) -> void
         {
-            for (auto const& entry : std::filesystem::recursive_directory_iterator(subFolder))
+            for (auto const& entry : sorted_directory_iterator<std::filesystem::recursive_directory_iterator>(subFolder))
             {
-                auto path = entry.path().relative_path();
+                auto path = entry.relative_path();
 
                 // TODO(compiler updates):
                 // entry.depth() is not yet available in all of our compilers
                 auto depth = std::distance(path.begin(), path.end());
 
-                bool isHelperFile = path.filename() == "helper.lua" || path.filename() == "helpers.lua";
+                bool isHelpersFile = path.filename() == "helpers.lua";
 
-                if (!entry.is_directory() &&
+                if (!std::filesystem::is_directory(path) &&
                     path.extension() == ".lua" &&
                     depth == 4 &&
-                    !isHelperFile)
+                    !isHelpersFile)
                 {
                     outVec.emplace_back(path.replace_extension("").make_preferred().string());
                 }
             }
         };
 
+        scrapeSubdir("scripts/battlefields");
         scrapeSubdir("scripts/missions");
         scrapeSubdir("scripts/quests");
 
         return outVec;
     }
 
-    /************************************************************************
-     *                                                                       *
-     * Overriding the official lua print function                            *
-     *                                                                       *
-     ************************************************************************/
-
-    template <typename T>
-    void print(T const& item)
-    {
-        TracyZoneScoped;
-        ShowScript(fmt::format("{}\n", item));
-    }
-
     sol::function getEntityCachedFunction(CBaseEntity* PEntity, std::string funcName)
     {
         TracyZoneScoped;
         TracyZoneString(funcName);
-        TracyZoneIString(PEntity->GetName());
+        TracyZoneString(PEntity->GetName());
 
         if (PEntity->objtype == TYPE_NPC)
         {
-            std::string zone_name = (const char*)PEntity->loc.zone->GetName();
-            std::string npc_name  = (const char*)PEntity->GetName();
+            std::string zone_name = PEntity->loc.zone->GetName();
+            std::string npc_name  = PEntity->GetName();
 
             if (auto cached_func = lua["xi"]["zones"][zone_name]["npcs"][npc_name][funcName]; cached_func.valid())
             {
@@ -426,8 +437,8 @@ namespace luautils
         }
         else if (PEntity->objtype == TYPE_MOB)
         {
-            std::string zone_name = (const char*)PEntity->loc.zone->GetName();
-            std::string mob_name  = (const char*)PEntity->GetName();
+            std::string zone_name = PEntity->loc.zone->GetName();
+            std::string mob_name  = PEntity->GetName();
 
             if (auto cached_func = lua["xi"]["zones"][zone_name]["mobs"][mob_name][funcName]; cached_func.valid())
             {
@@ -445,7 +456,7 @@ namespace luautils
         }
         else if (PEntity->objtype == TYPE_TRUST)
         {
-            std::string mob_name = (const char*)PEntity->GetName();
+            std::string mob_name = PEntity->GetName();
 
             if (auto cached_func = lua["xi"]["globals"]["spells"]["trust"][mob_name][funcName]; cached_func.valid())
             {
@@ -461,30 +472,63 @@ namespace luautils
     {
         TracyZoneScoped;
         TracyZoneString(funcName);
-        TracyZoneIString(PSpell->getName());
+        TracyZoneString(PSpell->getName());
 
-        auto name = (const char*)PSpell->getName();
+        auto name = PSpell->getName();
 
-        if (PSpell->getSpellGroup() == SPELLGROUP_BLUE)
+        std::string switchKey = "";
+        switch (PSpell->getSpellGroup())
         {
-            if (auto cached_func = lua["xi"]["globals"]["spells"]["bluemagic"][name][funcName]; cached_func.valid())
+            case SPELLGROUP_WHITE:
             {
-                return cached_func;
+                switchKey = "white";
             }
+            break;
+            case SPELLGROUP_BLACK:
+            {
+                switchKey = "black";
+            }
+            break;
+            case SPELLGROUP_SONG:
+            {
+                switchKey = "songs";
+            }
+            break;
+            case SPELLGROUP_NINJUTSU:
+            {
+                switchKey = "ninjutsu";
+            }
+            break;
+            case SPELLGROUP_SUMMONING:
+            {
+                switchKey = "summoning";
+            }
+            break;
+            case SPELLGROUP_BLUE:
+            {
+                switchKey = "blue";
+            }
+            break;
+            case SPELLGROUP_GEOMANCY:
+            {
+                switchKey = "geomancy";
+            }
+            break;
+            case SPELLGROUP_TRUST:
+            {
+                switchKey = "trust";
+            }
+            break;
+            default:
+            {
+                ShowError("luautils::getSpellCachedFunction: Spell %s not inside a folder or doesnt have a SpellGroup", name);
+            }
+            break;
         }
-        else if (PSpell->getSpellGroup() == SPELLGROUP_TRUST)
+
+        if (auto cached_func = lua["xi"]["globals"]["spells"][switchKey][name][funcName]; cached_func.valid())
         {
-            if (auto cached_func = lua["xi"]["globals"]["spells"]["trust"][name][funcName]; cached_func.valid())
-            {
-                return cached_func;
-            }
-        }
-        else
-        {
-            if (auto cached_func = lua["xi"]["globals"]["spells"][name][funcName]; cached_func.valid())
-            {
-                return cached_func;
-            }
+            return cached_func;
         }
 
         // Didn't find it
@@ -494,13 +538,18 @@ namespace luautils
     // Assumes filename in the form "./scripts/folder0/folder1/folder2/mob_name.lua
     // Object returned form that script will be cached to:
     // xi.folder0.folder1.folder2.mob_name
-    void CacheLuaObjectFromFile(std::string filename, bool printOutput /*= false*/)
+    void CacheLuaObjectFromFile(std::string filename, bool overwriteCurrentEntry /* = false*/)
     {
         TracyZoneScoped;
         TracyZoneString(filename);
 
+        auto path = std::filesystem::path(filename);
+        if (path.empty() || path.extension() == "")
+        {
+            return;
+        }
+
         // Handle filename -> path conversion
-        std::filesystem::path    path(filename);
         std::vector<std::string> parts;
         for (auto part : path)
         {
@@ -508,10 +557,43 @@ namespace luautils
             parts.emplace_back(part.string());
         }
 
+        // Handle Lua module files, then return
+        if (!parts.empty() && parts[0] == "modules")
+        {
+            auto result = lua.safe_script_file(filename);
+            if (!result.valid())
+            {
+                sol::error err = result;
+                ShowError("luautils::CacheLuaObjectFromFile: Load module error: %s: %s", filename, err.what());
+                return;
+            }
+
+            ShowInfo("[FileWatcher] RE-RUNNING MODULE FILE %s", filename);
+            return;
+        }
+
+        // Handle Lua settings files, then return
+        if (!parts.empty() && parts[0] == "settings")
+        {
+            auto result = lua.safe_script_file(filename);
+            if (!result.valid())
+            {
+                sol::error err = result;
+                ShowError("luautils::CacheLuaObjectFromFile: Load settings error: %s: %s", filename, err.what());
+                return;
+            }
+
+            ShowInfo("[FileWatcher] RELOADING ALL LUA SETTINGS FILES");
+
+            settings::init();
+
+            return;
+        }
+
         auto it = std::find(parts.begin(), parts.end(), "scripts");
         if (it == parts.end())
         {
-            ShowError("luautils::CacheLuaObjectFromFile: Invalid filename: %s\n", filename);
+            ShowError("luautils::CacheLuaObjectFromFile: Invalid filename: %s", filename);
             return;
         }
 
@@ -528,51 +610,102 @@ namespace luautils
             if (!result.valid())
             {
                 sol::error err = result;
-                ShowError("luautils::CacheLuaObjectFromFile: Load global error: %s: %s\n", filename, err.what());
+                ShowError("luautils::CacheLuaObjectFromFile: Load global error: %s: %s", filename, err.what());
                 return;
             }
 
-            ShowInfo("[FileWatcher] GLOBAL %s -> \"%s\"\n", filename, requireName);
+            ShowInfo("[FileWatcher] GLOBAL %s -> \"%s\"", filename, requireName);
+            return;
+        }
+
+        // Handle Commands then return
+        if (parts.size() == 2 && parts[0] == "commands")
+        {
+            auto result = lua.safe_script_file(filename);
+            if (!result.valid())
+            {
+                sol::error err = result;
+                ShowError("luautils::CacheLuaObjectFromFile: Load command error: %s: %s", filename, err.what());
+                return;
+            }
+
+            ShowInfo("[FileWatcher] COMMAND %s", filename);
+            return;
+        }
+
+        // Handle IDs then return
+        if (parts.size() == 3 && parts[2] == "IDs")
+        {
+            auto result = lua.safe_script_file(filename, &sol::script_pass_on_error);
+            if (!result.valid())
+            {
+                sol::error err = result;
+                ShowError("luautils::CacheLuaObjectFromFile: Load command error: %s: %s", filename, err.what());
+                return;
+            }
+
+            PopulateIDLookups();
+            ShowInfo("[FileWatcher] IDs %s", filename);
             return;
         }
 
         // Handle Quests and Missions then return
-        if (parts.size() == 3 && (parts[0] == "quests" || parts[0] == "missions"))
+        if (parts.size() == 3 &&
+            (parts[0] == "quests" || parts[0] == "missions" || parts[0] == "battlefields"))
         {
-            std::string requireName = fmt::format("scripts/{}/{}/{}", parts[0], parts[1], parts[2]);
-
-            auto result = lua.safe_script(fmt::format(R"(
-                require("scripts/globals/utils")
-                require("scripts/globals/interaction/interaction_global")
-
-                if package.loaded["{0}"] then
-                    local old = package.loaded["{0}"]
-                    package.loaded["{0}"] = nil
-                    if InteractionGlobal and old then
-                        InteractionGlobal.lookup:removeContainer(old)
-                    end
-                end
-
-                local res = utils.prequire("{0}")
-                if InteractionGlobal and res then
-                    InteractionGlobal.lookup:addContainer(res)
-                end
-            )", requireName));
-
-            if (!result.valid())
+            if (parts[2] == "helpers")
             {
-                sol::error err = result;
-                ShowError("luautils::CacheLuaObjectFromFile: Load interaction error: %s: %s\n", filename, err.what());
-                return;
+                std::string requireName = fmt::format("scripts/{}/{}/{}", parts[0], parts[1], parts[2]);
+
+                // clang-format off
+                auto result = lua.safe_script(fmt::format(R"(
+                    require("scripts/globals/utils")
+                    package.loaded["{0}"] = nil
+                    utils.prequire("{0}")
+                )", requireName));
+                // clang-format on
+
+                ShowInfo("[FileWatcher] INTERACTION HELPERS %s", parts[1]);
+            }
+            else // Regular interaction files
+            {
+                std::string requireName = fmt::format("scripts/{}/{}/{}", parts[0], parts[1], parts[2]);
+
+                auto result = lua.safe_script(fmt::format(R"(
+                    require("scripts/globals/utils")
+                    require("scripts/globals/interaction/interaction_global")
+
+                    if package.loaded["{0}"] then
+                        local old = package.loaded["{0}"]
+                        package.loaded["{0}"] = nil
+                        if InteractionGlobal and old then
+                            InteractionGlobal.lookup:removeContainer(old)
+                        end
+                    end
+
+                    local res = utils.prequire("{0}")
+                    if InteractionGlobal and res then
+                        InteractionGlobal.lookup:addContainer(res)
+                    end
+                )",
+                                                          requireName));
+
+                if (!result.valid())
+                {
+                    sol::error err = result;
+                    ShowError("luautils::CacheLuaObjectFromFile: Load interaction error: %s: %s", filename, err.what());
+                    return;
+                }
+
+                ShowInfo("[FileWatcher] INTERACTION %s -> %s", requireName, parts[2]);
             }
 
-            ShowInfo("[FileWatcher] INTERACTION %s -> %s\n", requireName, parts[2]);
             return;
         }
 
         if (!std::filesystem::exists(filename))
         {
-            // ShowDebug("luautils::CacheLuaObjectFromFile: File does not exist: %s\n", filename);
+            ShowTrace("luautils::CacheLuaObjectFromFile: File does not exist: %s", filename);
             return;
         }
 
@@ -581,13 +714,13 @@ namespace luautils
         if (!file_result.valid())
         {
             sol::error err = file_result;
-            ShowError("luautils::CacheLuaObjectFromFile: Load error: %s: %s\n", filename, err.what());
+            ShowError("luautils::CacheLuaObjectFromFile: Load error: %s: %s", filename, err.what());
             return;
         }
 
         if (!file_result.return_count())
         {
-            ShowError("luautils::CacheLuaObjectFromFile: No returned object to cache: %s\n", filename);
+            ShowError("luautils::CacheLuaObjectFromFile: No returned object to cache: %s", filename);
             return;
         }
 
@@ -599,7 +732,14 @@ namespace luautils
         {
             if (part == parts.back())
             {
-                table[sol::override_value][part] = file_result;
+                if (overwriteCurrentEntry)
+                {
+                    table[sol::override_value][part] = file_result;
+                }
+                else
+                {
+                    table[sol::update_if_empty][part] = file_result;
+                }
             }
             else
             {
@@ -608,10 +748,7 @@ namespace luautils
             out_str += "." + part;
         }
 
-        if (printOutput)
-        {
-            ShowInfo("[FileWatcher] %s -> %s\n", filename, out_str);
-        }
+        moduleutils::TryApplyLuaModules();
     }
 
     sol::table GetCacheEntryFromFilename(std::string filename)
@@ -636,7 +773,7 @@ namespace luautils
         auto it = std::find(parts.begin(), parts.end(), "scripts");
         if (it == parts.end())
         {
-            ShowError("luautils::GetCacheEntryFromFilename: Invalid filename: %s\n", filename);
+            ShowError("luautils::GetCacheEntryFromFilename: Invalid filename: %s", filename);
             return lua.create_table();
         }
 
@@ -660,16 +797,14 @@ namespace luautils
         std::string filename;
         if (PEntity->objtype == TYPE_NPC)
         {
-            // TODO: These int8 string need to die.
-            std::string zone_name = (const char*)PEntity->loc.zone->GetName();
-            std::string npc_name  = (const char*)PEntity->GetName();
+            std::string zone_name = PEntity->loc.zone->GetName();
+            std::string npc_name  = PEntity->GetName();
             filename              = fmt::format("./scripts/zones/{}/npcs/{}.lua", zone_name, npc_name);
         }
         else if (PEntity->objtype == TYPE_MOB)
         {
-            // TODO: These int8 string need to die.
-            std::string zone_name = (const char*)PEntity->loc.zone->GetName();
-            std::string mob_name  = (const char*)PEntity->GetName();
+            std::string zone_name = PEntity->loc.zone->GetName();
+            std::string mob_name  = PEntity->GetName();
             filename              = fmt::format("./scripts/zones/{}/mobs/{}.lua", zone_name, mob_name);
         }
         else if (PEntity->objtype == TYPE_PET)
@@ -679,11 +814,118 @@ namespace luautils
         }
         else if (PEntity->objtype == TYPE_TRUST)
         {
-            std::string mob_name = (const char*)PEntity->GetName();
+            std::string mob_name = PEntity->GetName();
             filename             = fmt::format("./scripts/globals/spells/trust/{}.lua", PEntity->GetName());
         }
 
         CacheLuaObjectFromFile(filename);
+    }
+
+    void PopulateIDLookups(std::optional<uint16> maybeZoneId)
+    {
+        TracyZoneScoped;
+
+        // Make sure this has been run at least once!
+        auto result = lua.safe_script_file("scripts/globals/zone.lua");
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError(fmt::format("Failed to load globals/zone.lua: {}", err.what()));
+        }
+
+        // clang-format off
+        std::string lookupPrefix = "LOOKUP_";
+        auto handleZone = [&](CZone* PZone)
+        {
+            auto zoneName = PZone->GetName();
+            auto result   = lua.safe_script_file(fmt::format("scripts/zones/{}/IDs.lua", zoneName));
+            if (result.valid() && zoneName != "Residential_Area")
+            {
+                auto table = lua["zones"][PZone->GetID()].get<sol::table>();
+                for (auto [outerKey, outerValue] : table)
+                {
+                    auto outerName = outerKey.as<std::string>();
+                    if (outerName == "mob" || outerName == "npc")
+                    {
+                        for (auto [innerKey, innerValue] : outerValue.as<sol::table>())
+                        {
+                            if (innerKey.get_type() == sol::type::string && innerValue.get_type() == sol::type::string)
+                            {
+                                auto innerName  = to_upper(innerKey.as<std::string>());
+                                auto lookupName = innerValue.as<std::string>();
+
+                                if (!starts_with(lookupName, lookupPrefix))
+                                {
+                                    continue;
+                                }
+
+                                // We have a lookup string, remove the prefix
+                                lookupName = lookupName.substr(lookupPrefix.length());
+
+                                bool found = false;
+                                if (outerName == "mob")
+                                {
+                                    // TODO: Execute this as a single query per-zone and pull out the desired results.
+                                    auto query = fmt::sprintf("SELECT mobid FROM mob_spawn_points "
+                                                        "WHERE ((mobid >> 12) & 0xFFF) = %i AND "
+                                                        "UPPER(REPLACE(mobname, '-', '_')) = '%s' "
+                                                        "LIMIT 1;", PZone->GetID(), lookupName.c_str());
+                                    DebugIDLookup(query.c_str());
+                                    auto ret = sql->Query(query.c_str());
+                                    if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
+                                    {
+                                        lua["zones"][PZone->GetID()][outerName][innerName] = sql->GetUIntData(0);
+                                        found = true;
+                                        DebugIDLookup(fmt::format("New value for {}.ID.{}.{} = {}",
+                                            zoneName, outerName, innerName, lua["zones"][PZone->GetID()][outerName][innerName].get<uint32>()));
+                                    }
+                                }
+                                else if (outerName == "npc")
+                                {
+                                    // TODO: Execute this as a single query per-zone and pull out the desired results.
+                                    auto query = fmt::sprintf("SELECT npcid FROM npc_list "
+                                                        "WHERE ((npcid >> 12) & 0xFFF) = %i AND "
+                                                        "UPPER(REPLACE(CAST(`name` as CHAR(64)), '-', '_')) = '%s' "
+                                                        "LIMIT 1;", PZone->GetID(), lookupName.c_str());
+                                    DebugIDLookup(query.c_str());
+                                    auto ret = sql->Query(query.c_str());
+                                    if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
+                                    {
+                                        lua["zones"][PZone->GetID()][outerName][innerName] = sql->GetUIntData(0);
+                                        found = true;
+                                        DebugIDLookup(fmt::format("New value for {}.ID.{}.{} = {}",
+                                            zoneName, outerName, innerName, lua["zones"][PZone->GetID()][outerName][innerName].get<uint32>()));
+                                    }
+                                }
+
+                                if (!found)
+                                {
+                                    ShowError(fmt::format("Could not complete id lookup for {}.ID.{}.{}", zoneName, outerName, innerName))
+                                }
+                            }
+                        }
+                    }
+                }
+                // Re-publish to package.loaded. This is the same as loading the contents of a script with require("name").
+                lua["package"]["loaded"][fmt::format("scripts/zones/{}/IDs", zoneName)] = lua["zones"][PZone->GetID()];
+            }
+        };
+
+        if (!maybeZoneId.has_value())
+        {
+            zoneutils::ForEachZone([&](CZone* PZone)
+            {
+                if (PZone->GetIP() != 0)
+                {
+                    handleZone(PZone);
+                }
+            });
+        }
+        else
+        {
+            handleZone(zoneutils::GetZone(maybeZoneId.value()));
+        }
+        // clang-format on
     }
 
     // temporary solution for geysers in Dangruf_Wadi
@@ -718,7 +960,7 @@ namespace luautils
 
         if (!PNpc)
         {
-            ShowWarning("luautils::GetNPCByID NPC doesn't exist (%d)\n", npcid);
+            ShowWarning("luautils::GetNPCByID NPC doesn't exist (%d)", npcid);
             return std::nullopt;
         }
 
@@ -730,25 +972,23 @@ namespace luautils
         CacheLuaObjectFromFile("./scripts/globals/interaction/interaction_global.lua");
 
         auto initZones = lua["xi"]["globals"]["interaction"]["interaction_global"]["initZones"];
+
         std::vector<uint16> zoneIds;
-        zoneutils::ForEachZone([&zoneIds](CZone* PZone) {
+        // clang-format off
+        zoneutils::ForEachZone([&zoneIds](CZone* PZone)
+        {
             zoneIds.push_back(PZone->GetID());
         });
+        // clang-format on
 
         auto result = initZones(zoneIds);
 
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::InitInteractionGlobal: %s\n", err.what());
+            ShowError("luautils::InitInteractionGlobal: %s", err.what());
         }
     }
-
-    /************************************************************************
-     *                                                                       *
-     *                                                                       *
-     *                                                                       *
-     ************************************************************************/
 
     std::optional<CLuaZone> GetZone(uint16 zoneId)
     {
@@ -786,11 +1026,46 @@ namespace luautils
 
         if (!PMob)
         {
-            ShowWarning("luautils::GetMobByID Mob doesn't exist (%d)\n", mobid);
+            ShowWarning("luautils::GetMobByID Mob doesn't exist (%d)", mobid);
             return std::nullopt;
         }
 
         return std::optional<CLuaBaseEntity>(PMob);
+    }
+
+    std::optional<CLuaBaseEntity> GetEntityByID(uint32 entityid, sol::object const& instanceObj, sol::object const& arg3)
+    {
+        TracyZoneScoped;
+
+        CInstance* PInstance = nullptr;
+        if (instanceObj.is<CLuaInstance>())
+        {
+            PInstance = instanceObj.as<CLuaInstance>().GetInstance();
+        }
+
+        bool silenceWarning = arg3.get_type() == sol::type::boolean ? arg3.as<bool>() : false;
+
+        CBaseEntity* PEntity{ nullptr };
+
+        if (PInstance)
+        {
+            PEntity = PInstance->GetEntity(entityid & 0xFFF, TYPE_MOB | TYPE_PET | TYPE_NPC);
+        }
+        else
+        {
+            PEntity = zoneutils::GetEntity(entityid, TYPE_MOB | TYPE_PET | TYPE_NPC);
+        }
+
+        if (!PEntity)
+        {
+            if (!silenceWarning)
+            {
+                ShowWarning("luautils::GetEntityByID Mob doesn't exist (%d)", entityid);
+            }
+            return std::nullopt;
+        }
+
+        return std::optional<CLuaBaseEntity>(PEntity);
     }
 
     /************************************************************************
@@ -883,7 +1158,7 @@ namespace luautils
         if (!setRegionalConquestOverseers.valid())
         {
             sol::error err = setRegionalConquestOverseers;
-            ShowError("luautils::setRegionalConquestOverseers: %s\n", err.what());
+            ShowError("luautils::setRegionalConquestOverseers: %s", err.what());
             return -1;
         }
 
@@ -891,11 +1166,16 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::setRegionalConquestOverseers: %s\n", err.what());
+            ShowError("luautils::setRegionalConquestOverseers: %s", err.what());
             return -1;
         }
 
         return 0;
+    }
+
+    void SendLuaFuncStringToZone(uint16 zoneId, std::string const& str)
+    {
+        message::send(zoneId, str);
     }
 
     /************************************************************************
@@ -1154,16 +1434,19 @@ namespace luautils
                 {
                     return true;
                 }
+                break;
             case 1: // Waning (decending)
-                if (phase <= 10 && phase >= 0)
+                if (phase <= 10)
                 {
                     return true;
                 }
+                break;
             case 2: // Waxing (increasing)
-                if (phase >= 0 && phase <= 5)
+                if (phase <= 5)
                 {
                     return true;
                 }
+                break;
         }
 
         return false;
@@ -1191,16 +1474,19 @@ namespace luautils
                 {
                     return true;
                 }
+                break;
             case 1: // Waning (decending)
                 if (phase >= 95 && phase <= 100)
                 {
                     return true;
                 }
+                break;
             case 2: // Waxing (increasing)
                 if (phase >= 90 && phase <= 100)
                 {
                     return true;
                 }
+                break;
         }
 
         return false;
@@ -1248,13 +1534,13 @@ namespace luautils
                 }
                 else
                 {
-                    ShowDebug(CL_CYAN "SpawnMob: %u <%s> is already spawned\n" CL_RESET, PMob->id, PMob->GetName());
+                    ShowDebug("SpawnMob: %u <%s> is already spawned", PMob->id, PMob->GetName());
                 }
             }
         }
         else
         {
-            ShowDebug(CL_RED "SpawnMob: mob <%u> not found\n" CL_RESET, mobid);
+            ShowDebug("SpawnMob: mob <%u> not found", mobid);
             return std::nullopt;
         }
 
@@ -1302,11 +1588,11 @@ namespace luautils
      *                                                                       *
      ************************************************************************/
 
-    std::optional<CLuaBaseEntity> GetPlayerByName(std::string name)
+    std::optional<CLuaBaseEntity> GetPlayerByName(std::string const& name)
     {
         TracyZoneScoped;
 
-        CCharEntity* PTargetChar = zoneutils::GetCharByName((int8*)name.c_str());
+        CCharEntity* PTargetChar = zoneutils::GetCharByName(name.c_str());
 
         if (PTargetChar != nullptr)
         {
@@ -1337,15 +1623,15 @@ namespace luautils
     }
 
     /*******************************************************************************
-    *                                                                              *
-    *  Returns data of Magian trials                                               *
-    *  Will return a single table with keys matching the SQL table column          *
-    *  names if given one trial #, or will return a table of likewise trial        *
-    *  columns if given a table of trial #s.                                       *
-    *  examples: GetMagianTrial(2)          returns {column = value, ...}          *
-    *            GetMagianTrial({2, 16})    returns { 2 = { column = value, ...},  *
-    *                                                16 = { column = value, ...}}  *
-    *******************************************************************************/
+     *                                                                              *
+     *  Returns data of Magian trials                                               *
+     *  Will return a single table with keys matching the SQL table column          *
+     *  names if given one trial #, or will return a table of likewise trial        *
+     *  columns if given a table of trial #s.                                       *
+     *  examples: GetMagianTrial(2)          returns {column = value, ...}          *
+     *            GetMagianTrial({2, 16})    returns { 2 = { column = value, ...},  *
+     *                                                16 = { column = value, ...}}  *
+     *******************************************************************************/
 
     sol::table GetMagianTrial(sol::variadic_args va)
     {
@@ -1358,11 +1644,11 @@ namespace luautils
             // Get all magian table columns to build lua keys
             const char*              ColumnQuery = "SHOW COLUMNS FROM `magian`;";
             std::vector<std::string> magianColumns;
-            if (Sql_Query(SqlHandle, ColumnQuery) == SQL_SUCCESS && Sql_NumRows(SqlHandle) != 0)
+            if (sql->Query(ColumnQuery) == SQL_SUCCESS && sql->NumRows() != 0)
             {
-                while (Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+                while (sql->NextRow() == SQL_SUCCESS)
                 {
-                    magianColumns.push_back((const char*)Sql_GetData(SqlHandle, 0));
+                    magianColumns.push_back(sql->GetStringData(0));
                 }
             }
             else
@@ -1377,11 +1663,11 @@ namespace luautils
             {
                 int32 trial = va[0].as<int32>();
                 int32 field{ 0 };
-                if (Sql_Query(SqlHandle, Query, trial) != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+                if (sql->Query(Query, trial) != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
                 {
                     for (auto column : magianColumns)
                     {
-                        table[column] = (int32)Sql_GetIntData(SqlHandle, field++);
+                        table[column] = sql->GetIntData(field++);
                     }
                 }
             }
@@ -1392,14 +1678,14 @@ namespace luautils
                 // one inner table each trial { trial# = { column = value, ... } }
                 for (auto trial : trials)
                 {
-                    int32 ret = Sql_Query(SqlHandle, Query, trial);
-                    if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+                    int32 ret = sql->Query(Query, trial);
+                    if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
                     {
                         auto  inner_table = table.create_named(trial);
                         int32 field{ 0 };
                         for (auto column : magianColumns)
                         {
-                            inner_table[column] = (int32)Sql_GetIntData(SqlHandle, field++);
+                            inner_table[column] = sql->GetIntData(field++);
                         }
                     }
                 }
@@ -1416,24 +1702,24 @@ namespace luautils
     }
 
     /*******************************************************************************
-    *                                                                              *
-    *  Returns a list of trial numbers who have the given parent trial             *
-    *                                                                              *
-    *******************************************************************************/
+     *                                                                              *
+     *  Returns a list of trial numbers who have the given parent trial             *
+     *                                                                              *
+     *******************************************************************************/
 
     sol::table GetMagianTrialsWithParent(int32 parentTrial)
     {
         TracyZoneScoped;
 
         const char* Query = "SELECT `trialId` from `magian` WHERE `previousTrial` = %u;";
-        int32       ret   = Sql_Query(SqlHandle, Query, parentTrial);
-        if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0)
+        int32       ret   = sql->Query(Query, parentTrial);
+        if (ret != SQL_ERROR && sql->NumRows() > 0)
         {
             auto  table = lua.create_table();
             int32 field{ 0 };
-            while (Sql_NextRow(SqlHandle) == 0)
+            while (sql->NextRow() == 0)
             {
-                int32 childTrial = Sql_GetIntData(SqlHandle, 0);
+                int32 childTrial = sql->GetIntData(0);
                 table[++field]   = childTrial;
             }
 
@@ -1453,18 +1739,6 @@ namespace luautils
     {
         TracyZoneScoped;
         return lua["zones"][ZoneID]["text"][variable].get_or(0);
-    }
-
-    /************************************************************************
-     *                                                                       *
-     *  Get a Variable From Settings.lua                                     *
-     *                                                                       *
-     ************************************************************************/
-
-    uint8 GetSettingsVariable(const char* variable)
-    {
-        TracyZoneScoped;
-        return lua[variable].valid() ? lua[variable].get<uint8>() : 0;
     }
 
     /************************************************************************
@@ -1493,7 +1767,7 @@ namespace luautils
             else
             {
                 // Cache contentTag lookups in a map so that we don't re-hit the Lua file every time
-                contentEnabled = (GetSettingsVariable(contentVariable.c_str()) != 0);
+                contentEnabled = settings::get<bool>(fmt::format("main.{}", contentVariable));
 
                 contentEnabledMap[contentVariable] = contentEnabled;
             }
@@ -1516,7 +1790,7 @@ namespace luautils
         TracyZoneScoped;
 
         CZone* PZone = zoneutils::GetZone(ZoneID);
-        auto   name  = (const char*)PZone->GetName();
+        auto   name  = PZone->GetName();
 
         auto filename = fmt::format("./scripts/zones/{}/Zone.lua", name);
 
@@ -1532,7 +1806,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInitialize: %s\n", err.what());
+            ShowError("luautils::onInitialize: %s", err.what());
             return -1;
         }
 
@@ -1541,7 +1815,35 @@ namespace luautils
 
     /************************************************************************
      *                                                                       *
-     *  Выполняем скрипт при входе персонажа в зону                          *
+     *  Called on ZoneServer Zone Tick (every 400ms)                         *
+     *                                                                       *
+     ************************************************************************/
+
+    void OnZoneTick(CZone* PZone)
+    {
+        TracyZoneScoped;
+
+        auto name = PZone->GetName();
+
+        auto filename = fmt::format("./scripts/zones/{}/Zone.lua", name);
+
+        auto onZoneTick = GetCacheEntryFromFilename(filename)["onZoneTick"];
+        if (!onZoneTick.valid())
+        {
+            return;
+        }
+
+        auto result = onZoneTick(CLuaZone(PZone));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onZoneTick: %s", err.what());
+        }
+    }
+
+    /************************************************************************
+     *                                                                       *
+     *  We perform the script at the entrance of the character to the server *
      *                                                                       *
      ************************************************************************/
 
@@ -1560,7 +1862,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onGameIn: %s\n", err.what());
+            ShowError("luautils::onGameIn: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1569,57 +1872,89 @@ namespace luautils
 
     /************************************************************************
      *                                                                       *
-     *  Выполняем скрипт при входе персонажа в зону                          *
+     *  We perform the script at the entrance of the character to the zone   *
      *                                                                       *
      ************************************************************************/
 
-    int32 OnZoneIn(CCharEntity* PChar)
+    void OnZoneIn(CCharEntity* PChar)
     {
         TracyZoneScoped;
 
-        auto name = PChar->m_moghouseID ? "Residential_Area" : (const char*)zoneutils::GetZone(PChar->loc.destination)->GetName();
+        auto name     = PChar->m_moghouseID ? "Residential_Area" : zoneutils::GetZone(PChar->loc.destination)->GetName();
+        auto filename = fmt::format("./scripts/zones/{}/Zone.lua", name);
 
         auto onZoneInFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onZoneIn"];
-        auto onZoneIn = lua["xi"]["zones"][name]["Zone"]["onZoneIn"];
+        auto onZoneIn          = GetCacheEntryFromFilename(filename)["onZoneIn"];
 
         auto result = onZoneInFramework(CLuaBaseEntity(PChar), PChar->loc.prevzone, onZoneIn);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onZoneIn: %s\n", err.what());
-            return -1;
+            ShowError("luautils::onZoneIn: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+            return;
         }
 
-        return result.get_type() == sol::type::number ? result : -1;
+        if (result.get_type() == sol::type::table)
+        {
+            auto resultTable = result.get<sol::table>();
+
+            PChar->currentEvent->eventId    = resultTable.get_or(1, -1);
+            PChar->currentEvent->textTable  = resultTable.get_or(2, -1);
+            PChar->currentEvent->eventFlags = resultTable.get_or(3, 0);
+        }
+        else if (result.get_type() == sol::type::number)
+        {
+            PChar->currentEvent->eventId = result.get<int32>();
+        }
     }
 
     void AfterZoneIn(CBaseEntity* PChar)
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PChar->loc.zone->GetName();
+        auto name     = PChar->loc.zone->GetName();
+        auto filename = fmt::format("./scripts/zones/{}/Zone.lua", name);
 
-        auto afterZoneIn = lua["xi"]["zones"][name]["Zone"]["afterZoneIn"];
-        if (!afterZoneIn.valid())
-        {
-            return;
-        }
+        auto afterZoneInFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["afterZoneIn"];
+        auto afterZoneIn          = GetCacheEntryFromFilename(filename)["afterZoneIn"];
 
-        auto result = afterZoneIn(CLuaBaseEntity(PChar));
+        auto result = afterZoneInFramework(CLuaBaseEntity(PChar), afterZoneIn);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::afterZoneIn: %s\n", err.what());
+            ShowError("luautils::afterZoneIn: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+        }
+    }
+
+    void OnZoneOut(CCharEntity* PChar)
+    {
+        TracyZoneScoped;
+
+        auto name     = PChar->loc.zone->GetName();
+        auto filename = fmt::format("./scripts/zones/{}/Zone.lua", name);
+
+        auto onZoneOutFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onZoneOut"];
+        auto onZoneOut          = GetCacheEntryFromFilename(filename)["onZoneOut"];
+
+        auto result = onZoneOutFramework(CLuaBaseEntity(PChar), onZoneOut);
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onZoneOut: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+            return;
         }
     }
 
     /************************************************************************
      *                                                                       *
-     *  Персонаж входит в активный регион                                    *
+     *  The character has entered the active trigger area                    *
      *                                                                       *
      ************************************************************************/
 
-    int32 OnRegionEnter(CCharEntity* PChar, CRegion* PRegion)
+    int32 OnTriggerAreaEnter(CCharEntity* PChar, CTriggerArea* PTriggerArea)
     {
         TracyZoneScoped;
 
@@ -1627,39 +1962,40 @@ namespace luautils
         if (PChar->PInstance)
         {
             filename =
-                std::string("./scripts/zones/") + (const char*)PChar->loc.zone->GetName() + "/instances/" + (const char*)PChar->PInstance->GetName() + ".lua";
+                std::string("./scripts/zones/") + PChar->loc.zone->GetName() + "/instances/" + PChar->PInstance->GetName() + ".lua";
         }
         else
         {
-            filename = std::string("./scripts/zones/") + (const char*)PChar->loc.zone->GetName() + "/Zone.lua";
+            filename = std::string("./scripts/zones/") + PChar->loc.zone->GetName() + "/Zone.lua";
         }
 
         // player may be entering because of an earlier event (event that changes position)
-        // these should probably not call another event from onRegionEnter (use onEventFinish instead)
-        if (PChar->m_event.EventID == -1)
+        // these should probably not call another event from onTriggerAreaEnter (use onEventFinish instead)
+        if (!PChar->isInEvent())
         {
-            PChar->m_event.Script = filename;
+            PChar->eventPreparation->scriptFile = filename;
         }
 
-        auto name = (const char*)PChar->loc.zone->GetName();
+        auto name = PChar->loc.zone->GetName();
 
-        sol::function onRegionEnter;
+        sol::function onTriggerAreaEnter;
         if (PChar->PInstance)
         {
-            auto instance_name = (const char*)PChar->PInstance->GetName();
-            onRegionEnter      = lua["xi"]["zones"][name]["instance"][instance_name]["onRegionEnter"];
+            auto instance_name = PChar->PInstance->GetName();
+            onTriggerAreaEnter = lua["xi"]["zones"][name]["instance"][instance_name]["onTriggerAreaEnter"];
         }
         else
         {
-            onRegionEnter = lua["xi"]["zones"][name]["Zone"]["onRegionEnter"];
+            onTriggerAreaEnter = lua["xi"]["zones"][name]["Zone"]["onTriggerAreaEnter"];
         }
 
-        auto onRegionEnterFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onRegionEnter"];
-        auto result                 = onRegionEnterFramework(CLuaBaseEntity(PChar), CLuaRegion(PRegion), onRegionEnter);
+        auto onTriggerAreaEnterFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onTriggerAreaEnter"];
+        auto result                      = onTriggerAreaEnterFramework(CLuaBaseEntity(PChar), CLuaTriggerArea(PTriggerArea), onTriggerAreaEnter);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onRegionEnter: %s\n", err.what());
+            ShowError("luautils::onTriggerAreaEnter: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1668,11 +2004,11 @@ namespace luautils
 
     /************************************************************************
      *                                                                       *
-     *  Персонаж покидает активный регион                                    *
+     *  The character has left the active trigger area                       *
      *                                                                       *
      ************************************************************************/
 
-    int32 OnRegionLeave(CCharEntity* PChar, CRegion* PRegion)
+    int32 OnTriggerAreaLeave(CCharEntity* PChar, CTriggerArea* PTriggerArea)
     {
         TracyZoneScoped;
 
@@ -1680,39 +2016,40 @@ namespace luautils
         if (PChar->PInstance)
         {
             filename =
-                std::string("scripts/zones/") + (const char*)PChar->loc.zone->GetName() + "/instances/" + (const char*)PChar->PInstance->GetName() + ".lua";
+                std::string("scripts/zones/") + PChar->loc.zone->GetName() + "/instances/" + PChar->PInstance->GetName() + ".lua";
         }
         else
         {
-            filename = std::string("scripts/zones/") + (const char*)PChar->loc.zone->GetName() + "/Zone.lua";
+            filename = std::string("scripts/zones/") + PChar->loc.zone->GetName() + "/Zone.lua";
         }
 
         // player may be leaving because of an earlier event (event that changes position)
-        if (PChar->m_event.EventID == -1)
+        if (!PChar->isInEvent())
         {
-            PChar->m_event.Script = filename;
+            PChar->eventPreparation->scriptFile = filename;
         }
 
-        auto name   = (const char*)PChar->loc.zone->GetName();
-        auto zoneId = (const uint16*)PChar->loc.zone->GetID();
+        auto name   = PChar->loc.zone->GetName();
+        auto zoneId = PChar->loc.zone->GetID();
 
-        sol::function onRegionLeave;
-        if (PChar->PInstance && zoneId == (const uint16*)PChar->PInstance->GetZone()->GetID())
+        sol::function onTriggerAreaLeave;
+        if (PChar->PInstance && zoneId == PChar->PInstance->GetZone()->GetID())
         {
-            auto instance_name = (const char*)PChar->PInstance->GetName();
-            onRegionLeave      = lua["xi"]["zones"][name]["instance"][instance_name]["onRegionLeave"];
+            auto instance_name = PChar->PInstance->GetName();
+            onTriggerAreaLeave = lua["xi"]["zones"][name]["instance"][instance_name]["onTriggerAreaLeave"];
         }
         else
         {
-            onRegionLeave = lua["xi"]["zones"][name]["Zone"]["onRegionLeave"];
+            onTriggerAreaLeave = lua["xi"]["zones"][name]["Zone"]["onTriggerAreaLeave"];
         }
 
-        auto onRegionLeaveFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onRegionLeave"];
-        auto result                 = onRegionLeaveFramework(CLuaBaseEntity(PChar), CLuaRegion(PRegion), onRegionLeave);
+        auto onTriggerAreaLeaveFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onTriggerAreaLeave"];
+        auto result                      = onTriggerAreaLeaveFramework(CLuaBaseEntity(PChar), CLuaTriggerArea(PTriggerArea), onTriggerAreaLeave);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onRegionLeave: %s\n", err.what());
+            ShowError("luautils::onTriggerAreaLeave: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1729,24 +2066,41 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone     = (const char*)PChar->loc.zone->GetName();
-        auto name     = (const char*)PNpc->GetName();
-        auto filename = fmt::format("./scripts/zones/{}/npcs/{}.lua", zone, name);
+        // Clicking objects does nothing if the player is mid synthesis
+        if (PChar->animation == ANIMATION_SYNTH)
+        {
+            return 0;
+        }
 
-        PChar->m_event.reset();
-        PChar->m_event.Target = PNpc;
-        PChar->m_event.Script = filename;
+        auto        zone = PChar->loc.zone->GetName();
+        auto        name = PNpc->GetName();
+        std::string pathFormat;
+        switch (PNpc->objtype)
+        {
+            case TYPE_NPC:
+                pathFormat = "./scripts/zones/{}/npcs/{}.lua";
+                break;
+            case TYPE_MOB:
+                pathFormat = "./scripts/zones/{}/mobs/{}.lua";
+                break;
+            default:
+                // Should never hit this
+                XI_DEBUG_BREAK_IF(true);
+        }
+        auto filename = fmt::format(pathFormat, zone, name);
 
-        PChar->StatusEffectContainer->DelStatusEffect(EFFECT_BOOST);
+        PChar->eventPreparation->targetEntity = PNpc;
+        PChar->eventPreparation->scriptFile   = filename;
 
         auto onTriggerFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onTrigger"];
-        auto onTrigger = GetCacheEntryFromFilename(filename)["onTrigger"];
+        auto onTrigger          = GetCacheEntryFromFilename(filename)["onTrigger"];
 
         auto result = onTriggerFramework(CLuaBaseEntity(PChar), CLuaBaseEntity(PNpc), onTrigger);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onTrigger: %s\n", err.what());
+            ShowError("luautils::onTrigger: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1762,24 +2116,31 @@ namespace luautils
     {
         TracyZoneScoped;
 
+        EventPrep* previousPrep = PChar->eventPreparation;
+        PChar->eventPreparation = PChar->currentEvent;
+
         auto onEventUpdate = LoadEventScript(PChar, "onEventUpdate");
         if (!onEventUpdate.valid())
         {
-            ShowError("luautils::onEventUpdate: undefined procedure onEventUpdate\n");
+            ShowError("luautils::onEventUpdate: undefined procedure onEventUpdate");
             return -1;
         }
 
         std::optional<CLuaBaseEntity> optTarget = std::nullopt;
-        if (PChar->m_event.Target)
+        if (PChar->currentEvent->targetEntity)
         {
-            optTarget = CLuaBaseEntity(PChar->m_event.Target);
+            optTarget = CLuaBaseEntity(PChar->currentEvent->targetEntity);
         }
 
         auto func_result = onEventUpdate(CLuaBaseEntity(PChar), eventID, result, extras, optTarget);
+
+        PChar->eventPreparation = previousPrep;
+
         if (!func_result.valid())
         {
             sol::error err = func_result;
-            ShowError("luautils::onEventUpdate: %s\n", err.what());
+            ShowError("luautils::onEventUpdate: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1795,20 +2156,27 @@ namespace luautils
     {
         TracyZoneScoped;
 
+        EventPrep* previousPrep = PChar->eventPreparation;
+        PChar->eventPreparation = PChar->currentEvent;
+
         auto onEventUpdateFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onEventUpdate"];
-        auto onEventUpdate = LoadEventScript(PChar, "onEventUpdate");
+        auto onEventUpdate          = LoadEventScript(PChar, "onEventUpdate");
 
         std::optional<CLuaBaseEntity> optTarget = std::nullopt;
-        if (PChar->m_event.Target)
+        if (PChar->currentEvent->targetEntity)
         {
-            optTarget = CLuaBaseEntity(PChar->m_event.Target);
+            optTarget = CLuaBaseEntity(PChar->currentEvent->targetEntity);
         }
 
         auto func_result = onEventUpdateFramework(CLuaBaseEntity(PChar), eventID, result, optTarget, onEventUpdate);
+
+        PChar->eventPreparation = previousPrep;
+
         if (!func_result.valid())
         {
             sol::error err = func_result;
-            ShowError("luautils::onEventUpdate: %s\n", err.what());
+            ShowError("luautils::onEventUpdate: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1819,20 +2187,27 @@ namespace luautils
     {
         TracyZoneScoped;
 
+        EventPrep* previousPrep = PChar->eventPreparation;
+        PChar->eventPreparation = PChar->currentEvent;
+
         auto onEventUpdateFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onEventUpdate"];
-        auto onEventUpdate = LoadEventScript(PChar, "onEventUpdate");
+        auto onEventUpdate          = LoadEventScript(PChar, "onEventUpdate");
 
         std::optional<CLuaBaseEntity> optTarget = std::nullopt;
-        if (PChar->m_event.Target)
+        if (PChar->currentEvent->targetEntity)
         {
-            optTarget = CLuaBaseEntity(PChar->m_event.Target);
+            optTarget = CLuaBaseEntity(PChar->currentEvent->targetEntity);
         }
 
-        auto result = onEventUpdateFramework(CLuaBaseEntity(PChar), PChar->m_event.EventID, updateString, optTarget, onEventUpdate);
+        auto result = onEventUpdateFramework(CLuaBaseEntity(PChar), PChar->currentEvent->eventId, updateString, optTarget, onEventUpdate);
+
+        PChar->eventPreparation = previousPrep;
+
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onEventUpdate: %s\n", err.what());
+            ShowError("luautils::onEventUpdate: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1849,29 +2224,37 @@ namespace luautils
     {
         TracyZoneScoped;
 
+        EventPrep* previousPrep = PChar->eventPreparation;
+        PChar->eventPreparation = PChar->currentEvent;
+
         auto onEventFinishFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onEventFinish"];
-        auto onEventFinish = LoadEventScript(PChar, "onEventFinish");
+        auto onEventFinish          = LoadEventScript(PChar, "onEventFinish");
 
         std::optional<CLuaBaseEntity> optTarget = std::nullopt;
-        if (PChar->m_event.Target)
+        if (PChar->currentEvent->targetEntity)
         {
-            if (PChar->m_event.Target->objtype == TYPE_NPC)
+            if (PChar->currentEvent->targetEntity->objtype == TYPE_NPC)
             {
-                PChar->m_event.Target->SetLocalVar("pauseNPCPathing", 0);
+                PChar->currentEvent->targetEntity->SetLocalVar("pauseNPCPathing", 0);
             }
 
-            optTarget = CLuaBaseEntity(PChar->m_event.Target);
+            optTarget = CLuaBaseEntity(PChar->currentEvent->targetEntity);
         }
 
         auto func_result = onEventFinishFramework(CLuaBaseEntity(PChar), eventID, result, optTarget, onEventFinish);
+
+        // Restore eventPreparation before potentially bailing out of function due to errors
+        PChar->eventPreparation = previousPrep;
+
         if (!func_result.valid())
         {
             sol::error err = func_result;
-            ShowError("luautils::onEventFinish %s\n", err.what());
+            ShowError("luautils::onEventFinish %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
-        if (PChar->m_event.Script.find("/bcnms/") > 0 && PChar->health.hp <= 0)
+        if (PChar->currentEvent->scriptFile.find("/bcnms/") > 0 && PChar->health.hp <= 0)
         { // for some reason the event doesnt enforce death afterwards
             PChar->animation = ANIMATION_DEATH;
             PChar->pushPacket(new CRaiseTractorMenuPacket(PChar, TYPE_HOMEPOINT));
@@ -1891,22 +2274,22 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone     = (const char*)PChar->loc.zone->GetName();
-        auto name     = (const char*)PNpc->GetName();
+        auto zone     = PChar->loc.zone->GetName();
+        auto name     = PNpc->GetName();
         auto filename = fmt::format("./scripts/zones/{}/npcs/{}.lua", zone, name);
 
-        PChar->m_event.reset();
-        PChar->m_event.Target = PNpc;
-        PChar->m_event.Script = filename;
+        PChar->eventPreparation->targetEntity = PNpc;
+        PChar->eventPreparation->scriptFile   = filename;
 
         auto onTradeFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onTrade"];
-        auto onTrade = lua["xi"]["zones"][zone]["npcs"][name]["onTrade"];
+        auto onTrade          = GetCacheEntryFromFilename(filename)["onTrade"];
 
         auto result = onTradeFramework(CLuaBaseEntity(PChar), CLuaBaseEntity(PNpc), CLuaTradeContainer(PChar->TradeContainer), onTrade);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onTrade: %s\n", err.what());
+            ShowError("luautils::onTrade: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return -1;
         }
 
@@ -1919,7 +2302,7 @@ namespace luautils
 
         if (PNpc == nullptr)
         {
-            ShowError("luautils::onNpcSpawn: Npc not found!\n");
+            ShowError("luautils::onNpcSpawn: Npc not found!");
             return 0;
         }
 
@@ -1933,27 +2316,23 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onNpcSpawn: %s\n", err.what());
+            ShowError("luautils::onNpcSpawn: %s", err.what());
             return -1;
         }
 
         return 0;
     }
 
-    int32 OnAdditionalEffect(CBattleEntity* PAttacker, CBattleEntity* PDefender, CItemWeapon* PItem, actionTarget_t* Action, int32 damage)
+    // Used by mobs
+    int32 OnAdditionalEffect(CBattleEntity* PAttacker, CBattleEntity* PDefender, actionTarget_t* Action, int32 damage)
     {
         TracyZoneScoped;
 
         sol::function onAdditionalEffect;
-        if (PAttacker->objtype == TYPE_PC)
+        if (PAttacker->objtype == TYPE_MOB)
         {
-            auto name          = (const char*)PItem->getName();
-            onAdditionalEffect = lua[sol::create_if_nil]["xi"]["globals"]["items"][name]["onAdditionalEffect"];
-        }
-        else
-        {
-            auto zone          = (const char*)PAttacker->loc.zone->GetName();
-            auto name          = (const char*)PAttacker->GetName();
+            auto zone          = PAttacker->loc.zone->GetName();
+            auto name          = PAttacker->GetName();
             onAdditionalEffect = lua[sol::create_if_nil]["xi"]["zones"][zone]["mobs"][name]["onAdditionalEffect"];
         }
 
@@ -1966,7 +2345,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onAdditionalEffect: %s\n", err.what());
+            ShowError("luautils::onAdditionalEffect: %s", err.what());
             return -1;
         }
 
@@ -1977,12 +2356,13 @@ namespace luautils
         return 0;
     }
 
-    int32 OnSpikesDamage(CBattleEntity* PDefender, CBattleEntity* PAttacker, actionTarget_t* Action, uint32 damage)
+    // Used by mobs
+    int32 OnSpikesDamage(CBattleEntity* PDefender, CBattleEntity* PAttacker, actionTarget_t* Action, int32 damage)
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PDefender->loc.zone->GetName();
-        auto name = (const char*)PDefender->GetName();
+        auto zone = PDefender->loc.zone->GetName();
+        auto name = PDefender->GetName();
 
         auto onSpikesDamage = lua["xi"]["zones"][zone]["mobs"][name]["onSpikesDamage"];
         if (!onSpikesDamage.valid())
@@ -1994,7 +2374,64 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onSpikesDamage: %s\n", err.what());
+            ShowError("luautils::onSpikesDamage: %s", err.what());
+            return -1;
+        }
+
+        Action->spikesEffect  = (SUBEFFECT)(result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0);
+        Action->spikesMessage = result.get_type(1) == sol::type::number ? result.get<int32>(1) : 0;
+        Action->spikesParam   = result.get_type(2) == sol::type::number ? result.get<int32>(2) : 0;
+
+        return 0;
+    }
+
+    // Used by items
+    int32 additionalEffectAttack(CBattleEntity* PAttacker, CBattleEntity* PDefender, CItemWeapon* PItem, actionTarget_t* Action, int32 baseAttackDamage)
+    {
+        TracyZoneScoped;
+
+        sol::function additionalEffectAttack;
+        if (PAttacker->objtype == TYPE_PC)
+        {
+            additionalEffectAttack = lua[sol::create_if_nil]["xi"]["additionalEffect"]["attack"];
+        }
+
+        if (!additionalEffectAttack.valid())
+        {
+            return -1;
+        }
+
+        auto result = additionalEffectAttack(CLuaBaseEntity(PAttacker), CLuaBaseEntity(PDefender), baseAttackDamage, CLuaItem(PItem));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::additionalEffectAttack: %s", err.what());
+            return -1;
+        }
+
+        Action->additionalEffect = (SUBEFFECT)(result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0);
+        Action->addEffectMessage = result.get_type(1) == sol::type::number ? result.get<int32>(1) : 0;
+        Action->addEffectParam   = result.get_type(2) == sol::type::number ? result.get<int32>(2) : 0;
+
+        return 0;
+    }
+
+    // future use: migrating items to scripts\globals\additional_effects.lua
+    int32 additionalEffectSpikes(CBattleEntity* PDefender, CBattleEntity* PAttacker, CItemEquipment* PItem, actionTarget_t* Action, int32 baseAttackDamage)
+    {
+        TracyZoneScoped;
+
+        auto additionalEffectSpikes = lua["xi"]["additionalEffect"]["spikes"];
+        if (!additionalEffectSpikes.valid())
+        {
+            return -1;
+        }
+
+        auto result = additionalEffectSpikes(CLuaBaseEntity(PDefender), CLuaBaseEntity(PAttacker), baseAttackDamage, CLuaItem(PItem));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::additionalEffectSpikes: %s", err.what());
             return -1;
         }
 
@@ -2021,7 +2458,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onEffectGain: %s\n", err.what());
+            ShowError("luautils::onEffectGain: %s", err.what());
+            ReportErrorToPlayer(PEntity, err.what());
             return -1;
         }
 
@@ -2044,7 +2482,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onEffectTick: %s\n", err.what());
+            ShowError("luautils::onEffectTick: %s", err.what());
+            ReportErrorToPlayer(PEntity, err.what());
             return -1;
         }
 
@@ -2067,7 +2506,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onEffectLose: %s\n", err.what());
+            ShowError("luautils::onEffectLose: %s", err.what());
+            ReportErrorToPlayer(PEntity, err.what());
             return -1;
         }
 
@@ -2078,7 +2518,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)attachment->getName();
+        auto name = attachment->getName();
 
         auto onEquip = lua["xi"]["globals"]["abilities"]["pets"]["attachments"][name]["onEquip"];
         if (!onEquip.valid())
@@ -2086,11 +2526,11 @@ namespace luautils
             return -1;
         }
 
-        auto result = onEquip(CLuaBaseEntity(PEntity));
+        auto result = onEquip(CLuaBaseEntity(PEntity), CLuaItem(attachment));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onEquip: %s\n", err.what());
+            ShowError("luautils::onEquip: %s", err.what());
             return -1;
         }
 
@@ -2101,7 +2541,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)attachment->getName();
+        auto name = attachment->getName();
 
         auto onUnequip = lua["xi"]["globals"]["abilities"]["pets"]["attachments"][name]["onUnequip"];
         if (!onUnequip.valid())
@@ -2109,11 +2549,11 @@ namespace luautils
             return -1;
         }
 
-        auto result = onUnequip(CLuaBaseEntity(PEntity));
+        auto result = onUnequip(CLuaBaseEntity(PEntity), CLuaItem(attachment));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onUnequip: %s\n", err.what());
+            ShowError("luautils::onUnequip: %s", err.what());
             return -1;
         }
 
@@ -2124,7 +2564,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)attachment->getName();
+        auto name = attachment->getName();
 
         auto onManeuverGain = lua["xi"]["globals"]["abilities"]["pets"]["attachments"][name]["onManeuverGain"];
         if (!onManeuverGain.valid())
@@ -2132,11 +2572,11 @@ namespace luautils
             return -1;
         }
 
-        auto result = onManeuverGain(CLuaBaseEntity(PEntity), maneuvers);
+        auto result = onManeuverGain(CLuaBaseEntity(PEntity), CLuaItem(attachment), maneuvers);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onManeuverGain: %s\n", err.what());
+            ShowError("luautils::onManeuverGain: %s", err.what());
             return -1;
         }
 
@@ -2147,7 +2587,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)attachment->getName();
+        auto name = attachment->getName();
 
         auto onManeuverLose = lua["xi"]["globals"]["abilities"]["pets"]["attachments"][name]["onManeuverLose"];
         if (!onManeuverLose.valid())
@@ -2155,11 +2595,11 @@ namespace luautils
             return -1;
         }
 
-        auto result = onManeuverLose(CLuaBaseEntity(PEntity), maneuvers);
+        auto result = onManeuverLose(CLuaBaseEntity(PEntity), CLuaItem(attachment), maneuvers);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onManeuverLose: %s\n", err.what());
+            ShowError("luautils::onManeuverLose: %s", err.what());
             return -1;
         }
 
@@ -2170,7 +2610,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)attachment->getName();
+        auto name = attachment->getName();
 
         auto onUpdate = lua["xi"]["globals"]["abilities"]["pets"]["attachments"][name]["onUpdate"];
         if (!onUpdate.valid())
@@ -2178,11 +2618,11 @@ namespace luautils
             return -1;
         }
 
-        auto result = onUpdate(CLuaBaseEntity(PEntity), maneuvers);
+        auto result = onUpdate(CLuaBaseEntity(PEntity), CLuaItem(attachment), maneuvers);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onUpdate: %s\n", err.what());
+            ShowError("luautils::onUpdate: %s", err.what());
             return -1;
         }
 
@@ -2209,11 +2649,12 @@ namespace luautils
             caster = CLuaBaseEntity(PCaster);
         }
 
-        auto result = onItemCheck(CLuaBaseEntity(PTarget), static_cast<uint32>(param), caster);
+        auto result = onItemCheck(CLuaBaseEntity(PTarget), caster, static_cast<uint32>(param));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onItemCheck: %s\n", err.what());
+            ShowError("luautils::onItemCheck: %s", err.what());
+            ReportErrorToPlayer(PTarget, err.what());
             return { 56, 0, 0 };
         }
 
@@ -2227,7 +2668,7 @@ namespace luautils
     // We use the subject. The return value is the message number or 0.
     // It is also necessary to somehow pass the message parameter (for example,
     // number of recovered MP)
-    int32 OnItemUse(CBaseEntity* PTarget, CItem* PItem)
+    int32 OnItemUse(CBaseEntity* PUser, CBaseEntity* PTarget, CItem* PItem)
     {
         TracyZoneScoped;
 
@@ -2239,11 +2680,85 @@ namespace luautils
             return -1;
         }
 
-        auto result = onItemUse(CLuaBaseEntity(PTarget));
+        auto result = onItemUse(CLuaBaseEntity(PTarget), CLuaBaseEntity(PUser), CLuaItem(PItem));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onItemUse: %s\n", err.what());
+            ShowError("luautils::onItemUse: %s", err.what());
+            ReportErrorToPlayer(PUser, err.what());
+            return -1;
+        }
+
+        return 0;
+    }
+
+    // Trigger Code on an item when it has been dropped
+    int32 OnItemDrop(CBaseEntity* PUser, CItem* PItem)
+    {
+        TracyZoneScoped;
+
+        auto filename = fmt::format("./scripts/globals/items/{}.lua", PItem->getName());
+
+        sol::function onItemDrop = GetCacheEntryFromFilename(filename)["onItemDrop"].get<sol::function>();
+        if (!onItemDrop.valid())
+        {
+            return -1;
+        }
+
+        auto result = onItemDrop(CLuaBaseEntity(PUser), CLuaItem(PItem));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onItemDrop: %s", err.what());
+            ReportErrorToPlayer(PUser, err.what());
+            return -1;
+        }
+
+        return 0;
+    }
+
+    int32 OnItemEquip(CBaseEntity* PUser, CItem* PItem)
+    {
+        TracyZoneScoped;
+
+        auto filename = fmt::format("./scripts/globals/items/{}.lua", PItem->getName());
+
+        sol::function onItemEquip = GetCacheEntryFromFilename(filename)["onItemEquip"].get<sol::function>();
+        if (!onItemEquip.valid())
+        {
+            return -1;
+        }
+
+        auto result = onItemEquip(CLuaBaseEntity(PUser), CLuaItem(PItem));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onItemEquip: %s", err.what());
+            ReportErrorToPlayer(PUser, err.what());
+            return -1;
+        }
+
+        return 0;
+    }
+
+    int32 OnItemUnequip(CBaseEntity* PUser, CItem* PItem)
+    {
+        TracyZoneScoped;
+
+        auto filename = fmt::format("./scripts/globals/items/{}.lua", PItem->getName());
+
+        sol::function onItemUnequip = GetCacheEntryFromFilename(filename)["onItemUnequip"].get<sol::function>();
+        if (!onItemUnequip.valid())
+        {
+            return -1;
+        }
+
+        auto result = onItemUnequip(CLuaBaseEntity(PUser), CLuaItem(PItem));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onItemUnequip: %s", err.what());
+            ReportErrorToPlayer(PUser, err.what());
             return -1;
         }
 
@@ -2255,8 +2770,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        // TODO: This shouldn't be global, attach to xi.gear_sets or similar
-        auto checkForGearSet = lua["checkForGearSet"];
+        auto checkForGearSet = lua["xi"]["gear_sets"]["checkForGearSet"];
         if (!checkForGearSet.valid())
         {
             return 56;
@@ -2266,20 +2780,21 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::CheckForGearSet: %s\n", err.what());
+            ShowError("luautils::CheckForGearSet: %s", err.what());
+            ReportErrorToPlayer(PTarget, err.what());
             return -1;
         }
 
         return 0;
     }
 
-    uint32 OnSpellCast(CBattleEntity* PCaster, CBattleEntity* PTarget, CSpell* PSpell)
+    int32 OnSpellCast(CBattleEntity* PCaster, CBattleEntity* PTarget, CSpell* PSpell)
     {
         TracyZoneScoped;
 
         if (PSpell == nullptr)
         {
-            ShowError("luautils::OnSpellCast: Spell not found!\n");
+            ShowError("luautils::OnSpellCast: Spell not found!");
             return -1;
         }
 
@@ -2293,11 +2808,12 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onSpellCast: %s\n", err.what());
+            ShowError("luautils::onSpellCast: %s", err.what());
+            ReportErrorToPlayer(PCaster, err.what());
             return -1;
         }
 
-        uint32 retVal = result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
+        int32 retVal = result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
         return retVal;
     }
 
@@ -2320,33 +2836,41 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onSpellPrecast: %s\n", err.what());
+            ShowError("luautils::onSpellPrecast: %s", err.what());
+            ReportErrorToPlayer(PCaster, err.what());
             return 0;
         }
 
         return 0;
     }
 
-    std::optional<SpellID> OnMonsterMagicPrepare(CBattleEntity* PCaster, CBattleEntity* PTarget)
+    std::optional<SpellID> OnMobMagicPrepare(CBattleEntity* PCaster, CBattleEntity* PTarget, std::optional<SpellID> startingSpellId)
     {
         TracyZoneScoped;
 
-        if (PCaster == nullptr || PTarget == nullptr)
+        if (PCaster == nullptr)
         {
             return {};
         }
 
-        sol::function onMonsterMagicPrepare = getEntityCachedFunction(PCaster, "onMonsterMagicPrepare");
-        if (!onMonsterMagicPrepare.valid())
+        sol::function onMobMagicPrepare = getEntityCachedFunction(PCaster, "onMobMagicPrepare");
+        if (!onMobMagicPrepare.valid())
         {
             return {};
         }
 
-        auto result = onMonsterMagicPrepare(CLuaBaseEntity(PCaster), CLuaBaseEntity(PTarget));
+        std::optional<CLuaSpell> luaSpell;
+        if (startingSpellId.has_value())
+        {
+            luaSpell = spell::GetSpell(startingSpellId.value());
+        }
+
+        auto result = onMobMagicPrepare(CLuaBaseEntity(PCaster), CLuaBaseEntity(PTarget), luaSpell);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMonsterMagicPrepare: %s\n", err.what());
+            ShowError("luautils::OnMobMagicPrepare: %s", err.what());
+            ReportErrorToPlayer(PCaster, err.what());
             return {};
         }
 
@@ -2370,8 +2894,6 @@ namespace luautils
             return -1;
         }
 
-        PTarget->PAI->EventHandler.triggerListener("MAGIC_TAKE", CLuaBaseEntity(PTarget), CLuaBaseEntity(PCaster), CLuaSpell(PSpell));
-
         sol::function onMagicHit = getEntityCachedFunction(PTarget, "onMagicHit");
         if (!onMagicHit.valid())
         {
@@ -2382,7 +2904,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMagicHit: %s\n", err.what());
+            ShowError("luautils::onMagicHit: %s", err.what());
             return -1;
         }
 
@@ -2404,11 +2926,33 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onWeaponskillHit: %s\n", err.what());
+            ShowError("luautils::onWeaponskillHit: %s", err.what());
             return 0;
         }
 
         return result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
+    }
+
+    bool OnTrustSpellCastCheckBattlefieldTrusts(CBattleEntity* PCaster) // Check if trust count would go over the limit when cast finishes (for simultaneous multi-party casts
+    {
+        TracyZoneScoped;
+
+        sol::function checkBattlefieldTrustCount = lua["xi"]["trust"]["checkBattlefieldTrustCount"];
+
+        if (!checkBattlefieldTrustCount.valid())
+        {
+            return false;
+        }
+
+        auto result = checkBattlefieldTrustCount(CLuaBaseEntity(PCaster));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::OnTrustSpellCastCheckBattlefieldTrusts: %s", err.what());
+            return 0;
+        }
+
+        return result.get_type(0) == sol::type::boolean ? result.get<bool>(0) : true;
     }
 
     int32 OnMobInitialize(CBaseEntity* PMob)
@@ -2425,7 +2969,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobInitialize: %s\n", err.what());
+            ShowError("luautils::onMobInitialize: %s", err.what());
             return -1;
         }
 
@@ -2446,12 +2990,12 @@ namespace luautils
         lua.set("mixins", sol::lua_nil);
         lua.set("mixinOptions", sol::lua_nil);
 
-        auto zone_name = (const char*)PMob->loc.zone->GetName();
-        auto name      = (const char*)PMob->GetName();
+        auto zone_name = PMob->loc.zone->GetName();
+        auto name      = PMob->GetName();
 
         auto filename = fmt::format("./scripts/zones/{}/mobs/{}.lua", zone_name, name);
 
-        auto script_result = lua.script_file(filename);
+        auto script_result = lua.safe_script_file(filename);
         if (!script_result.valid())
         {
             return -1;
@@ -2478,7 +3022,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::applyMixins: %s\n", err.what());
+            ShowError("luautils::applyMixins: %s", err.what());
         }
 
         return 0;
@@ -2500,7 +3044,7 @@ namespace luautils
 
         auto filename = fmt::format("./scripts/mixins/zones/{}.lua", PMob->loc.zone->GetName());
 
-        auto script_result = lua.script_file(filename);
+        auto script_result = lua.safe_script_file(filename);
         if (!script_result.valid())
         {
             return -1;
@@ -2527,7 +3071,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::applyMixins %s\n", err.what());
+            ShowError("luautils::applyMixins %s", err.what());
             return -1;
         }
 
@@ -2553,7 +3097,59 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onPath: %s\n", err.what());
+            ShowError("luautils::onPath: %s", err.what());
+            return -1;
+        }
+
+        return 0;
+    }
+
+    int32 OnPathPoint(CBaseEntity* PEntity)
+    {
+        TracyZoneScoped;
+
+        if (PEntity == nullptr || PEntity->objtype == TYPE_PC)
+        {
+            return -1;
+        }
+
+        sol::function onPathPoint = getEntityCachedFunction(PEntity, "onPathPoint");
+        if (!onPathPoint.valid())
+        {
+            return -1;
+        }
+
+        auto result = onPathPoint(CLuaBaseEntity(PEntity));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::OnPathPoint: %s", err.what());
+            return -1;
+        }
+
+        return 0;
+    }
+
+    int32 OnPathComplete(CBaseEntity* PEntity)
+    {
+        TracyZoneScoped;
+
+        if (PEntity == nullptr || PEntity->objtype == TYPE_PC)
+        {
+            return -1;
+        }
+
+        sol::function onPathComplete = getEntityCachedFunction(PEntity, "onPathComplete");
+        if (!onPathComplete.valid())
+        {
+            return -1;
+        }
+
+        auto result = onPathComplete(CLuaBaseEntity(PEntity));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::OnPathComplete: %s", err.what());
             return -1;
         }
 
@@ -2584,7 +3180,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldHandlerInitialise: %s\n", err.what());
+            ShowError("luautils::onBattlefieldHandlerInitialise: %s", err.what());
             return MaxAreas;
         }
 
@@ -2600,7 +3196,7 @@ namespace luautils
             return -1;
         }
 
-        auto zone = (const char*)PBattlefield->GetZone()->GetName();
+        auto zone = PBattlefield->GetZone()->GetName();
         auto name = PBattlefield->GetName();
 
         // TODO: This will happen more often than needed, but not so often that it's a performance concern
@@ -2610,14 +3206,14 @@ namespace luautils
         auto onBattlefieldInitialise = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldInitialise"];
         if (!onBattlefieldInitialise.valid())
         {
-            return -1;
+            return invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldInitialise", CLuaBattlefield(PBattlefield));
         }
 
         auto result = onBattlefieldInitialise(CLuaBattlefield(PBattlefield));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldInitialise: %s\n", err.what());
+            ShowError("luautils::onBattlefieldInitialise: %s", err.what());
             return -1;
         }
 
@@ -2633,22 +3229,27 @@ namespace luautils
             return -1;
         }
 
-        auto zone = (const char*)PBattlefield->GetZone()->GetName();
-        auto name = PBattlefield->GetName();
+        auto zone    = PBattlefield->GetZone()->GetName();
+        auto name    = PBattlefield->GetName();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(PBattlefield->GetTimeInside()).count();
 
         auto onBattlefieldTick = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldTick"];
         if (!onBattlefieldTick.valid())
         {
-            ShowError("luautils::onBattlefieldTick: Unable to find onBattlefieldTick function for %s\n", name);
+            if (invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldTick", CLuaBattlefield(PBattlefield), seconds) == 0)
+            {
+                return 0;
+            }
+
+            ShowError("luautils::onBattlefieldTick: Unable to find onBattlefieldTick function for %s", name);
             return -1;
         }
 
-        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(PBattlefield->GetTimeInside()).count();
-        auto result  = onBattlefieldTick(CLuaBattlefield(PBattlefield), seconds);
+        auto result = onBattlefieldTick(CLuaBattlefield(PBattlefield), seconds);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldTick: %s\n", err.what());
+            ShowError("luautils::onBattlefieldTick: %s", err.what());
             return -1;
         }
 
@@ -2664,20 +3265,20 @@ namespace luautils
             return -1;
         }
 
-        auto zone = (const char*)PBattlefield->GetZone()->GetName();
+        auto zone = PBattlefield->GetZone()->GetName();
         auto name = PBattlefield->GetName();
 
         auto onBattlefieldStatusChange = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldStatusChange"];
         if (!onBattlefieldStatusChange.valid())
         {
-            return -1;
+            return invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldStatusChange", CLuaBattlefield(PBattlefield), PBattlefield->GetStatus());
         }
 
         auto result = onBattlefieldStatusChange(CLuaBattlefield(PBattlefield), PBattlefield->GetStatus());
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldStatusChange: %s\n", err.what());
+            ShowError("luautils::onBattlefieldStatusChange: %s", err.what());
             return -1;
         }
 
@@ -2711,9 +3312,8 @@ namespace luautils
 
         if (PTarget->objtype == TYPE_PC)
         {
-            ((CCharEntity*)PTarget)->m_event.reset();
-            ((CCharEntity*)PTarget)->m_event.Target = PMob;
-            ((CCharEntity*)PTarget)->m_event.Script = filename;
+            ((CCharEntity*)PTarget)->eventPreparation->targetEntity = PMob;
+            ((CCharEntity*)PTarget)->eventPreparation->scriptFile   = filename;
         }
 
         sol::function onMobEngaged = getEntityCachedFunction(PMob, "onMobEngaged");
@@ -2726,7 +3326,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobEngaged: %s\n", err.what());
+            ShowError("luautils::onMobEngaged: %s", err.what());
             return -1;
         }
 
@@ -2760,7 +3360,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobDisengage: %s\n", err.what());
+            ShowError("luautils::onMobDisengage: %s", err.what());
             return -1;
         }
 
@@ -2780,9 +3380,8 @@ namespace luautils
 
         if (PTarget->objtype == TYPE_PC)
         {
-            ((CCharEntity*)PTarget)->m_event.reset();
-            ((CCharEntity*)PTarget)->m_event.Target = PMob;
-            ((CCharEntity*)PTarget)->m_event.Script = filename;
+            ((CCharEntity*)PTarget)->eventPreparation->targetEntity = PMob;
+            ((CCharEntity*)PTarget)->eventPreparation->scriptFile   = filename;
         }
 
         sol::function onMobDrawIn = getEntityCachedFunction(PMob, "onMobDrawIn");
@@ -2795,7 +3394,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobDrawIn: %s\n", err.what());
+            ShowError("luautils::onMobDrawIn: %s", err.what());
             return -1;
         }
 
@@ -2827,7 +3426,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobFight: %s\n", err.what());
+            ShowError("luautils::onMobFight: %s", err.what());
             return -1;
         }
 
@@ -2859,7 +3458,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onCriticalHit %s\n", err.what());
+            ShowError("luautils::onCriticalHit %s", err.what());
             return -1;
         }
 
@@ -2881,43 +3480,53 @@ namespace luautils
             return -1;
         }
 
-        // TODO: These int8 string need to die.
-        std::string zone_name = (const char*)PMob->loc.zone->GetName();
-        std::string mob_name  = (const char*)PMob->GetName();
+        std::string zone_name = PMob->loc.zone->GetName();
+        std::string mob_name  = PMob->GetName();
 
         CCharEntity* PChar = dynamic_cast<CCharEntity*>(PKiller);
+
+        auto optParams = lua.create_table();
+
+        optParams["isKiller"]          = false;
+        optParams["noKiller"]          = true;
+        optParams["isWeaponSkillKill"] = false;
+
         if (PChar && PMob->objtype == TYPE_MOB)
         {
-            // TODO: Don't save this globally
-            auto onMobDeathEx = lua["onMobDeathEx"];
+            auto onMobDeathEx = lua["xi"]["mob"]["onMobDeathEx"];
             if (!onMobDeathEx.valid())
             {
                 return -1;
             }
 
-            PChar->ForAlliance([PMob, PChar, &onMobDeathEx](CBattleEntity* PMember) {
+            // clang-format off
+            PChar->ForAlliance([PMob, PChar, &onMobDeathEx](CBattleEntity* PMember)
+            {
                 if (PMember->getZone() == PChar->getZone())
                 {
                     CLuaBaseEntity LuaMobEntity(PMob);
                     CLuaBaseEntity LuaAllyEntity(PMember);
                     bool           isKiller          = PMember == PChar;
-                    bool           isWeaponSkillKill = PChar->getWeaponSkillKill();
+                    bool           isWeaponSkillKill = PMob->GetLocalVar("weaponskillHit") > 0;
 
                     auto result = onMobDeathEx(LuaMobEntity, LuaAllyEntity, isKiller, isWeaponSkillKill);
                     if (!result.valid())
                     {
                         sol::error err = result;
-                        ShowError("luautils::onMobDeathEx: %s\n", err.what());
+                        ShowError("luautils::onMobDeathEx: %s", err.what());
                     }
                 }
             });
+            // clang-format on
 
             auto filename = fmt::format("./scripts/zones/{}/mobs/{}.lua", PMob->loc.zone->GetName(), PMob->GetName());
 
-            auto onMobDeathFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onMobDeath"];
-            sol::function onMobDeath = getEntityCachedFunction(PMob, "onMobDeath");
+            auto          onMobDeathFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onMobDeath"];
+            sol::function onMobDeath          = getEntityCachedFunction(PMob, "onMobDeath");
 
-            PChar->ForAlliance([PMob, PChar, &onMobDeathFramework, &onMobDeath, &filename](CBattleEntity* PPartyMember) {
+            // clang-format off
+            PChar->ForAlliance([PMob, PChar, &onMobDeathFramework, &onMobDeath, &filename, &optParams](CBattleEntity* PPartyMember)
+            {
                 CCharEntity* PMember = (CCharEntity*)PPartyMember;
                 if (PMember && PMember->getZone() == PChar->getZone())
                 {
@@ -2927,34 +3536,42 @@ namespace luautils
                     {
                         optLuaAllyEntity = CLuaBaseEntity(PMember);
                     }
-                    bool isKiller = PMember == PChar;
-                    bool noKiller = false;
 
-                    PMember->m_event.reset();
-                    PMember->m_event.Target = PMob;
-                    PMember->m_event.Script = filename;
+                    optParams["isKiller"]          = PMember == PChar;
+                    optParams["noKiller"]          = false;
+                    optParams["isWeaponSkillKill"] = PMob->GetLocalVar("weaponskillHit") > 0;
 
-                    // onMobDeath(mob, player, isKiller, noKiller)
-                    auto result = onMobDeathFramework(LuaMobEntity, optLuaAllyEntity, isKiller, noKiller, onMobDeath);
+                    PChar->eventPreparation->targetEntity = PMob;
+                    PChar->eventPreparation->scriptFile   = filename;
+
+                    // onMobDeath(mob, player, optParams)
+                    auto result = onMobDeathFramework(LuaMobEntity, optLuaAllyEntity, optParams, onMobDeath);
+
+                    // NOTE: result is only NOT valid if the function call fails. If it returns nil its still valid (this is expected)
                     if (!result.valid())
                     {
                         sol::error err = result;
-                        ShowError("luautils::onMobDeath: %s\n", err.what());
+                        ShowError("luautils::onMobDeath: %s", err.what());
                     }
+
+                    PChar->PAI->EventHandler.triggerListener("DEFEATED_MOB", LuaMobEntity, optLuaAllyEntity, optParams);
                 }
             });
+            // clang-format on
         }
         else
         {
-            auto onMobDeathFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onMobDeath"];
-            sol::function onMobDeath = getEntityCachedFunction(PMob, "onMobDeath");
+            auto          onMobDeathFramework = lua["xi"]["globals"]["interaction"]["interaction_global"]["onMobDeath"];
+            sol::function onMobDeath          = getEntityCachedFunction(PMob, "onMobDeath");
 
-            // onMobDeath(mob, player, isKiller, noKiller)
-            auto result = onMobDeathFramework(CLuaBaseEntity(PMob), sol::lua_nil, sol::lua_nil, true, onMobDeath);
+            // onMobDeath(mob, player, optParams)
+            auto result = onMobDeathFramework(CLuaBaseEntity(PMob), sol::lua_nil, optParams, onMobDeath);
+
+            // NOTE: result is only NOT valid if the function call fails. If it returns nil its still valid (this is expected)
             if (!result.valid())
             {
                 sol::error err = result;
-                ShowError("luautils::onMobDeath: %s\n", err.what());
+                ShowError("luautils::onMobDeath: %s", err.what());
                 return -1;
             }
         }
@@ -2981,7 +3598,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobSpawn: %s\n", err.what());
+            ShowError("luautils::onMobSpawn: %s", err.what());
             return -1;
         }
 
@@ -3007,7 +3624,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobRoonMobRoamActionam: %s\n", err.what());
+            ShowError("luautils::onMobRoonMobRoamActionam: %s", err.what());
             return -1;
         }
 
@@ -3028,7 +3645,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobRoam: %s\n", err.what());
+            ShowError("luautils::onMobRoam: %s", err.what());
             return -1;
         }
 
@@ -3054,7 +3671,39 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobDespawn: %s\n", err.what());
+            ShowError("luautils::onMobDespawn: %s", err.what());
+            return -1;
+        }
+
+        return 0;
+    }
+
+    /************************************************************************
+     *                                                                       *
+     *  Сalled when a pet's level restriction status changes                 *
+     *                                                                       *
+     ************************************************************************/
+
+    int32 OnPetLevelRestriction(CBaseEntity* PMob)
+    {
+        TracyZoneScoped;
+
+        if (PMob == nullptr || PMob->objtype != TYPE_PET)
+        {
+            return -1;
+        }
+
+        sol::function onPetLevelRestriction = getEntityCachedFunction(PMob, "onPetLevelRestriction");
+        if (!onPetLevelRestriction.valid())
+        {
+            return -1;
+        }
+
+        auto result = onPetLevelRestriction(CLuaBaseEntity(PMob));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onPetLevelRestriction: %s", err.what());
             return -1;
         }
 
@@ -3071,7 +3720,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PZone->GetName();
+        auto name = PZone->GetName();
 
         auto onGameDay = lua["xi"]["zones"][name]["Zone"]["onGameDay"];
         if (!onGameDay.valid())
@@ -3083,7 +3732,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onGameDay: %s\n", err.what());
+            ShowError("luautils::onGameDay: %s", err.what());
             return -1;
         }
 
@@ -3100,7 +3749,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PZone->GetName();
+        auto name = PZone->GetName();
 
         auto onGameHour = lua["xi"]["zones"][name]["Zone"]["onGameHour"];
         if (!onGameHour.valid())
@@ -3112,7 +3761,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onGameHour: %s\n", err.what());
+            ShowError("luautils::onGameHour: %s", err.what());
             return -1;
         }
 
@@ -3123,7 +3772,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)zoneutils::GetZone(ZoneID)->GetName();
+        auto name = zoneutils::GetZone(ZoneID)->GetName();
 
         auto onZoneWeatherChange = lua["xi"]["zones"][name]["Zone"]["onZoneWeatherChange"];
         if (!onZoneWeatherChange.valid())
@@ -3135,7 +3784,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onZoneWeatherChange: %s\n", err.what());
+            ShowError("luautils::onZoneWeatherChange: %s", err.what());
             return -1;
         }
 
@@ -3146,7 +3795,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)zoneutils::GetZone(ZoneID)->GetName();
+        auto name = zoneutils::GetZone(ZoneID)->GetName();
 
         auto onTOTDChange = lua["xi"]["zones"][name]["Zone"]["onTOTDChange"];
         if (!onTOTDChange.valid())
@@ -3158,7 +3807,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onTOTDChange: %s\n", err.what());
+            ShowError("luautils::onTOTDChange: %s", err.what());
             return -1;
         }
 
@@ -3170,7 +3819,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)wskill->getName();
+        auto name = wskill->getName();
 
         auto onUseWeaponSkill = lua["xi"]["globals"]["weaponskills"][name]["onUseWeaponSkill"];
         if (!onUseWeaponSkill.valid())
@@ -3188,7 +3837,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onUseWeaponSkill: %s\n", err.what());
+            ShowError("luautils::onUseWeaponSkill: %s", err.what());
             return std::tuple<int32, uint8, uint8>();
         }
 
@@ -3199,10 +3848,42 @@ namespace luautils
 
         if (criticalHit)
         {
-            luautils::OnCriticalHit((CBattleEntity*)PMob, (CBattleEntity*)PChar);
+            luautils::OnCriticalHit((CBattleEntity*)PMob, PChar);
         }
 
         return std::make_tuple(dmg, tpHitsLanded, extraHitsLanded);
+    }
+
+    uint16 OnMobWeaponSkillPrepare(CBattleEntity* PMob, CBattleEntity* PTarget)
+    {
+        TracyZoneScoped;
+
+        if (PMob == nullptr || PTarget == nullptr)
+        {
+            return 0;
+        }
+
+        sol::function onMobWeaponSkillPrepare = getEntityCachedFunction(PMob, "onMobWeaponSkillPrepare");
+        if (!onMobWeaponSkillPrepare.valid())
+        {
+            return 0;
+        }
+
+        auto result = onMobWeaponSkillPrepare(CLuaBaseEntity(PMob), CLuaBaseEntity(PTarget));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onMobWeaponSkillPrepare: %s", err.what());
+            return 0;
+        }
+
+        uint16 retVal = result.get_type(0) == sol::type::number ? result.get<uint16>(0) : 0;
+        if (retVal > 0)
+        {
+            return retVal;
+        }
+
+        return 0;
     }
 
     int32 OnMobWeaponSkill(CBaseEntity* PTarget, CBaseEntity* PMob, CMobSkill* PMobSkill, action_t* action)
@@ -3211,8 +3892,8 @@ namespace luautils
 
         // Mob Script
         {
-            auto zone = (const char*)PMob->loc.zone->GetName();
-            auto name = (const char*)PMob->GetName();
+            auto zone = PMob->loc.zone->GetName();
+            auto name = PMob->GetName();
 
             auto onMobWeaponSkill = lua["xi"]["zones"][zone]["mobs"][name]["onMobWeaponSkill"];
             if (onMobWeaponSkill.valid())
@@ -3221,14 +3902,14 @@ namespace luautils
                 if (!result.valid())
                 {
                     sol::error err = result;
-                    ShowError("luautils::onMobWeaponSkill (mob) %s\n", err.what());
+                    ShowError("luautils::onMobWeaponSkill (mob) %s", err.what());
                     return 0;
                 }
             }
         }
 
         // Mob Skill Script
-        auto mobskill_name = (const char*)PMobSkill->getName();
+        auto mobskill_name = PMobSkill->getName();
 
         auto onMobWeaponSkill = lua["xi"]["globals"]["mobskills"][mobskill_name]["onMobWeaponSkill"];
         if (!onMobWeaponSkill.valid())
@@ -3240,7 +3921,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobWeaponSkill (mobskill) %s\n", err.what());
+            ShowError("luautils::onMobWeaponSkill (mobskill) %s", err.what());
             return 0;
         }
 
@@ -3251,7 +3932,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PMobSkill->getName();
+        auto name = PMobSkill->getName();
 
         auto onMobSkillCheck = lua["xi"]["globals"]["mobskills"][name]["onMobSkillCheck"];
         if (!onMobSkillCheck.valid())
@@ -3263,34 +3944,86 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobSkillCheck: %s\n", err.what());
+            ShowError("luautils::onMobSkillCheck: %s", err.what());
             return 1;
         }
 
         return result.get_type(0) == sol::type::number ? result.get<int32>(0) : -5;
     }
 
-    int32 OnMobAutomatonSkillCheck(CBaseEntity* PTarget, CAutomatonEntity* PAutomaton, CMobSkill* PMobSkill)
+    CBattleEntity* OnMobSkillTarget(CBattleEntity* PTarget, CBaseEntity* PMob, CMobSkill* PMobSkill)
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PMobSkill->getName();
+        auto zone = PMob->loc.zone->GetName();
+        auto name = PMob->GetName();
 
-        auto onMobSkillCheck = lua["xi"]["globals"]["abilities"]["pets"][name]["onMobSkillCheck"];
-        if (!onMobSkillCheck.valid())
+        auto onMobSkillTarget = lua["xi"]["zones"][zone]["mobs"][name]["onMobSkillTarget"];
+        if (!onMobSkillTarget.valid())
+        {
+            return PTarget;
+        }
+
+        auto result = onMobSkillTarget(CLuaBaseEntity(static_cast<CBaseEntity*>(PTarget)), CLuaBaseEntity(PMob), CLuaMobSkill(PMobSkill));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onMobSkillTarget: %s", err.what());
+            return PTarget;
+        }
+
+        if (result.get_type(0) == sol::type::userdata || result.get_type(0) == sol::type::lua_nil)
+        {
+            CLuaBaseEntity* PEntity = result.get<CLuaBaseEntity*>(0);
+
+            return (PEntity && PEntity->GetBaseEntity()) ? static_cast<CBattleEntity*>(PEntity->GetBaseEntity()) : PTarget;
+        }
+
+        return PTarget;
+    }
+
+    int32 OnAutomatonAbilityCheck(CBaseEntity* PTarget, CAutomatonEntity* PAutomaton, CMobSkill* PMobSkill)
+    {
+        TracyZoneScoped;
+
+        auto filename = fmt::format("./scripts/globals/abilities/pets/automaton/{}.lua", PMobSkill->getName());
+
+        sol::function onAutomatonAbilityCheck = GetCacheEntryFromFilename(filename)["onAutomatonAbilityCheck"];
+        if (!onAutomatonAbilityCheck.valid())
         {
             return 1;
         }
 
-        auto result = onMobSkillCheck(CLuaBaseEntity(PTarget), CLuaBaseEntity(PAutomaton), CLuaMobSkill(PMobSkill));
+        auto result = onAutomatonAbilityCheck(CLuaBaseEntity(PTarget), CLuaBaseEntity(PAutomaton), CLuaMobSkill(PMobSkill));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMobSkillCheck: %s\n", err.what());
+            ShowError("luautils::onAutomatonAbilityCheck: %s", err.what());
             return 1;
         }
 
         return result.get_type(0) == sol::type::number ? result.get<int32>(0) : -5;
+    }
+
+    int32 OnAutomatonAbility(CBaseEntity* PTarget, CBaseEntity* PMob, CMobSkill* PMobSkill, CBaseEntity* PMobMaster, action_t* action)
+    {
+        auto filename = fmt::format("./scripts/globals/abilities/pets/automaton/{}.lua", PMobSkill->getName());
+
+        sol::function onAutomatonAbility = GetCacheEntryFromFilename(filename)["onAutomatonAbility"];
+        if (!onAutomatonAbility.valid())
+        {
+            return 0;
+        }
+
+        auto result = onAutomatonAbility(CLuaBaseEntity(PTarget), CLuaBaseEntity(PMob), CLuaMobSkill(PMobSkill), CLuaBaseEntity(PMobMaster), CLuaAction(action));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onAutomatonAbility: %s", err.what());
+            return 0;
+        }
+
+        return result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
     }
 
     /***********************************************************************
@@ -3306,7 +4039,7 @@ namespace luautils
         auto onMagicCastingCheck = getSpellCachedFunction(PSpell, "onMagicCastingCheck");
         if (!onMagicCastingCheck.valid())
         {
-            ShowWarning("luautils::onMagicCastingCheck\n");
+            ShowWarning("luautils::onMagicCastingCheck, spell (%s) has no lua file, it cannot be cast.", PSpell->getName());
             return 47;
         }
 
@@ -3314,7 +4047,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onMagicCastingCheck (%s): %s\n", PSpell->getName(), err.what());
+            ShowError("luautils::onMagicCastingCheck (%s): %s", PSpell->getName(), err.what());
             return 47;
         }
 
@@ -3333,7 +4066,7 @@ namespace luautils
 
         if (PAbility == nullptr)
         {
-            ShowError("luautils::OnAbilityCheck: Invalid PAbility\n");
+            ShowError("luautils::OnAbilityCheck: Invalid PAbility");
             return 87;
         }
 
@@ -3351,7 +4084,7 @@ namespace luautils
         if (!onAbilityCheck.valid())
         {
             // TODO: We rely on this to fail silently in certain cases, but this is bad :(
-            //ShowWarning("luautils::onAbilityCheck - Ability %s not found.\n", PAbility->getName());
+            // ShowWarning("luautils::onAbilityCheck - Ability %s not found.", PAbility->getName());
             return 0;
         }
 
@@ -3359,7 +4092,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onAbilityCheck (%s): %s\n", PAbility->getName(), err.what());
+            ShowError("luautils::onAbilityCheck (%s): %s", PAbility->getName(), err.what());
             return 87;
         }
 
@@ -3367,7 +4100,7 @@ namespace luautils
         auto result1 = result.get_type(1) == sol::type::number ? result.get<int32>(1) : 0;
         if (result1 != 0)
         {
-            *PMsgTarget = (CBaseEntity*)PTarget;
+            *PMsgTarget = PTarget;
         }
 
         return result0 ? result0 : 0; // Default to no Message
@@ -3395,13 +4128,13 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onPetAbility: %s\n", err.what());
+            ShowError("luautils::onPetAbility: %s", err.what());
             return 0;
         }
 
         // Bloodpact Skillups
         // TODO: This probably shouldn't be in here
-        if (PMob->objtype == TYPE_PET && map_config.skillup_bloodpact)
+        if (PMob->objtype == TYPE_PET && settings::get<bool>("map.SKILLUP_BLOODPACT"))
         {
             CPetEntity* PPet = (CPetEntity*)PMob;
             if (PPet->getPetType() == PET_TYPE::AVATAR && PPet->PMaster->objtype == TYPE_PC)
@@ -3417,11 +4150,37 @@ namespace luautils
         return result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
     }
 
-    /************************************************************************
-     *                                                                       *
-     *                                                                       *
-     *                                                                       *
-     ************************************************************************/
+    int32 OnPetAbility(CBaseEntity* PTarget, CPetEntity* PPet, CPetSkill* PPetSkill, CBaseEntity* PMobMaster, action_t* action)
+    {
+        TracyZoneScoped;
+
+        std::string filename = fmt::format("./scripts/globals/abilities/pets/{}.lua", PPetSkill->getName());
+
+        sol::function onPetAbility = GetCacheEntryFromFilename(filename)["onPetAbility"];
+        if (!onPetAbility.valid())
+        {
+            return 0;
+        }
+
+        auto result = onPetAbility(CLuaBaseEntity(PTarget), CLuaBaseEntity(PPet), CLuaPetSkill(PPetSkill), CLuaBaseEntity(PMobMaster), CLuaAction(action));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onPetAbility: %s", err.what());
+            return 0;
+        }
+
+        if (PPet->getPetType() == PET_TYPE::AVATAR && PPet->PMaster->objtype == TYPE_PC)
+        {
+            CCharEntity* PMaster = (CCharEntity*)PPet->PMaster;
+            if (PMaster->GetMJob() == JOB_SMN)
+            {
+                charutils::TrySkillUP(PMaster, SKILL_SUMMONING_MAGIC, PMaster->GetMLevel());
+            }
+        }
+
+        return result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
+    }
 
     int32 OnUseAbility(CBattleEntity* PUser, CBattleEntity* PTarget, CAbility* PAbility, action_t* action)
     {
@@ -3440,7 +4199,7 @@ namespace luautils
         sol::function onUseAbility = GetCacheEntryFromFilename(filename)["onUseAbility"];
         if (!onUseAbility.valid())
         {
-            ShowWarning("luautils::onUseAbility - Ability %s not found.\n", PAbility->getName());
+            ShowWarning("luautils::onUseAbility - Ability %s not found.", PAbility->getName());
             return 0;
         }
 
@@ -3448,30 +4207,99 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onUseAbility: %s\n", err.what());
+            ShowError("luautils::onUseAbility: %s", err.what());
             return 0;
         }
 
         return result.get_type(0) == sol::type::number ? result.get<int32>(0) : 0;
     }
 
-    void ClearVarFromAll(std::string const& varName)
+    int32 OnSteal(CBattleEntity* PChar, CBattleEntity* PMob, CAbility* PAbility, action_t* action)
     {
         TracyZoneScoped;
-        Sql_Query(SqlHandle, "DELETE FROM char_vars WHERE varname = '%s';", varName);
+
+        if (PChar == nullptr || PMob == nullptr)
+        {
+            return 0;
+        }
+
+        sol::function onSteal = getEntityCachedFunction(PMob, "onSteal");
+        if (!onSteal.valid())
+        {
+            return 0;
+        }
+
+        auto result = onSteal(CLuaBaseEntity(PChar), CLuaBaseEntity(PMob), CLuaAbility(PAbility), CLuaAction(action));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onSteal %s", err.what());
+            return 0;
+        }
+
+        uint16 retVal = result.get_type(0) == sol::type::number ? result.get<uint16>(0) : 0;
+        if (retVal > 0)
+        {
+            return retVal;
+        }
+
+        return 0;
+    }
+
+    bool OnCanUseSpell(CBattleEntity* PChar, CSpell* Spell) // triggers when CanUseSpell is invoked on spell.cpp for PCs only
+    {
+        TracyZoneScoped;
+
+        sol::function canUseSpellOverride = lua["xi"]["spells"]["canUseSpellOverride"];
+
+        if (!canUseSpellOverride.valid())
+        {
+            return false;
+        }
+
+        auto result = canUseSpellOverride(CLuaBaseEntity(PChar), CLuaSpell(Spell));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::OnCanUseSpell: %s", err.what());
+            return 0;
+        }
+
+        return result.get_type(0) == sol::type::boolean ? result.get<bool>(0) : true;
     }
 
     void Terminate()
     {
         TracyZoneScoped;
-        zoneutils::ForEachZone([](CZone* PZone) {
-            PZone->ForEachChar([](CCharEntity* PChar) {
+        // clang-format off
+        zoneutils::ForEachZone([](CZone* PZone)
+        {
+            PZone->ForEachChar([](CCharEntity* PChar)
+            {
+                PChar->PersistData();
                 charutils::SaveCharPosition(PChar);
                 charutils::SaveCharStats(PChar);
                 charutils::SaveCharExp(PChar, PChar->GetMJob());
             });
         });
+        // clang-format on
         exit(1);
+    }
+
+    auto GetCachedInstanceScript(uint16 instanceId) -> sol::table
+    {
+        TracyZoneScoped;
+
+        auto instanceData = instanceutils::GetInstanceData(instanceId);
+
+        auto cachedInstanceScript = GetCacheEntryFromFilename(instanceData.filename);
+        if (!cachedInstanceScript.valid())
+        {
+            ShowError("luautils::GetCachedInstanceScript: Could not retrieve cache entry for %d", instanceId);
+            return sol::lua_nil;
+        }
+
+        return cachedInstanceScript;
     }
 
     int32 OnInstanceZoneIn(CCharEntity* PChar, CInstance* PInstance)
@@ -3480,7 +4308,7 @@ namespace luautils
 
         CZone* PZone = PInstance->GetZone();
 
-        auto name = (const char*)PZone->GetName();
+        auto name = PZone->GetName();
 
         auto onInstanceZoneIn = lua["xi"]["zones"][name]["Zone"]["onInstanceZoneIn"];
         if (!onInstanceZoneIn.valid())
@@ -3492,7 +4320,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceZoneIn %s\n", err.what());
+            ShowError("luautils::onInstanceZoneIn %s", err.what());
             return -1;
         }
 
@@ -3505,8 +4333,8 @@ namespace luautils
 
         TracyZoneScoped;
 
-        auto zone     = (const char*)PChar->loc.zone->GetName();
-        auto instance = (const char*)PChar->PInstance->GetName();
+        auto zone     = PChar->loc.zone->GetName();
+        auto instance = PChar->PInstance->GetName();
 
         auto afterInstanceRegister = lua["xi"]["zones"][zone]["instances"][instance]["afterInstanceRegister"];
         if (!afterInstanceRegister.valid())
@@ -3518,7 +4346,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::afterInstanceRegister %s\n", err.what());
+            ShowError("luautils::afterInstanceRegister %s", err.what());
         }
     }
 
@@ -3526,7 +4354,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PZone->GetName();
+        auto name = PZone->GetName();
 
         auto onInstanceLoadFailed = lua["xi"]["zones"][name]["Zone"]["onInstanceLoadFailed"];
         if (!onInstanceLoadFailed.valid())
@@ -3538,7 +4366,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::afterInstanceRegister %s\n", err.what());
+            ShowError("luautils::onInstanceLoadFailed %s", err.what());
             return 0;
         }
 
@@ -3549,10 +4377,9 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PInstance->GetZone()->GetName();
-        auto name = (const char*)PInstance->GetName();
+        auto instanceData = instanceutils::GetInstanceData(PInstance->GetID());
 
-        auto onInstanceTimeUpdate = lua["xi"]["zones"][zone]["instances"][name]["onInstanceTimeUpdate"];
+        auto onInstanceTimeUpdate = GetCacheEntryFromFilename(instanceData.filename)["onInstanceTimeUpdate"];
         if (!onInstanceTimeUpdate.valid())
         {
             return -1;
@@ -3562,7 +4389,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceTimeUpdate %s\n", err.what());
+            ShowError("luautils::onInstanceTimeUpdate %s", err.what());
             return -1;
         }
 
@@ -3573,10 +4400,9 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PInstance->GetZone()->GetName();
-        auto name = (const char*)PInstance->GetName();
+        auto instanceData = instanceutils::GetInstanceData(PInstance->GetID());
 
-        auto onInstanceFailure = lua["xi"]["zones"][zone]["instances"][name]["onInstanceFailure"];
+        auto onInstanceFailure = GetCacheEntryFromFilename(instanceData.filename)["onInstanceFailure"];
         if (!onInstanceFailure.valid())
         {
             return -1;
@@ -3586,7 +4412,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceFailure %s\n", err.what());
+            ShowError("luautils::onInstanceFailure %s", err.what());
             return -1;
         }
 
@@ -3599,34 +4425,24 @@ namespace luautils
      *                                                                       *
      ************************************************************************/
 
-    int32 OnInstanceCreated(CCharEntity* PChar, CInstance* PInstance)
+    int32 OnInstanceCreatedCallback(CCharEntity* PChar, CInstance* PInstance)
     {
         TracyZoneScoped;
 
-        auto onInstanceCreated = GetCacheEntryFromFilename(PChar->m_event.Script)["onInstanceCreated"];
-        if (!onInstanceCreated.valid())
+        auto instanceData = instanceutils::GetInstanceData(PInstance->GetID());
+
+        auto onInstanceCreatedCallback = GetCacheEntryFromFilename(instanceData.filename)["onInstanceCreatedCallback"];
+        if (!onInstanceCreatedCallback.valid())
         {
-            // If you can't load from PChar->m_event.Script, try from the zone
-            auto filename     = fmt::format("./scripts/zones/{}/Zone.lua", PChar->loc.zone->GetName());
-            onInstanceCreated.set(GetCacheEntryFromFilename(filename)["onInstanceCreated"]);
-            if (!onInstanceCreated.valid())
-            {
-                ShowError("luautils::onInstanceCreated: undefined procedure onInstanceCreated\n");
-                return -1;
-            }
+            ShowError("luautils::OnInstanceCreatedCallback: undefined procedure onInstanceCreatedCallback");
+            return -1;
         }
 
-        std::optional<CLuaInstance> optLuaInstance = std::nullopt;
-        if (PInstance)
-        {
-            optLuaInstance = CLuaInstance(PInstance);
-        }
-
-        auto result = onInstanceCreated(CLuaBaseEntity(PChar), CLuaBaseEntity(PChar->m_event.Target), optLuaInstance);
+        auto result = onInstanceCreatedCallback(CLuaBaseEntity(PChar), CLuaInstance(PInstance));
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceCreated %s\n", err.what());
+            ShowError("luautils::OnInstanceCreatedCallback %s", err.what());
             return -1;
         }
 
@@ -3643,8 +4459,8 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PInstance->GetZone()->GetName();
-        auto name = (const char*)PInstance->GetName();
+        auto zone = PInstance->GetZone()->GetName();
+        auto name = PInstance->GetName();
 
         auto onInstanceCreated = lua["xi"]["zones"][zone]["instances"][name]["onInstanceCreated"];
         if (!onInstanceCreated.valid())
@@ -3656,7 +4472,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceCreated %s\n", err.what());
+            ShowError("luautils::onInstanceCreated %s", err.what());
             return -1;
         }
 
@@ -3667,8 +4483,8 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PInstance->GetZone()->GetName();
-        auto name = (const char*)PInstance->GetName();
+        auto zone = PInstance->GetZone()->GetName();
+        auto name = PInstance->GetName();
 
         auto onInstanceProgressUpdate = lua["xi"]["zones"][zone]["instances"][name]["onInstanceProgressUpdate"];
         if (!onInstanceProgressUpdate.valid())
@@ -3680,7 +4496,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceProgressUpdate %s\n", err.what());
+            ShowError("luautils::onInstanceProgressUpdate %s", err.what());
             return -1;
         }
 
@@ -3691,8 +4507,8 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PInstance->GetZone()->GetName();
-        auto name = (const char*)PInstance->GetName();
+        auto zone = PInstance->GetZone()->GetName();
+        auto name = PInstance->GetName();
 
         auto onInstanceStageChange = lua["xi"]["zones"][zone]["instances"][name]["onInstanceStageChange"];
         if (!onInstanceStageChange.valid())
@@ -3704,7 +4520,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceStageChange %s\n", err.what());
+            ShowError("luautils::onInstanceStageChange %s", err.what());
             return -1;
         }
 
@@ -3715,8 +4531,8 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PInstance->GetZone()->GetName();
-        auto name = (const char*)PInstance->GetName();
+        auto zone = PInstance->GetZone()->GetName();
+        auto name = PInstance->GetName();
 
         auto onInstanceComplete = lua["xi"]["zones"][zone]["instances"][name]["onInstanceComplete"];
         if (!onInstanceComplete.valid())
@@ -3728,18 +4544,12 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onInstanceComplete %s\n", err.what());
+            ShowError("luautils::onInstanceComplete %s", err.what());
             return -1;
         }
 
         return 0;
     }
-
-    /************************************************************************
-     *                                                                       *
-     *                                                                       *
-     *                                                                       *
-     ************************************************************************/
 
     void StartElevator(uint32 ElevatorID)
     {
@@ -3747,52 +4557,61 @@ namespace luautils
         CTransportHandler::getInstance()->startElevator(ElevatorID);
     }
 
-    /************************************************************************
-     *                                                                       *
-     *  Получаем значение глобальной переменной сервера.                     *
-     *  Переменная действительна лишь в пределах зоны, в которой установлена *
-     *                                                                       *
-     ************************************************************************/
-
-    int32 GetServerVariable(std::string const& varName)
+    // Returns -1 if elevator is not found. Otherwise, returns the uint8 state.
+    int16 GetElevatorState(uint8 id) // Returns -1 if elevator is not found. Otherwise, returns the uint8 state.
     {
         TracyZoneScoped;
+        Elevator_t* elevator = CTransportHandler::getInstance()->getElevator(id);
 
-        int32 value = 0;
-
-        int32 ret = Sql_Query(SqlHandle, "SELECT value FROM server_variables WHERE name = '%s' LIMIT 1;", varName);
-
-        if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+        if (elevator)
         {
-            value = (int32)Sql_GetIntData(SqlHandle, 0);
+            return elevator->state;
         }
 
-        return value;
+        return -1;
     }
 
-    /************************************************************************
-     *                                                                       *
-     *  Устанавливаем значение глобальной переменной сервера.                *
-     *                                                                       *
-     ************************************************************************/
+    int32 GetServerVariable(std::string const& name)
+    {
+        return serverutils::GetServerVar(name);
+    }
 
     void SetServerVariable(std::string const& name, int32 value)
     {
-        TracyZoneScoped;
+        serverutils::SetServerVar(name, value);
+    }
 
-        if (value == 0)
-        {
-            Sql_Query(SqlHandle, "DELETE FROM server_variables WHERE name = '%s' LIMIT 1;", name);
-            return;
-        }
-        Sql_Query(SqlHandle, "INSERT INTO server_variables VALUES ('%s', %i) ON DUPLICATE KEY UPDATE value = %i;", name, value, value);
+    int32 GetVolatileServerVariable(std::string const& varName)
+    {
+        return serverutils::GetVolatileServerVar(varName);
+    }
+
+    void SetVolatileServerVariable(std::string const& varName, int32 value)
+    {
+        serverutils::SetVolatileServerVar(varName, value);
+    }
+
+    int32 GetCharVar(uint32 charId, std::string const& varName)
+    {
+        return charutils::FetchCharVar(charId, varName);
+    }
+
+    // Using the charID set a char variable on the SQL DB
+    void SetCharVar(uint32 charId, std::string const& varName, int32 value)
+    {
+        charutils::SetCharVar(charId, varName, value);
+    }
+
+    void ClearCharVarFromAll(std::string const& varName)
+    {
+        charutils::ClearCharVarFromAll(varName);
     }
 
     int32 OnTransportEvent(CCharEntity* PChar, uint32 TransportID)
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PChar->loc.zone->GetName();
+        auto name = PChar->loc.zone->GetName();
 
         auto onTransportEvent = lua["xi"]["zones"][name]["Zone"]["onTransportEvent"];
         if (!onTransportEvent.valid())
@@ -3804,7 +4623,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onTransportEvent: %s\n", err.what());
+            ShowError("luautils::onTransportEvent: %s", err.what());
             return -1;
         }
 
@@ -3825,7 +4644,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onTimeTrigger: %s\n", err.what());
+            ShowError("luautils::onTimeTrigger: %s", err.what());
             return;
         }
     }
@@ -3834,7 +4653,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PZone->GetName();
+        auto name = PZone->GetName();
 
         auto onConquestUpdate = lua["xi"]["zones"][name]["Zone"]["onConquestUpdate"];
         if (!onConquestUpdate.valid())
@@ -3848,11 +4667,89 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onConquestUpdate: %s\n", err.what());
+            ShowError("luautils::onConquestUpdate: %s", err.what());
             return -1;
         }
 
         return 0;
+    }
+
+    /************************************************************************
+     *                                                                       *
+     *  Called on Server Start                                               *
+     *                                                                       *
+     ************************************************************************/
+
+    void OnServerStart()
+    {
+        TracyZoneScoped;
+
+        auto onServerStart = lua["xi"]["server"]["onServerStart"];
+        if (!onServerStart.valid())
+        {
+            ShowWarning("luautils::onServerStart");
+            return;
+        }
+
+        auto result = onServerStart();
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onServerStart: %s", err.what());
+            return;
+        }
+    }
+
+    /************************************************************************
+     *                                                                       *
+     *  Called on JST Midnight                                               *
+     *                                                                       *
+     ************************************************************************/
+
+    void OnJSTMidnight()
+    {
+        TracyZoneScoped;
+
+        auto onJSTMidnight = lua["xi"]["server"]["onJSTMidnight"];
+        if (!onJSTMidnight.valid())
+        {
+            ShowWarning("luautils::onJSTMidnight");
+            return;
+        }
+
+        auto result = onJSTMidnight();
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onJSTMidnight: %s", err.what());
+            return;
+        }
+    }
+
+    /************************************************************************
+     *                                                                       *
+     *  Called on TimeServer Tick (every 2400ms)                             *
+     *                                                                       *
+     ************************************************************************/
+
+    void OnTimeServerTick()
+    {
+        TracyZoneScoped;
+
+        auto onTimeServerTick = lua["xi"]["server"]["onTimeServerTick"];
+        if (!onTimeServerTick.valid())
+        {
+            ShowWarning("luautils::onTimeServerTick");
+            return;
+        }
+
+        auto result = onTimeServerTick();
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onTimeServerTick: %s", err.what());
+            return;
+        }
     }
 
     /********************************************************************
@@ -3864,12 +4761,13 @@ namespace luautils
 
         CZone* PZone = PChar->loc.zone == nullptr ? zoneutils::GetZone(PChar->loc.destination) : PChar->loc.zone;
 
-        auto zone = (const char*)PZone->GetName();
+        auto zone = PZone->GetName();
         auto name = PBattlefield->GetName();
 
         auto onBattlefieldEnter = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldEnter"];
         if (!onBattlefieldEnter.valid())
         {
+            invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldEnter", CLuaBaseEntity(PChar), CLuaBattlefield(PBattlefield));
             return;
         }
 
@@ -3877,7 +4775,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldEnter: %s\n", err.what());
+            ShowError("luautils::onBattlefieldEnter: %s", err.what());
         }
     }
 
@@ -3899,24 +4797,38 @@ namespace luautils
 
         auto filename = fmt::format("./scripts/zones/{}/bcnms/{}.lua", PZone->GetName(), PBattlefield->GetName());
 
-        auto zone = (const char*)PZone->GetName();
+        auto zone = PZone->GetName();
         auto name = PBattlefield->GetName();
 
         auto onBattlefieldLeave = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldLeave"];
         if (!onBattlefieldLeave.valid())
         {
+            invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldLeave", CLuaBaseEntity(PChar), CLuaBattlefield(PBattlefield), LeaveCode);
             return;
         }
 
-        PChar->m_event.reset();
-        PChar->m_event.Target = PChar;
-        PChar->m_event.Script = filename;
+        PChar->eventPreparation->targetEntity = PChar;
+        PChar->eventPreparation->scriptFile   = filename;
 
         auto result = onBattlefieldLeave(CLuaBaseEntity(PChar), CLuaBattlefield(PBattlefield), LeaveCode);
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldLeave: %s\n", err.what());
+            ShowError("luautils::onBattlefieldLeave: %s", err.what());
+        }
+    }
+
+    void OnBattlefieldKick(CCharEntity* PChar)
+    {
+        TracyZoneScoped;
+
+        CStatusEffect* status = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_BATTLEFIELD);
+
+        if (status != nullptr)
+        {
+            uint16 power = status->GetPower();
+
+            invokeBattlefieldEvent(power, "onBattlefieldKick", CLuaBaseEntity(PChar));
         }
     }
 
@@ -3933,12 +4845,13 @@ namespace luautils
 
         CZone* PZone = PChar->loc.zone == nullptr ? zoneutils::GetZone(PChar->loc.destination) : PChar->loc.zone;
 
-        auto zone = (const char*)PZone->GetName();
+        auto zone = PZone->GetName();
         auto name = PBattlefield->GetName();
 
         auto onBattlefieldRegister = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldRegister"];
         if (!onBattlefieldRegister.valid())
         {
+            invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldRegister", CLuaBaseEntity(PChar), CLuaBattlefield(PBattlefield));
             return;
         }
 
@@ -3946,7 +4859,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldRegister: %s\n", err.what());
+            ShowError("luautils::onBattlefieldRegister: %s", err.what());
         }
     }
 
@@ -3957,12 +4870,13 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto zone = (const char*)PBattlefield->GetZone()->GetName();
+        auto zone = PBattlefield->GetZone()->GetName();
         auto name = PBattlefield->GetName();
 
         auto onBattlefieldDestroy = lua["xi"]["zones"][zone]["bcnms"][name]["onBattlefieldDestroy"];
         if (!onBattlefieldDestroy.valid())
         {
+            invokeBattlefieldEvent(PBattlefield->GetID(), "onBattlefieldDestroy", CLuaBattlefield(PBattlefield));
             return;
         }
 
@@ -3970,7 +4884,7 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onBattlefieldDestroy: %s\n", err.what());
+            ShowError("luautils::onBattlefieldDestroy: %s", err.what());
         }
     }
     /************************************************************************
@@ -3989,7 +4903,7 @@ namespace luautils
         }
         else
         {
-            ShowDebug(CL_RED "DisallowRespawn: mob <%u> not found\n" CL_RESET, mobid);
+            ShowDebug("DisallowRespawn: mob <%u> not found", mobid);
         }
     }
 
@@ -4007,35 +4921,35 @@ namespace luautils
         if (PMob != nullptr)
         {
             int32 r   = 0;
-            int32 ret = Sql_Query(SqlHandle, "SELECT count(mobid) FROM `nm_spawn_points` where mobid=%u", mobid);
-            if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS && Sql_GetUIntData(SqlHandle, 0) > 0)
+            int32 ret = sql->Query("SELECT count(mobid) FROM `nm_spawn_points` where mobid=%u", mobid);
+            if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS && sql->GetUIntData(0) > 0)
             {
-                r = xirand::GetRandomNumber(Sql_GetUIntData(SqlHandle, 0));
+                r = xirand::GetRandomNumber(sql->GetUIntData(0));
             }
             else
             {
-                ShowDebug(CL_RED "UpdateNMSpawnPoint: SQL error: No entries for mobid <%u> found.\n" CL_RESET, mobid);
+                ShowDebug("UpdateNMSpawnPoint: SQL error: No entries for mobid <%u> found.", mobid);
                 return;
             }
 
-            ret = Sql_Query(SqlHandle, "SELECT pos_x, pos_y, pos_z FROM `nm_spawn_points` WHERE mobid=%u AND pos=%i", mobid, r);
-            if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+            ret = sql->Query("SELECT pos_x, pos_y, pos_z FROM `nm_spawn_points` WHERE mobid=%u AND pos=%i", mobid, r);
+            if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
             {
                 PMob->m_SpawnPoint.rotation = xirand::GetRandomNumber(256);
-                PMob->m_SpawnPoint.x        = Sql_GetFloatData(SqlHandle, 0);
-                PMob->m_SpawnPoint.y        = Sql_GetFloatData(SqlHandle, 1);
-                PMob->m_SpawnPoint.z        = Sql_GetFloatData(SqlHandle, 2);
-                // ShowDebug(CL_RED"UpdateNMSpawnPoint: After %i - %f, %f, %f, %i\n" CL_RESET, r,
+                PMob->m_SpawnPoint.x        = sql->GetFloatData(0);
+                PMob->m_SpawnPoint.y        = sql->GetFloatData(1);
+                PMob->m_SpawnPoint.z        = sql->GetFloatData(2);
+                // ShowDebug(CL_RED"UpdateNMSpawnPoint: After %i - %f, %f, %f, %i", r,
                 // PMob->m_SpawnPoint.x,PMob->m_SpawnPoint.y,PMob->m_SpawnPoint.z,PMob->m_SpawnPoint.rotation);
             }
             else
             {
-                ShowDebug(CL_RED "UpdateNMSpawnPoint: SQL error or NM <%u> not found in nmspawnpoints table.\n" CL_RESET, mobid);
+                ShowDebug("UpdateNMSpawnPoint: SQL error or NM <%u> not found in nmspawnpoints table.", mobid);
             }
         }
         else
         {
-            ShowDebug(CL_RED "UpdateNMSpawnPoint: mob <%u> not found\n" CL_RESET, mobid);
+            ShowDebug("UpdateNMSpawnPoint: mob <%u> not found", mobid);
         }
     }
 
@@ -4056,11 +4970,12 @@ namespace luautils
             return PMob->m_RespawnTime / 1000;
         }
 
-        ShowError(CL_RED "luautils::GetMobAction: mob <%u> was not found\n" CL_RESET, mobid);
+        ShowError("luautils::GetMobAction: mob <%u> was not found", mobid);
         return 0;
     }
 
     /************************************************************************
+     *   DEPRECATED: Use mob:addListener("ITEM_DROPS", ...) instead.         *
      *   Change drop rate of a mob                                           *
      *   1st number: dropid in mob_droplist.sql                              *
      *   2nd number: itemid in mob_droplist.sql                              *
@@ -4083,12 +4998,6 @@ namespace luautils
                 }
             }
         }
-    }
-
-    uint8 GetHealingTickDelay()
-    {
-        TracyZoneScoped;
-        return map_config.healing_tick_delay;
     }
 
     /***************************************************************************
@@ -4129,51 +5038,6 @@ namespace luautils
         return PSpell ? std::optional<CLuaSpell>(PSpell) : std::nullopt;
     }
 
-    int32 UpdateServerMessage()
-    {
-        TracyZoneScoped;
-
-        int8  line[1024];
-        FILE* fp;
-
-        // Clear old messages..
-        map_config.server_message.clear();
-
-        // Load the English server message..
-        fp = fopen("./conf/server_message.conf", "rb");
-        if (fp == nullptr)
-        {
-            ShowError("Could not read English server message from: ./conf/server_message.conf\n");
-            return 1;
-        }
-
-        while (fgets((char*)line, sizeof(line), fp))
-        {
-            string_t sline((const char*)line);
-            map_config.server_message += sline;
-        }
-
-        fclose(fp);
-
-        // Ensure both messages have NULL terminates..
-        if (map_config.server_message.at(map_config.server_message.length() - 1) != 0x00)
-        {
-            map_config.server_message += (char)0x00;
-        }
-
-        return 0;
-    }
-
-    sol::table GetServerVersion()
-    {
-        sol::table version = lua.create_table();
-        version["branch"]  = XI_RELEASE_FLAG;
-        version["major"]   = XI_MAJOR_VERSION;
-        version["minor"]   = XI_MINOR_VERSION;
-        version["rev"]     = XI_REVISION;
-        return version;
-    }
-
     sol::table NearLocation(sol::table const& table, float radius, float theta)
     {
         TracyZoneScoped;
@@ -4194,6 +5058,47 @@ namespace luautils
         return nearPos;
     }
 
+    sol::table GetFurthestValidPosition(CLuaBaseEntity* fromTarget, float distance, float theta)
+    {
+        CBaseEntity* entity = fromTarget->GetBaseEntity();
+        position_t   pos    = nearPosition(entity->loc.p, distance, theta);
+
+        float validPos[3];
+        bool  success = entity->loc.zone->m_navMesh->findFurthestValidPoint(entity->loc.p, pos, validPos);
+        if (!success)
+        {
+            return sol::lua_nil;
+        }
+
+        sol::table outPos = lua.create_table();
+        outPos["x"]       = validPos[0];
+        outPos["y"]       = validPos[1];
+        outPos["z"]       = validPos[2];
+
+        return outPos;
+    }
+
+    void OnPlayerDeath(CCharEntity* PChar)
+    {
+        TracyZoneScoped;
+
+        auto onPlayerDeath = lua["xi"]["player"]["onPlayerDeath"];
+        if (!onPlayerDeath.valid())
+        {
+            ShowWarning("luautils::onPlayerDeath");
+            return;
+        }
+
+        auto result = onPlayerDeath(CLuaBaseEntity(PChar));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onPlayerDeath: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+            return;
+        }
+    }
+
     void OnPlayerLevelUp(CCharEntity* PChar)
     {
         TracyZoneScoped;
@@ -4201,7 +5106,7 @@ namespace luautils
         auto onPlayerLevelUp = lua["xi"]["player"]["onPlayerLevelUp"];
         if (!onPlayerLevelUp.valid())
         {
-            ShowWarning("luautils::onPlayerLevelUp\n");
+            ShowWarning("luautils::onPlayerLevelUp");
             return;
         }
 
@@ -4209,7 +5114,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onPlayerLevelUp: %s\n", err.what());
+            ShowError("luautils::onPlayerLevelUp: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return;
         }
     }
@@ -4221,7 +5127,7 @@ namespace luautils
         auto onPlayerLevelDown = lua["xi"]["player"]["onPlayerLevelDown"];
         if (!onPlayerLevelDown.valid())
         {
-            ShowWarning("luautils::onPlayerLevelDown\n");
+            ShowWarning("luautils::onPlayerLevelDown");
             return;
         }
 
@@ -4229,7 +5135,71 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onPlayerLevelDown: %s\n", err.what());
+            ShowError("luautils::onPlayerLevelDown: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+            return;
+        }
+    }
+
+    void OnPlayerMount(CCharEntity* PChar)
+    {
+        TracyZoneScoped;
+
+        auto onPlayerMount = lua["xi"]["player"]["onPlayerMount"];
+        if (!onPlayerMount.valid())
+        {
+            ShowWarning("luautils::onPlayerMount");
+            return;
+        }
+
+        auto result = onPlayerMount(CLuaBaseEntity(PChar));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onPlayerMount: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+            return;
+        }
+    }
+
+    void OnPlayerEmote(CCharEntity* PChar, Emote EmoteID)
+    {
+        TracyZoneScoped;
+
+        auto onPlayerEmote = lua["xi"]["player"]["onPlayerEmote"];
+        if (!onPlayerEmote.valid())
+        {
+            ShowWarning("luautils::onPlayerEmote");
+            return;
+        }
+
+        auto result = onPlayerEmote(CLuaBaseEntity(PChar), static_cast<uint8>(EmoteID));
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onPlayerEmote: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
+            return;
+        }
+    }
+
+    void OnPlayerVolunteer(CCharEntity* PChar, std::string text)
+    {
+        TracyZoneScoped;
+
+        auto onPlayerVolunteer = lua["xi"]["player"]["onPlayerVolunteer"];
+        if (!onPlayerVolunteer.valid())
+        {
+            ShowWarning("luautils::onPlayerVolunteer");
+            return;
+        }
+
+        auto result = onPlayerVolunteer(CLuaBaseEntity(PChar), text);
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::onPlayerVolunteer: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return;
         }
     }
@@ -4238,12 +5208,12 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PChar->loc.zone->GetName();
+        auto name = PChar->loc.zone->GetName();
 
         auto onChocoboDig = lua["xi"]["zones"][name]["Zone"]["onChocoboDig"];
         if (!onChocoboDig.valid())
         {
-            ShowWarning("luautils::onChocoboDig\n");
+            ShowWarning("luautils::onChocoboDig");
             return false;
         }
 
@@ -4251,7 +5221,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onChocoboDig: %s\n", err.what());
+            ShowError("luautils::onChocoboDig: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return false;
         }
 
@@ -4260,7 +5231,7 @@ namespace luautils
 
     // Loads a Lua function with a fallback hierarchy
     //
-    // 1) 1st try: PChar->m_event.Script
+    // 1) 1st try: PChar->currentEvent->scriptFile
     // 2) 2nd try: The instance script if the player is in one
     // 3) 3rd try: The battlefield script if the player is in one
     // 4) 4th try: The zone script for the zone the player is in
@@ -4268,7 +5239,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto funcFromChar = GetCacheEntryFromFilename(PChar->m_event.Script)[functionName];
+        auto funcFromChar = GetCacheEntryFromFilename(PChar->currentEvent->scriptFile)[functionName];
         if (funcFromChar.valid())
         {
             return funcFromChar;
@@ -4276,7 +5247,10 @@ namespace luautils
 
         if (PChar->PInstance)
         {
-            auto instance_filename = fmt::format("./scripts/zones/{}/instances/{}", PChar->loc.zone->GetName(), PChar->PInstance->GetName());
+            auto instance_filename = fmt::format(
+                "./scripts/zones/{}/instances/{}",
+                PChar->PInstance->GetZone()->GetName(),
+                PChar->PInstance->GetName());
 
             auto funcFromInstance = GetCacheEntryFromFilename(instance_filename)[functionName];
             if (funcFromInstance.valid())
@@ -4311,10 +5285,10 @@ namespace luautils
         TracyZoneScoped;
 
         uint16 effectId = 0;
-        int32  ret      = Sql_Query(SqlHandle, "SELECT effectId FROM despoil_effects WHERE itemId = %u", itemId);
-        if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+        int32  ret      = sql->Query("SELECT effectId FROM despoil_effects WHERE itemId = %u", itemId);
+        if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
         {
-            effectId = (uint16)Sql_GetUIntData(SqlHandle, 0);
+            effectId = (uint16)sql->GetUIntData(0);
         }
 
         return effectId;
@@ -4324,7 +5298,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PItem->getName();
+        auto name = PItem->getName();
 
         auto onFurniturePlaced = lua["xi"]["globals"]["items"][name]["onFurniturePlaced"];
         if (!onFurniturePlaced.valid())
@@ -4336,7 +5310,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onFurniturePlaced: %s\n", err.what());
+            ShowError("luautils::onFurniturePlaced: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return;
         }
     }
@@ -4345,7 +5320,7 @@ namespace luautils
     {
         TracyZoneScoped;
 
-        auto name = (const char*)PItem->getName();
+        auto name = PItem->getName();
 
         auto onFurnitureRemoved = lua["xi"]["globals"]["items"][name]["onFurnitureRemoved"];
         if (!onFurnitureRemoved.valid())
@@ -4357,7 +5332,8 @@ namespace luautils
         if (!result.valid())
         {
             sol::error err = result;
-            ShowError("luautils::onFurnitureRemoved: %s\n", err.what());
+            ShowError("luautils::onFurnitureRemoved: %s", err.what());
+            ReportErrorToPlayer(PChar, err.what());
             return;
         }
     }
@@ -4369,24 +5345,119 @@ namespace luautils
         return daily::SelectItem(player, dial);
     }
 
-    void OnPlayerEmote(CCharEntity* PChar, Emote EmoteID)
+    std::string SetCustomMenuContext(CCharEntity* PChar, sol::table table)
     {
-        TracyZoneScoped;
+        customMenuContext[PChar->id] = table;
 
-        auto onPlayerEmote = lua["xi"]["player"]["onPlayerEmote"];
-        if (!onPlayerEmote.valid())
+        auto onStart = table["onStart"];
+        if (onStart.valid())
         {
-            ShowWarning("luautils::onPlayerEmote\n");
-            return;
+            onStart(CLuaBaseEntity(PChar));
         }
 
-        auto result = onPlayerEmote(CLuaBaseEntity(PChar), static_cast<uint8>(EmoteID));
-        if (!result.valid())
+        auto escape = [](std::string s)
         {
-            sol::error err = result;
-            ShowError("luautils::onPlayerEmote: %s\n", err.what());
-            return;
+            return fmt::format("\"{}\"", s);
+        };
+
+        std::string outStr;
+
+        // Title
+        outStr += escape(table["title"].get<std::string>());
+
+        // Options
+        for (auto& entry : table["options"].get<sol::table>())
+        {
+            outStr += escape(entry.second.as<sol::table>()[1]);
         }
+
+        return outStr;
     }
 
+    bool HasCustomMenuContext(CCharEntity* PChar)
+    {
+        auto context = customMenuContext.find(PChar->id);
+        return context != customMenuContext.end();
+    }
+
+    void HandleCustomMenu(CCharEntity* PChar, std::string selection)
+    {
+        // Selection is of the form:
+        // GMTELL(Testo): Question(Test Menu): Result (Option 1)
+        // Cancelled:
+        // GMTELL(Testo): Question(Test Menu (Play Effect)): Result (Canceled.)
+
+        if (selection.empty())
+        {
+            ShowWarning(fmt::format("Custom menu for {} was provided an empty string.", PChar->name));
+            return;
+        }
+
+        std::string cleanedSelection = selection.substr(selection.find("): Result (") + 11);
+        cleanedSelection.pop_back(); // Remove trailing ')'
+
+        auto context = customMenuContext[PChar->id];
+        if (strcmp(cleanedSelection.c_str(), "Canceled.") == 0)
+        {
+            auto onCancelled = context["onCancelled"];
+            if (onCancelled.valid())
+            {
+                onCancelled(CLuaBaseEntity(PChar));
+            }
+        }
+        else
+        {
+            for (auto& entry : context["options"].get<sol::table>())
+            {
+                if (entry.second.get_type() == sol::type::table)
+                {
+                    auto table = entry.second.as<sol::table>();
+                    auto name  = table[1].get<std::string>();
+                    auto func  = table[2].get<sol::function>();
+
+                    if (cleanedSelection.compare(name) == 0)
+                    {
+                        auto result = func(CLuaBaseEntity(PChar));
+                        if (!result.valid())
+                        {
+                            sol::error err = result;
+                            ShowError("Menu error: %s", err.what());
+                            ReportErrorToPlayer(PChar, err.what());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        auto onEnd = context["onEnd"];
+        if (onEnd.valid())
+        {
+            onEnd(CLuaBaseEntity(PChar));
+        }
+
+        customMenuContext.erase(PChar->id);
+    }
+
+    uint16 GetItemIDByName(std::string const& name)
+    {
+        uint16      id    = 0;
+        const char* Query = "SELECT itemid FROM item_basic WHERE name LIKE '%s';";
+        int32       ret   = sql->Query(Query, name);
+
+        if (ret != SQL_ERROR && sql->NumRows() == 1) // Found a single result
+        {
+            while (sql->NextRow() == SQL_SUCCESS)
+            {
+                id = sql->GetIntData(0);
+            }
+        }
+        else if (ret != SQL_ERROR && sql->NumRows() > 1)
+        {
+            // 0xFFFF is gil, so we will always return a value less than that as a warning
+            id = 0xFFFF - sql->NumRows() + 1;
+        }
+
+        return id;
+    }
 }; // namespace luautils

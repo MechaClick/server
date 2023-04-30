@@ -19,12 +19,13 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
-#include "../../common/timer.h"
+#include "common/logging.h"
+#include "common/timer.h"
 
 #include "lua_instance.h"
 
 #include "../instance.h"
+#include "../utils/instanceutils.h"
 #include "../utils/mobutils.h"
 #include "lua_baseentity.h"
 #include "luautils.h"
@@ -34,18 +35,18 @@ CLuaInstance::CLuaInstance(CInstance* PInstance)
 {
     if (PInstance == nullptr)
     {
-        ShowError("CLuaInstance created with nullptr instead of valid CInstance*!\n");
+        ShowError("CLuaInstance created with nullptr instead of valid CInstance*!");
     }
 }
 
-uint8 CLuaInstance::getID()
+uint16 CLuaInstance::getID()
 {
     return m_PLuaInstance->GetID();
 }
 
-std::string CLuaInstance::getName()
+const std::string& CLuaInstance::getName()
 {
-    return (const char*)m_PLuaInstance->GetName();
+    return m_PLuaInstance->GetName();
 }
 
 CLuaZone CLuaInstance::getZone()
@@ -53,9 +54,14 @@ CLuaZone CLuaInstance::getZone()
     return CLuaZone(m_PLuaInstance->GetZone());
 }
 
+uint32 CLuaInstance::getEntranceZoneID()
+{
+    return instanceutils::GetInstanceData(m_PLuaInstance->GetID()).entrance_zone;
+}
+
 sol::table CLuaInstance::getAllies()
 {
-    auto table = luautils::lua.create_table();
+    auto table = lua.create_table();
     for (auto& member : m_PLuaInstance->m_allyList)
     {
         table.add(CLuaBaseEntity(member.second));
@@ -66,7 +72,7 @@ sol::table CLuaInstance::getAllies()
 
 sol::table CLuaInstance::getChars()
 {
-    auto table = luautils::lua.create_table();
+    auto table = lua.create_table();
     for (auto& member : m_PLuaInstance->m_charList)
     {
         table.add(CLuaBaseEntity(member.second));
@@ -77,7 +83,7 @@ sol::table CLuaInstance::getChars()
 
 sol::table CLuaInstance::getMobs()
 {
-    auto table = luautils::lua.create_table();
+    auto table = lua.create_table();
     for (auto& member : m_PLuaInstance->m_mobList)
     {
         table.add(CLuaBaseEntity(member.second));
@@ -88,7 +94,7 @@ sol::table CLuaInstance::getMobs()
 
 sol::table CLuaInstance::getNpcs()
 {
-    auto table = luautils::lua.create_table();
+    auto table = lua.create_table();
     for (auto& member : m_PLuaInstance->m_npcList)
     {
         table.add(CLuaBaseEntity(member.second));
@@ -99,7 +105,7 @@ sol::table CLuaInstance::getNpcs()
 
 sol::table CLuaInstance::getPets()
 {
-    auto table = luautils::lua.create_table();
+    auto table = lua.create_table();
     for (auto& member : m_PLuaInstance->m_petList)
     {
         table.add(CLuaBaseEntity(member.second));
@@ -117,7 +123,7 @@ uint32 CLuaInstance::getTimeLimit()
 sol::table CLuaInstance::getEntryPos()
 {
     position_t entry = m_PLuaInstance->GetEntryLoc();
-    sol::table table = luautils::lua.create_table();
+    sol::table table = lua.create_table();
 
     table["x"]   = entry.x;
     table["y"]   = entry.y;
@@ -125,6 +131,11 @@ sol::table CLuaInstance::getEntryPos()
     table["rot"] = entry.rotation;
 
     return table;
+}
+
+uint8 CLuaInstance::getLevelCap()
+{
+    return m_PLuaInstance->GetLevelCap();
 }
 
 uint32 CLuaInstance::getLastTimeUpdate()
@@ -167,7 +178,7 @@ uint32 CLuaInstance::getStage()
     return m_PLuaInstance->GetStage();
 }
 
-uint64_t CLuaInstance::getLocalVar(std::string name)
+uint64_t CLuaInstance::getLocalVar(std::string const& name)
 {
     return m_PLuaInstance->GetLocalVar(name);
 }
@@ -180,6 +191,11 @@ void CLuaInstance::setLevelCap(uint8 cap)
 void CLuaInstance::setLastTimeUpdate(uint32 ms)
 {
     m_PLuaInstance->SetLastTimeUpdate(std::chrono::milliseconds(ms));
+}
+
+void CLuaInstance::setTimeLimit(uint32 seconds)
+{
+    m_PLuaInstance->SetTimeLimit(std::chrono::seconds(seconds));
 }
 
 void CLuaInstance::setProgress(uint32 progress)
@@ -197,7 +213,7 @@ void CLuaInstance::setStage(uint32 stage)
     m_PLuaInstance->SetStage(stage);
 }
 
-void CLuaInstance::setLocalVar(std::string name, uint64_t value)
+void CLuaInstance::setLocalVar(std::string const& name, uint64_t value)
 {
     m_PLuaInstance->SetLocalVar(name, value);
 }
@@ -231,7 +247,7 @@ std::optional<CLuaBaseEntity> CLuaInstance::insertAlly(uint32 groupid)
         return std::optional<CLuaBaseEntity>(PAlly);
     }
 
-    ShowError(CL_RED "CLuaBattlefield::insertAlly - group ID %u not found!" CL_RESET, groupid);
+    ShowError("CLuaBattlefield::insertAlly - group ID %u not found!", groupid);
     return std::nullopt;
 }
 
@@ -243,6 +259,7 @@ void CLuaInstance::Register()
     SOL_REGISTER("getID", CLuaInstance::getID);
     SOL_REGISTER("getName", CLuaInstance::getName);
     SOL_REGISTER("getZone", CLuaInstance::getZone);
+    SOL_REGISTER("getEntranceZoneID", CLuaInstance::getEntranceZoneID);
     SOL_REGISTER("setLevelCap", CLuaInstance::setLevelCap);
     SOL_REGISTER("getAllies", CLuaInstance::getAllies);
     SOL_REGISTER("getChars", CLuaInstance::getChars);
@@ -250,7 +267,9 @@ void CLuaInstance::Register()
     SOL_REGISTER("getNpcs", CLuaInstance::getNpcs);
     SOL_REGISTER("getPets", CLuaInstance::getPets);
     SOL_REGISTER("getTimeLimit", CLuaInstance::getTimeLimit);
+    SOL_REGISTER("setTimeLimit", CLuaInstance::setTimeLimit);
     SOL_REGISTER("getEntryPos", CLuaInstance::getEntryPos);
+    SOL_REGISTER("getLevelCap", CLuaInstance::getLevelCap);
     SOL_REGISTER("getLastTimeUpdate", CLuaInstance::getLastTimeUpdate);
     SOL_REGISTER("setLastTimeUpdate", CLuaInstance::setLastTimeUpdate);
     SOL_REGISTER("getProgress", CLuaInstance::getProgress);
@@ -267,6 +286,12 @@ void CLuaInstance::Register()
     SOL_REGISTER("insertAlly", CLuaInstance::insertAlly);
     SOL_REGISTER("getLocalVar", CLuaInstance::getLocalVar);
     SOL_REGISTER("setLocalVar", CLuaInstance::setLocalVar);
+}
+
+std::ostream& operator<<(std::ostream& os, const CLuaInstance& instance)
+{
+    std::string id = instance.m_PLuaInstance ? std::to_string(instance.m_PLuaInstance->GetID()) : "nullptr";
+    return os << "CLuaInstance(" << id << ")";
 }
 
 //======================================================//

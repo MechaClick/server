@@ -8,20 +8,18 @@ require("scripts/globals/status")
 require("scripts/globals/trust")
 require("scripts/globals/weaponskillids")
 -----------------------------------
-local spell_object = {}
+local spellObject = {}
 
-local message_page_offset = 86
-
-spell_object.onMagicCastingCheck = function(caster, target, spell)
+spellObject.onMagicCastingCheck = function(caster, target, spell)
     return xi.trust.canCast(caster, spell, 906)
 end
 
-spell_object.onSpellCast = function(caster, target, spell)
+spellObject.onSpellCast = function(caster, target, spell)
     return xi.trust.spawn(caster, spell)
 end
 
-spell_object.onMobSpawn = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.SPAWN)
+spellObject.onMobSpawn = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.SPAWN)
 
     -- Stun all the things!
     mob:addSimpleGambit(ai.t.TARGET, ai.c.READYING_WS, 0,
@@ -43,15 +41,15 @@ spell_object.onMobSpawn = function(mob)
     mob:addSimpleGambit(ai.t.SELF, ai.c.ALWAYS, 0,
                         ai.r.JA, ai.s.SPECIFIC, xi.ja.LAST_RESORT)
 
-    mob:setTrustTPSkillSettings(ai.tp.CLOSER, ai.s.RANDOM)
+    mob:setTrustTPSkillSettings(ai.tp.CLOSER_UNTIL_TP, ai.s.RANDOM, 3000)
 end
 
-spell_object.onMobDespawn = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DESPAWN)
+spellObject.onMobDespawn = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DESPAWN)
 end
 
-spell_object.onMobDeath = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DEATH)
+spellObject.onMobDeath = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DEATH)
 end
 
-return spell_object
+return spellObject

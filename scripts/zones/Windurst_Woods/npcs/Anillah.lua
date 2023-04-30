@@ -14,15 +14,14 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local guildMember = isGuildMember(player, 3)
-    local SkillCap = getCraftSkillCap(player, xi.skill.CLOTHCRAFT)
-    local SkillLevel = player:getSkillLevel(xi.skill.CLOTHCRAFT)
+    local skillCap    = xi.crafting.getCraftSkillCap(player, xi.skill.CLOTHCRAFT)
+    local skillLevel  = xi.crafting.getRealSkill(player, xi.skill.CLOTHCRAFT)
 
-    if guildMember == 1 then
+    if xi.crafting.hasJoinedGuild(player, xi.crafting.guild.CLOTHCRAFT) then
         if not player:hasStatusEffect(xi.effect.CLOTHCRAFT_IMAGERY) then
-            player:startEvent(10015, SkillCap, SkillLevel, 2, 511, player:getGil(), 0, 0, 0) -- p1 = skill level
+            player:startEvent(10015, skillCap, skillLevel, 2, 511, player:getGil(), 0, 0, 0)
         else
-            player:startEvent(10015, SkillCap, SkillLevel, 2, 511, player:getGil(), 7108, 0, 0)
+            player:startEvent(10015, skillCap, skillLevel, 2, 511, player:getGil(), 7108, 0, 0)
         end
     else
         player:startEvent(10015) -- Standard Dialogue

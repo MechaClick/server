@@ -34,15 +34,16 @@ enum UCONTAINERTYPE
     UCONTAINER_TRADE,
     UCONTAINER_USEITEM,
     UCONTAINER_AUCTION,
-    UCONTAINER_DELIVERYBOX
+    UCONTAINER_SEND_DELIVERYBOX,
+    UCONTAINER_RECV_DELIVERYBOX,
 };
 
 #define UCONTAINER_SIZE 16
 
 /************************************************************************
- *																		*
- *  Универсальный контейнер общего назначения							*
- *																		*
+ *                                                                        *
+ *  Универсальный контейнер общего назначения                            *
+ *                                                                        *
  ************************************************************************/
 
 // главный предмет (gil, кристалл, используемый предмет ...)

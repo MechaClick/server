@@ -6,17 +6,16 @@
 require("scripts/globals/settings")
 require("scripts/globals/status")
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     return 0
 end
 
-item_object.onItemUse = function(target)
-    local duration = math.random(300, 480)
-    if (not target:hasStatusEffect(xi.effect.SNEAK)) then
-        target:addStatusEffect(xi.effect.SNEAK, 1, 10, math.floor(duration * SNEAK_INVIS_DURATION_MULTIPLIER))
+itemObject.onItemUse = function(target)
+    if not target:hasStatusEffect(xi.effect.SNEAK) then
+        target:addStatusEffect(xi.effect.SNEAK, 1, 10, math.floor(600 * xi.settings.main.SNEAK_INVIS_DURATION_MULTIPLIER))
     end
 end
 
-return item_object
+return itemObject

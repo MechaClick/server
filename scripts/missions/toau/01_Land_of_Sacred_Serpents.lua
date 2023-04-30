@@ -5,7 +5,7 @@
 -- NOTE: xi.mission.id.toau.LAND_OF_SACRED_SERPENTS is set on character creation
 -- !addmission 4 0
 -----------------------------------
-require("scripts/globals/keyitems")
+require('scripts/globals/keyitems')
 require('scripts/globals/missions')
 require('scripts/globals/settings')
 require('scripts/globals/interaction/mission')
@@ -26,19 +26,18 @@ mission.sections =
         -- NOTE: I don't know HOW would someone get to Whitegate without the Boarding Permit Key Item, but it's probably for the best to add the additional check.
         check = function(player, currentMission, missionStatus, vars)
             return currentMission == mission.missionId and
-                   ENABLE_TOAU == 1 and
-                   player:hasKeyItem(xi.ki.BOARDING_PERMIT)
+                xi.settings.main.ENABLE_TOAU == 1 and
+                player:hasKeyItem(xi.ki.BOARDING_PERMIT)
         end,
 
         [xi.zone.AHT_URHGAN_WHITEGATE] =
         {
-
-            -- TODO: Edit region defined in Aht Urghan Whitegate, becouse as of now, it is incorrect.
-            -- CS should trigger in the ramp inside Naja Salaheem building.
-            onRegionEnter =
+            onTriggerAreaEnter =
             {
-                [3] = function (player, csid, option, npc)
-                    return mission:progressEvent(3000)
+                [3] = function(player, triggerArea)
+                    -- Naja Salaheem interactions require the 9th argument set to 0.
+                    -- This is because Aht Uhrgan Whitegate uses 2 different dats.
+                    return mission:progressEvent(3000, { text_table = 0 })
                 end,
             },
 

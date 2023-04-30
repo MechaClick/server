@@ -23,7 +23,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #define _EVENT_HANDLER
 
 #include <functional>
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 #include "../../../common/cbasetypes.h"
@@ -46,22 +46,30 @@ class CAIEventHandler
 public:
     void addListener(std::string const& eventname, sol::function lua_func, std::string const& identifier);
     void removeListener(std::string const& identifier);
+    bool hasListener(std::string const& eventName);
 
     // calls event from core
     template <class... Args>
     void triggerListener(std::string const& eventname, Args&&... args)
     {
-        if (auto eventListener = eventListeners.find(eventname); eventListener != eventListeners.end())
+        TracyZoneScoped;
+        TracyZoneString(eventname);
+        if (eventListeners.count(eventname))
         {
-            for (auto&& event : eventListener->second)
+            for (auto&& event : eventListeners.at(eventname))
             {
-                event.lua_func(std::forward<Args&&>(args)...);
+                auto result = event.lua_func(std::forward<Args&&>(args)...);
+                if (!result.valid())
+                {
+                    sol::error err = result;
+                    ShowError("Error in listener event %s: %s", eventname, err.what());
+                }
             }
         }
     }
 
 private:
-    std::map<std::string, std::vector<ai_event_t>> eventListeners;
+    std::unordered_map<std::string, std::vector<ai_event_t>> eventListeners;
 };
 
 #endif

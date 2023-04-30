@@ -6,9 +6,9 @@
 -- Shimmering Circle : !pos -220 0 12 168
 -----------------------------------
 require('scripts/globals/interaction/mission')
-require("scripts/globals/keyitems")
+require('scripts/globals/keyitems')
 require('scripts/globals/missions')
-require("scripts/globals/titles")
+require('scripts/globals/titles')
 require('scripts/globals/zone')
 -----------------------------------
 
@@ -26,11 +26,17 @@ mission.sections =
             return currentMission == mission.missionId
         end,
 
-        [xi.zone.CHAMBER_OF_ORACLES] = {
+        [xi.zone.NORG] =
+        {
+            ['Gilgamesh']  = mission:event(12),
+        },
+
+        [xi.zone.CHAMBER_OF_ORACLES] =
+        {
             onEventFinish =
             {
                 [32001] = function(player, csid, option, npc)
-                    if player:getLocalVar("battlefieldWin") == 192 then
+                    if player:getLocalVar('battlefieldWin') == 192 then
                         mission:complete(player)
                     end
                 end,

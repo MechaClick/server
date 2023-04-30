@@ -8,7 +8,7 @@ CREATE TABLE `bcnm_treasure_chests` (
   `bcnmId` smallint(5) unsigned NOT NULL,
   `battlefieldNumber` tinyint(3),
   `npcId` int(10) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 AVG_ROW_LENGTH=56;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 AVG_ROW_LENGTH=56;
 
 -- ----------------------------
 -- Records of instance
@@ -428,4 +428,3 @@ INSERT INTO bcnm_treasure_chests VALUES (1304,6,16929029); -- Central Temenos - 
 INSERT INTO bcnm_treasure_chests VALUES (1305,5,16929004); -- Central Temenos - 3rd Floor
 INSERT INTO bcnm_treasure_chests VALUES (1306,4,16928965); -- Central Temenos - 4th Floor
 INSERT INTO bcnm_treasure_chests VALUES (1301,8,16929052); -- Central Temenos - Basement
-

@@ -6,24 +6,24 @@
 -- Utsusemi/Blink absorb: N/A
 -- Range: Self
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/settings")
 require("scripts/globals/status")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
-    local power = mob:getMainLvl()/10 * 4 + 5
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
+    local power = mob:getMainLvl() / 10 * 4 + 5
     local duration = 60
 
     local typeEffect = xi.effect.REGEN
 
-    skill:setMsg(MobBuffMove(mob, typeEffect, power, 3, duration))
+    skill:setMsg(xi.mobskills.mobBuffMove(mob, typeEffect, power, 3, duration))
     return typeEffect
 end
 
-return mobskill_object
+return mobskillObject

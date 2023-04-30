@@ -22,12 +22,12 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #ifndef _CAHHISTORYPACKET_H_
 #define _CAHHISTORYPACKET_H_
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 class CAHHistoryPacket
 {
 public:
-    CAHHistoryPacket(uint16 ItemID);
+    CAHHistoryPacket(ahItem item, uint8 stack);
 
     void AddItem(ahHistory* item);
 

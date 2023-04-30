@@ -5,7 +5,8 @@ local ID = require("scripts/zones/Castle_Oztroja/IDs")
 require("scripts/globals/status")
 -----------------------------------
 
-local CASTLE_OZTROJA = {
+local oztrojaGlobal =
+{
     --[[..............................................................................................
         pick a new handle combination for the brass door on floor 2
         ..............................................................................................]]
@@ -66,6 +67,7 @@ local CASTLE_OZTROJA = {
                     break
                 end
             end
+
             if comboFound then
                 GetNPCByID(ID.npc.HANDLE_DOOR_FLOOR_2):openDoor(6)
                 for i = 0, 3 do
@@ -76,4 +78,4 @@ local CASTLE_OZTROJA = {
     end,
 }
 
-return CASTLE_OZTROJA
+return oztrojaGlobal

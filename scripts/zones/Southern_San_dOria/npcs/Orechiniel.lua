@@ -13,15 +13,14 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local guildMember = isGuildMember(player, 7)
-    local SkillLevel = player:getSkillLevel(xi.skill.LEATHERCRAFT)
-    local Cost = getAdvImageSupportCost(player, xi.skill.LEATHERCRAFT)
+    local skillLevel = player:getSkillLevel(xi.skill.LEATHERCRAFT)
+    local cost = xi.crafting.getAdvImageSupportCost(player, xi.skill.LEATHERCRAFT)
 
-    if (guildMember == 1) then
-        if (player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) == false) then
-            player:startEvent(650, Cost, SkillLevel, 0, 239, player:getGil(), 0, 0, 0)
+    if xi.crafting.hasJoinedGuild(player, xi.crafting.guild.LEATHERCRAFT) then
+        if not player:hasStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY) then
+            player:startEvent(650, cost, skillLevel, 0, 239, player:getGil(), 0, 0, 0)
         else
-            player:startEvent(650, Cost, SkillLevel, 0, 239, player:getGil(), 28727, 0, 0)
+            player:startEvent(650, cost, skillLevel, 0, 239, player:getGil(), 28727, 0, 0)
         end
     else
         player:startEvent(650) -- Standard Dialogue
@@ -32,10 +31,10 @@ entity.onEventUpdate = function(player, csid, option)
 end
 
 entity.onEventFinish = function(player, csid, option)
-    local Cost = getAdvImageSupportCost(player, xi.skill.LEATHERCRAFT)
+    local cost = xi.crafting.getAdvImageSupportCost(player, xi.skill.LEATHERCRAFT)
 
-    if (csid == 650 and option == 1) then
-        player:delGil(Cost)
+    if csid == 650 and option == 1 then
+        player:delGil(cost)
         player:messageSpecial(ID.text.LEATHER_SUPPORT, 0, 5, 0)
         player:addStatusEffect(xi.effect.LEATHERCRAFT_IMAGERY, 3, 0, 480)
     end

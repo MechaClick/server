@@ -22,23 +22,17 @@
 #ifndef _CLINKSHELLMESSAGEPACKET_H
 #define _CLINKSHELLMESSAGEPACKET_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 #include "../linkshell.h"
 
 #include "basic.h"
 
-/************************************************************************
- *																		*
- *  																		*
- *																		*
- ************************************************************************/
-
 class CLinkshellMessagePacket : public CBasicPacket
 {
 public:
     static const uint16 id{ 0xCC };
-    CLinkshellMessagePacket(const int8* poster, const int8* message, const int8* lsname, uint32 posttime, bool ls1);
+    CLinkshellMessagePacket(const std::string& poster, const std::string& message, const std::string& lsname, uint32 posttime, bool ls1);
 };
 
 #endif

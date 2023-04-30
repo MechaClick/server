@@ -19,17 +19,17 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
 #include "../entities/charentity.h"
 #include "stop_downloading.h"
 
-CStopDownloadingPacket::CStopDownloadingPacket(CCharEntity* PChar, std::vector<std::pair<uint32, string_t>> blacklist)
+CStopDownloadingPacket::CStopDownloadingPacket(CCharEntity* PChar, std::vector<std::pair<uint32, std::string>> blacklist)
 {
-    this->type = 0x41;
-    this->size = 0x7C;
+    this->setType(0x41);
+    this->setSize(0xF8);
 
     for (size_t x = 0; x < blacklist.size(); x++)
     {

@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Lower Jeuno
 --  NPC: Zalsuhm
--- Standard Info NPC
 -----------------------------------
 local ID = require("scripts/zones/Lower_Jeuno/IDs")
 require("scripts/globals/equipment")
@@ -13,11 +12,11 @@ require("scripts/globals/weaponskillids")
 local entity = {}
 
 local function getQuestId(mainJobId)
-    return xi.quest.jeuno.UNLOCKING_A_MYTH_WARRIOR - 1 + mainJobId
+    return xi.quest.id.jeuno.UNLOCKING_A_MYTH_WARRIOR - 1 + mainJobId
 end
 
 entity.onTrade = function(player, npc, trade)
-    for i, wepId in pairs(xi.equip.baseNyzulWeapons) do
+    for i, wepId in pairs(xi.equipment.baseNyzulWeapons) do
         if npcUtil.tradeHasExactly(trade, wepId) then
             local unlockingAMyth = player:getQuestStatus(xi.quest.log_id.JEUNO, getQuestId(i))
             if unlockingAMyth == QUEST_ACCEPTED then
@@ -39,9 +38,9 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local mainJobId = player:getMainJob()
-    local unlockingAMyth = player:getQuestStatus(xi.quest.log_id.JEUNO, getQuestId(mainJobId))
-    local nyzulWeaponMain = xi.equip.isBaseNyzulWeapon(player:getEquipID(xi.slot.MAIN))
+    local mainJobId         = player:getMainJob()
+    local unlockingAMyth    = player:getQuestStatus(xi.quest.log_id.JEUNO, getQuestId(mainJobId))
+    local nyzulWeaponMain   = xi.equip.isBaseNyzulWeapon(player:getEquipID(xi.slot.MAIN))
     local nyzulWeaponRanged = xi.equip.isBaseNyzulWeapon(player:getEquipID(xi.slot.RANGED))
 
     if unlockingAMyth == QUEST_AVAILABLE then

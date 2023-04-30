@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Western Adoulin
 --  NPC: Oka Qhantari
--- Type: Standard NPC and Quest NPC
 --  Involved With Quest: 'Order Up'
 -- !pos -30 3 -6 256
 -----------------------------------
@@ -14,15 +13,12 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    local Order_Up = player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.ORDER_UP)
-    local Order_Oka_Qhantari = utils.mask.getBit(player:getCharVar("Order_Up_NPCs"), 9)
+    local orderUp = player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.ORDER_UP)
+    local orderOkaQhantari = utils.mask.getBit(player:getCharVar("Order_Up_NPCs"), 9)
 
-    if Order_Up == QUEST_ACCEPTED and not Order_Oka_Qhantari then
+    if orderUp == QUEST_ACCEPTED and not orderOkaQhantari then
         -- Progresses Quest: 'Order Up'
         player:startEvent(71)
-    else
-        -- Standard Dialogue
-        player:startEvent(511)
     end
 end
 

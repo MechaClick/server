@@ -66,54 +66,71 @@ local checks =
     mobID = function(self, player, params)    -- Mob ID check
         return (params.mob and self.reqs.mobID[params.mob:getID()]) and true or false
     end,
+
     mobName = function(self, player, params)
         return (params.mob and self.reqs.mobName[params.mob:getName()]) and true or false
     end,
+
     mobXP = function(self, player, params)    -- Mob yields xp
         return (params.mob and player:checkKillCredit(params.mob)) and true or false
     end,
+
     mobFamily = function(self, player, params)   -- Mob family in set
         return (params.mob and self.reqs.mobFamily[params.mob:getFamily()]) and true or false
     end,
+
     mobSystem = function(self, player, params)   -- Mob system in set
-        return (params.mob and self.reqs.mobSystem[params.mob:getSystem()]) and true or false
+        return (params.mob and self.reqs.mobSystem[params.mob:getEcosystem()]) and true or false
     end,
+
     dmgMin = function(self, player, params)  -- Minimum Dmg Dealt/Taken
         return (params.dmg and params.dmg >= self.reqs.dmgMin) and true or false
     end,
+
     dmgMax = function(self, player, params)  -- Maximum Dmg Dealt/Taken
         return (params.dmg and params.dmg <= self.reqs.dmgMax) and true or false
     end,
+
     atkType = function(self, player, params)  -- Dmg Type is
         return (params.atkType == self.reqs.atkType) and true or false
     end,
+
     healMin = function(self, player, params)  -- Minimum Amount healed
         return (params.heal and params.heal >= self.reqs.healMin) and true or false
     end,
+
     zone = function(self, player, params)  -- Player in Zone
         return (self.reqs.zone[player:getZoneID()]) and true or false
     end,
+
     zoneNot = function(self, player, params)  -- Player not in Zone
         return (not self.reqs.zoneNot[player:getZoneID()]) and true or false
     end,
+
     itemID = function(self, player, params)  -- itemid in set
         return (params.itemid and self.reqs.itemID[params.itemid]) and true or false
     end,
+
     levelSync = function(self, player, params)  -- Player is Level Sync'd
         return self.reqs.levelSync and player:isLevelSync() and true or false
     end,
+
     jobLvl = function(self, player, params)  -- Player has job at minimum level X
         return player:getJobLevel(self.reqs.jobLvl[1]) >= self.reqs.jobLvl[2] and true or false
     end,
-    questComplete = function(self, player, params) -- Player has {KINGDOM, QUEST} marked complete
+
+    questComplete = function(self, player, params) -- Player has { KINGDOM, QUEST } marked complete
         return player:getQuestStatus(self.reqs.questComplete[1], self.reqs.questComplete[2]) == QUEST_COMPLETED
     end,
-    missionComplete = function(self, player, params) -- Player has {NATION, MISSION} marked complete
+
+    missionComplete = function(self, player, params) -- Player has { NATION, MISSION } marked complete
         return player:hasCompletedMission(self.reqs.missionComplete[1], self.reqs.missionComplete[2])
     end,
+
     unityLeader = function(self, player, params) -- Player is a member of the specified Unity (1..11)
         return player:getUnityLeader() == self.reqs.unityLeader
     end,
+
     skillType = function(self, player, params) -- Generic numeric check, used for synthSuccess and helmSuccess
         return params.skillType == self.reqs.skillType and true or false
     end,
@@ -127,6 +144,7 @@ local masterCheck = function(self, player, params)
             return false
         end
     end
+
     return true
 end
 
@@ -135,26 +153,28 @@ end
 -----------------------------------
 
 -- Schedule for Timed Records.
-local timedSchedule = {
+local timedSchedule =
+{
 -- 4-hour timeslots (6 per day) all days/times are in JST
 --    00-04  04-08  08-12  12-16  16-20  20-00
-    {  4021,  4010,  4016,  4012,  4018,  4013}, -- Sunday
-    {  4015,  4011,  4017,  4014,  4019,  4008}, -- Monday
-    {  4016,  4012,  4018,  4013,  4020,  4009}, -- Tuesday
-    {  4017,  4014,  4019,  4008,  4021,  4010}, -- Wednesday
-    {  4018,  4013,  4020,  4009,  4015,  4011}, -- Thursdsay
-    {  4019,  4008,  4021,  4010,  4016,  4012}, -- Friday
-    {  4020,  4009,  4015,  4011,  4017,  4014}, -- Saturday
+    {  4021,  4010,  4016,  4012,  4018,  4013 }, -- Sunday
+    {  4015,  4011,  4017,  4014,  4019,  4008 }, -- Monday
+    {  4016,  4012,  4018,  4013,  4020,  4009 }, -- Tuesday
+    {  4017,  4014,  4019,  4008,  4021,  4010 }, -- Wednesday
+    {  4018,  4013,  4020,  4009,  4015,  4011 }, -- Thursdsay
+    {  4019,  4008,  4021,  4010,  4016,  4012 }, -- Friday
+    {  4020,  4009,  4015,  4011,  4017,  4014 }, -- Saturday
 }
 -- Load timetable for timed records
-if ENABLE_ROE_TIMED and ENABLE_ROE_TIMED > 0 then
+if xi.settings.main.ENABLE_ROE and xi.settings.main.ENABLE_ROE_TIMED > 0 then
     RoeParseTimed(timedSchedule)
 end
 
 dofile("scripts/globals/roe_records.lua")
 local records = getRoeRecords(triggers)
 
-local defaults = {
+local defaults =
+{
     check = masterCheck,        -- Check function should return true/false
     increment = 1,              -- Amount to increment per successful check
     notify = 1,                 -- Progress notifications shown every X increases
@@ -163,13 +183,17 @@ local defaults = {
                                 --        "timed"  - 4-hour record.
                                 --        "repeat" - Repeatable record.
                                 --        "daily"  - Daily record.
+                                --        "weekly" - Weekly record.
+                                --        "unity"  - Weekly reset, but doesn't reset progress, only completion.
                                 --        "retro"  - Can be claimed retroactively. Calls check on taking record.
+                                --        "hidden" - Special internal-use record used only as a client-flag to unlock others.
+                                --                   Does not count towards completed record count.
     reqs = {},                  -- Other requirements. List of function names from above, with required values.
     reward = {},                -- Reward parameters give on completion. (See completeRecord directly below.)
 }
 
 -- Apply defaults for records
-for i,v in pairs(records) do
+for _, v in pairs(records) do
     setmetatable(v, { __index = defaults })
 end
 
@@ -177,7 +201,7 @@ end
 -- This is used to deny taking records which aren't implemented in the above table.
 RoeParseRecords(records)
 
---[[ **************************************************************************
+--[[ --------------------------------------------------------------------------
     Complete a record of eminence. This is for internal roe use only.
     For external calls use onRecordTrigger below. (see healing.lua for example)
     If record rewards items, and the player cannot carry them, return false.
@@ -185,13 +209,16 @@ RoeParseRecords(records)
     Example of usage + reward table (all params are optional):
 
     completeRecord(player, record#)
-    reward = {
-        item = { {640,2}, 641 },          -- see npcUtil.giveItem for formats (Only given on first completion)
+    reward =
+    {
+        item = { { 640, 2 }, 641 },      -- see npcUtil.giveItem for formats (Only given on first completion)
         keyItem = xi.ki.ZERUHN_REPORT,   -- see npcUtil.giveKeyItem for formats
         sparks = 500,
-        xp = 1000
+        xp = 1000,
+        accolades = 300,
+        capacity = 400,
     })
-*************************************************************************** --]]
+--------------------------------------------------------------------------- --]]
 local function completeRecord(player, record)
     local recordEntry = records[record]
     local recordFlags = recordEntry.flags
@@ -204,17 +231,17 @@ local function completeRecord(player, record)
         end
     end
 
-    player:messageBasic(xi.msg.basic.ROE_COMPLETE,record)
+    player:messageBasic(xi.msg.basic.ROE_COMPLETE, record)
 
     if rewards["sparks"] ~= nil and type(rewards["sparks"]) == "number" then
         local bonus = 1
         if player:getEminenceCompleted(record) then
-            player:addCurrency('spark_of_eminence', rewards["sparks"] * bonus * SPARKS_RATE, CAP_CURRENCY_SPARKS)
-            player:messageBasic(xi.msg.basic.ROE_RECEIVE_SPARKS, rewards["sparks"] * SPARKS_RATE, player:getCurrency("spark_of_eminence"))
+            player:addCurrency('spark_of_eminence', rewards["sparks"] * bonus * xi.settings.main.SPARKS_RATE, xi.settings.main.CAP_CURRENCY_SPARKS)
+            player:messageBasic(xi.msg.basic.ROE_RECEIVE_SPARKS, rewards["sparks"] * xi.settings.main.SPARKS_RATE, player:getCurrency("spark_of_eminence"))
         else
             bonus = 3
-            player:addCurrency('spark_of_eminence', rewards["sparks"] * bonus * SPARKS_RATE, CAP_CURRENCY_SPARKS)
-            player:messageBasic(xi.msg.basic.ROE_FIRST_TIME_SPARKS, rewards["sparks"] * bonus * SPARKS_RATE, player:getCurrency("spark_of_eminence"))
+            player:addCurrency('spark_of_eminence', rewards["sparks"] * bonus * xi.settings.main.SPARKS_RATE, xi.settings.main.CAP_CURRENCY_SPARKS)
+            player:messageBasic(xi.msg.basic.ROE_FIRST_TIME_SPARKS, rewards["sparks"] * bonus * xi.settings.main.SPARKS_RATE, player:getCurrency("spark_of_eminence"))
         end
     end
 
@@ -224,13 +251,14 @@ local function completeRecord(player, record)
         else
             player:messageBasic(xi.msg.basic.ROE_REPEAT_OR_CANCEL)
         end
+
         player:setEminenceCompleted(record, true)
     else
         player:setEminenceCompleted(record)
     end
 
     if rewards["xp"] ~= nil and type(rewards["xp"]) == "number" then
-        player:addExp(rewards["xp"] * ROE_EXP_RATE)
+        player:addExp(rewards["xp"] * xi.settings.main.ROE_EXP_RATE)
     end
 
     if rewards["capacity"] ~= nil and type(rewards["capacity"]) == "number" then
@@ -243,13 +271,13 @@ local function completeRecord(player, record)
         type(rewards["accolades"]) == "number"
     then
         local bonusAccoladeRate = 1.0
-
         if record ~= 5 then -- Do not grant a bonus for All for One
             bonusAccoladeRate = bonusAccoladeRate + ((player:getUnityRank() - 1) * 0.05)
         end
 
-        player:addCurrency("unity_accolades", math.floor(rewards["accolades"] * bonusAccoladeRate), CAP_CURRENCY_ACCOLADES)
-        player:messageBasic(xi.msg.basic.ROE_RECEIVED_ACCOLADES, rewards["accolades"], player:getCurrency("unity_accolades"))
+        local accoladePayout = math.floor(rewards["accolades"] * bonusAccoladeRate)
+        player:addCurrency("unity_accolades", accoladePayout, xi.settings.main.CAP_CURRENCY_ACCOLADES)
+        player:messageBasic(xi.msg.basic.ROE_RECEIVED_ACCOLADES, accoladePayout, player:getCurrency("unity_accolades"))
     end
 
     if rewards["keyItem"] ~= nil then

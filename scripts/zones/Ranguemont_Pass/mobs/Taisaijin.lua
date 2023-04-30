@@ -7,8 +7,8 @@ require("scripts/globals/titles")
 -----------------------------------
 local entity = {}
 
-entity.onMobDeath = function(mob, player, isKiller)
-    player:addTitle(xi.title.BYEBYE_TAISAI)
+entity.onMobDeath = function(mob, player, optParams)
+    player:addTitle(xi.title.BYE_BYE_TAISAI)
 end
 
 entity.onMobDespawn = function(mob)

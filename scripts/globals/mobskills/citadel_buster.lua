@@ -7,84 +7,37 @@
 -- 2608/MDB * (256-MDT)/256 (weather bonus)
 -- 2816/MDB * (256-MDT)/256 (day+weather bonus)
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/settings")
 require("scripts/globals/status")
-local ID = require("scripts/zones/Temenos/IDs")
-
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target,mob,skill)
-    local phase = mob:getLocalVar("battlePhase")
-    if (phase == 4) then
-        mob:setLocalVar("citadelBuster", 1)
-        mob:SetMobAbilityEnabled(false)
-        mob:SetMagicCastingEnabled(false)
-        mob:SetAutoAttackEnabled(false)
-        mob:setMobMod(xi.mobMod.DRAW_IN, 1)
-        local battlefield = mob:getBattlefield()
-        local players = battlefield:getPlayers()
-        for _, member in pairs(players) do
-            member:messageSpecial(ID.text.CITADEL_BASE)
-        end
-        mob:timer(10000, function(mob)
-            for _, member in pairs(players) do
-                member:messageSpecial(ID.text.CITADEL_BASE+1)
-            end
-            mob:timer(10000, function(mob)
-                for _, member in pairs(players) do
-                    member:messageSpecial(ID.text.CITADEL_BASE+2)
-                end
-                mob:timer(5000, function(mob)
-                    for _, member in pairs(players) do
-                        member:messageSpecial(ID.text.CITADEL_BASE+3)
-                    end
-                    mob:timer(1000, function(mob)
-                        for _, member in pairs(players) do
-                            member:messageSpecial(ID.text.CITADEL_BASE+4)
-                        end
-                        mob:timer(1000, function(mob)
-                            for _, member in pairs(players) do
-                                member:messageSpecial(ID.text.CITADEL_BASE+5)
-                            end
-                            mob:timer(1000, function(mob)
-                                for _, member in pairs(players) do
-                                    member:messageSpecial(ID.text.CITADEL_BASE+6)
-                                end
-                                mob:timer(1000, function(mob)
-                                    for _, member in pairs(players) do
-                                        member:messageSpecial(ID.text.CITADEL_BASE+7)
-                                    end
-                                    mob:timer(1000, function(mob)
-                                        mob:useMobAbility(1540)
-                                        mob:timer(500, function(mob)
-                                            mob:setLocalVar("citadelBuster", 0)
-                                            mob:SetMagicCastingEnabled(true)
-                                            mob:SetAutoAttackEnabled(true)
-                                            mob:SetMobAbilityEnabled(true)
-                                            mob:setMobMod(xi.mobMod.DRAW_IN, 0)
-                                        end)
-                                    end)
-                                end)
-                            end)
-                        end)
-                    end)
-                end)
-            end)
-        end)
-    end
-    return 1
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
+    return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local basedmg = 2088
-    if mob:getWeather() == xi.weather.AURORAS or mob:getWeather() == xi.weather.STELLAR_GLARE then basedmg = basedmg + 520 end
-    if VanadielDayElement() == xi.magic.ele.LIGHT then basedmg = basedmg + 208 end
-    local damage = basedmg/(1+(target:getMod(xi.mod.MDEF)/100))
-    local dmg = MobFinalAdjustments(damage,mob,skill,target, xi.attackType.MAGICAL, xi.damageType.LIGHT,MOBPARAM_IGNORE_SHADOWS)
+
+    if
+        mob:getWeather() == xi.weather.AURORAS or
+        mob:getWeather() == xi.weather.STELLAR_GLARE
+    then
+        basedmg = basedmg + 520
+    end
+
+    if VanadielDayElement() == xi.magic.ele.LIGHT then
+        basedmg = basedmg + 208
+    end
+
+    local damage = basedmg / (1 + (target:getMod(xi.mod.MDEF) / 100))
+    local dmg = xi.mobskills.mobFinalAdjustments(damage, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.LIGHT, xi.mobskills.shadowBehavior.IGNORE_SHADOWS)
+
     target:takeDamage(dmg, mob, xi.attackType.MAGICAL, xi.damageType.LIGHT)
     mob:resetEnmity(target)
+
     return dmg
 end
-return mobskill_object
+
+return mobskillObject

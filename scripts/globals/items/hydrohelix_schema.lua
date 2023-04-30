@@ -3,14 +3,16 @@
 -- Hydrohelix Schema
 -- Teaches the black magic Hydrohelix
 -----------------------------------
-local item_object = {}
+require("scripts/globals/spell_data")
+-----------------------------------
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
-    return target:canLearnSpell(279)
+itemObject.onItemCheck = function(target)
+    return target:canLearnSpell(xi.magic.spell.HYDROHELIX)
 end
 
-item_object.onItemUse = function(target)
-    target:addSpell(279)
+itemObject.onItemUse = function(target)
+    target:addSpell(xi.magic.spell.HYDROHELIX)
 end
 
-return item_object
+return itemObject

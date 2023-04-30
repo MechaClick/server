@@ -9,16 +9,13 @@ require("scripts/globals/roe")
 require("scripts/globals/trust")
 require("scripts/globals/weaponskillids")
 -----------------------------------
-local spell_object = {}
+local spellObject = {}
 
-local message_page_offset = 12
-
-spell_object.onMagicCastingCheck = function(caster, target, spell)
+spellObject.onMagicCastingCheck = function(caster, target, spell)
     return xi.trust.canCast(caster, spell, 1014)
 end
 
-spell_object.onSpellCast = function(caster, target, spell)
-
+spellObject.onSpellCast = function(caster, target, spell)
     -- Records of Eminence: Alter Ego: Tenzen
     if caster:getEminenceProgress(935) then
         xi.roe.onRecordTrigger(caster, 935)
@@ -27,8 +24,8 @@ spell_object.onSpellCast = function(caster, target, spell)
     return xi.trust.spawn(caster, spell)
 end
 
-spell_object.onMobSpawn = function(mob)
-    xi.trust.teamworkMessage(mob, message_page_offset, {
+spellObject.onMobSpawn = function(mob)
+    xi.trust.teamworkMessage(mob, {
         [xi.magic.spell.IROHA] = xi.trust.message_offset.TEAMWORK_1,
     })
 
@@ -38,15 +35,15 @@ spell_object.onMobSpawn = function(mob)
     mob:addSimpleGambit(ai.t.SELF, ai.c.HAS_TOP_ENMITY, 0,
         ai.r.JA, ai.s.SPECIFIC, xi.ja.THIRD_EYE)
 
-    mob:setTrustTPSkillSettings(ai.tp.CLOSER, ai.s.HIGHEST)
+    mob:setTrustTPSkillSettings(ai.tp.CLOSER_UNTIL_TP, ai.s.HIGHEST, 1500)
 end
 
-spell_object.onMobDespawn = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DESPAWN)
+spellObject.onMobDespawn = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DESPAWN)
 end
 
-spell_object.onMobDeath = function(mob)
-    xi.trust.message(mob, message_page_offset, xi.trust.message_offset.DEATH)
+spellObject.onMobDeath = function(mob)
+    xi.trust.message(mob, xi.trust.message_offset.DEATH)
 end
 
-return spell_object
+return spellObject

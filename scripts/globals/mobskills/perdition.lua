@@ -2,18 +2,23 @@
 -- Perdition
 -- Description: Instant K.O.
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/status")
 require("scripts/globals/msg")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
-    if target:hasStatusEffect(xi.effect.MAGIC_SHIELD) or math.random(0, 99) < target:getMod(xi.mod.DEATHRES) then
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
+    if
+        target:isUndead() or
+        target:hasStatusEffect(xi.effect.MAGIC_SHIELD) or
+        -- Todo: DeathRes has no place in the resistance functions so far..
+        math.random(1, 100) <= target:getMod(xi.mod.DEATH_MEVA)
+    then
         skill:setMsg(xi.msg.basic.SKILL_NO_EFFECT)
         return 0
     end
@@ -24,4 +29,4 @@ mobskill_object.onMobWeaponSkill = function(target, mob, skill)
     return 0
 end
 
-return mobskill_object
+return mobskillObject

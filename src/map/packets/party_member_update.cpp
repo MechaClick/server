@@ -19,7 +19,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
@@ -32,10 +32,19 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 
 CPartyMemberUpdatePacket::CPartyMemberUpdatePacket(CCharEntity* PChar, uint8 MemberNumber, uint16 memberflags, uint16 ZoneID)
 {
-    this->type = 0xDD;
-    this->size = 0x20;
+    this->setType(0xDD);
 
-    XI_DEBUG_BREAK_IF(PChar == nullptr);
+    // This packet size may have changed in the Nov 2021 Update with the introduction of master levels, but it broke things for us in the following ways:
+    // 1. Trusts would not appear in the party list
+    // 2. Players in a party would always appear as out of zone
+    // Modify with caution for the below functions!
+    this->setSize(0x40);
+
+    if (PChar == nullptr)
+    {
+        ShowError("CPartyMemberUpdatePacket::CPartyMemberUpdatePacket() - PChar was null.");
+        return;
+    }
 
     ref<uint32>(0x04) = PChar->id;
 
@@ -64,15 +73,19 @@ CPartyMemberUpdatePacket::CPartyMemberUpdatePacket(CCharEntity* PChar, uint8 Mem
         }
     }
 
-    memcpy(data + (0x26), PChar->GetName(), PChar->name.size());
+    memcpy(data + (0x28), PChar->GetName().c_str(), PChar->GetName().size());
 }
 
 CPartyMemberUpdatePacket::CPartyMemberUpdatePacket(CTrustEntity* PTrust, uint8 MemberNumber)
 {
-    this->type = 0xDD;
-    this->size = 0x20;
+    this->setType(0xDD);
+    this->setSize(0x40);
 
-    XI_DEBUG_BREAK_IF(PTrust == nullptr);
+    if (PTrust == nullptr)
+    {
+        ShowError("CPartyMemberUpdatePacket::CPartyMemberUpdatePacket() - PTrust was null.");
+        return;
+    }
 
     ref<uint32>(0x04) = PTrust->id;
 
@@ -90,18 +103,18 @@ CPartyMemberUpdatePacket::CPartyMemberUpdatePacket(CTrustEntity* PTrust, uint8 M
     ref<uint8>(0x24) = PTrust->GetSJob();
     ref<uint8>(0x25) = PTrust->GetSLevel();
 
-    memcpy(data + (0x26), PTrust->packetName.c_str(), PTrust->packetName.size());
+    memcpy(data + (0x28), PTrust->packetName.c_str(), PTrust->packetName.size());
 }
 
-CPartyMemberUpdatePacket::CPartyMemberUpdatePacket(uint32 id, const int8* name, uint16 memberFlags, uint8 MemberNumber, uint16 ZoneID)
+CPartyMemberUpdatePacket::CPartyMemberUpdatePacket(uint32 id, const std::string& name, uint16 memberFlags, uint8 MemberNumber, uint16 ZoneID)
 {
-    this->type = 0xDD;
-    this->size = 0x20;
+    this->setType(0xDD);
+    this->setSize(0x40);
 
     ref<uint32>(0x04) = id;
 
     ref<uint16>(0x14) = memberFlags;
     ref<uint16>(0x20) = ZoneID;
 
-    memcpy(data + (0x26), name, strlen((const char*)name));
+    memcpy(data + (0x28), name.c_str(), name.size());
 }

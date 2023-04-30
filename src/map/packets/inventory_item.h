@@ -22,22 +22,16 @@
 #ifndef _CINVENTORYITEMPACKET_H
 #define _CINVENTORYITEMPACKET_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 #include "basic.h"
-
-/************************************************************************
- *																		*
- *  																		*
- *																		*
- ************************************************************************/
 
 class CItem;
 
 class CInventoryItemPacket : public CBasicPacket
 {
 public:
-    CInventoryItemPacket(CItem* PItem, uint8, uint8);
+    CInventoryItemPacket(CItem* PItem, uint8 LocationID, uint8 SlotID);
 };
 
 #endif

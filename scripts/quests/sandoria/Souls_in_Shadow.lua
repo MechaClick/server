@@ -3,26 +3,28 @@
 -- Novalmauge !pos 70 -24 21 167
 -- qm2 !pos 118 36 -281 160
 -----------------------------------
-require("scripts/globals/interaction/quest")
-require("scripts/globals/weaponskillids")
-require("scripts/globals/keyitems")
-require("scripts/globals/npc_util")
-require("scripts/globals/quests")
-require("scripts/globals/status")
-require("scripts/globals/items")
+require('scripts/globals/interaction/quest')
+require('scripts/globals/weaponskillids')
+require('scripts/globals/keyitems')
+require('scripts/globals/npc_util')
+require('scripts/globals/quests')
+require('scripts/globals/status')
+require('scripts/globals/items')
 -----------------------------------
-local bostaunieuxID = require("scripts/zones/Bostaunieux_Oubliette/IDs")
-local denOfRancorID = require("scripts/zones/Den_of_Rancor/IDs")
+local bostaunieuxID = require('scripts/zones/Bostaunieux_Oubliette/IDs')
+local denOfRancorID = require('scripts/zones/Den_of_Rancor/IDs')
 -----------------------------------
 
 local quest = Quest:new(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.SOULS_IN_SHADOW)
 
-quest.reward = {
+quest.reward =
+{
     fame = 30,
+    fameArea = xi.quest.fame_area.SANDORIA,
 }
 
-quest.sections = {
-
+quest.sections =
+{
     {
         check = function(player, status, vars)
             return status == QUEST_AVAILABLE and
@@ -31,16 +33,25 @@ quest.sections = {
                 not player:hasKeyItem(xi.keyItem.WEAPON_TRAINING_GUIDE)
         end,
 
-        [xi.zone.BOSTAUNIEUX_OUBLIETTE] = {
-            ['Novalmauge'] = {
+        [xi.zone.BOSTAUNIEUX_OUBLIETTE] =
+        {
+            ['Novalmauge'] =
+            {
                 onTrigger = function(player, npc)
                     return quest:event(0):oncePerZone() -- start
                 end,
             },
 
-            onEventFinish = {
+            onEventFinish =
+            {
                 [0] = function(player, csid, option, npc)
-                    if option == 1 and (player:hasItem(xi.items.SCYTHE_OF_TRIALS) or npcUtil.giveItem(player, xi.items.SCYTHE_OF_TRIALS)) then
+                    if
+                        option == 1 and
+                        (
+                            player:hasItem(xi.items.SCYTHE_OF_TRIALS) or
+                            npcUtil.giveItem(player, xi.items.SCYTHE_OF_TRIALS)
+                        )
+                    then
                         npcUtil.giveKeyItem(player, xi.keyItem.WEAPON_TRAINING_GUIDE)
                         quest:begin(player)
                     end
@@ -54,8 +65,10 @@ quest.sections = {
             return status == QUEST_ACCEPTED
         end,
 
-        [xi.zone.BOSTAUNIEUX_OUBLIETTE] = {
-            ['Novalmauge'] = {
+        [xi.zone.BOSTAUNIEUX_OUBLIETTE] =
+        {
+            ['Novalmauge'] =
+            {
                 onTrigger = function(player, npc)
                     if player:hasKeyItem(xi.ki.ANNALS_OF_TRUTH) then
                         return quest:progressEvent(5) -- complete
@@ -79,7 +92,8 @@ quest.sections = {
                 end,
             },
 
-            onEventFinish = {
+            onEventFinish =
+            {
                 [3] = function(player, csid, option, npc)
                     if option == 1 and not player:hasItem(xi.items.SCYTHE_OF_TRIALS) then
                         npcUtil.giveItem(player, xi.items.SCYTHE_OF_TRIALS)
@@ -96,18 +110,21 @@ quest.sections = {
                 end,
 
                 [5] = function(player, csid, option, npc)
-                    player:delKeyItem(xi.ki.MAP_TO_THE_ANNALS_OF_TRUTH)
-                    player:delKeyItem(xi.ki.ANNALS_OF_TRUTH)
-                    player:delKeyItem(xi.ki.WEAPON_TRAINING_GUIDE)
-                    player:addLearnedWeaponskill(xi.ws_unlock.SPIRAL_HELL)
-                    player:messageSpecial(bostaunieuxID.text.SPIRAL_HELL_LEARNED)
-                    quest:complete(player)
+                    if quest:complete(player) then
+                        player:delKeyItem(xi.ki.MAP_TO_THE_ANNALS_OF_TRUTH)
+                        player:delKeyItem(xi.ki.ANNALS_OF_TRUTH)
+                        player:delKeyItem(xi.ki.WEAPON_TRAINING_GUIDE)
+                        player:addLearnedWeaponskill(xi.ws_unlock.SPIRAL_HELL)
+                        player:messageSpecial(bostaunieuxID.text.SPIRAL_HELL_LEARNED)
+                    end
                 end,
             },
         },
 
-        [xi.zone.DEN_OF_RANCOR] = {
-            ['qm2'] = {
+        [xi.zone.DEN_OF_RANCOR] =
+        {
+            ['qm2'] =
+            {
                 onTrigger = function(player, npc)
                     if player:getLocalVar('killed_wsnm') == 1 then
                         player:setLocalVar('killed_wsnm', 0)
@@ -116,15 +133,16 @@ quest.sections = {
                     elseif
                         player:hasKeyItem(xi.ki.MAP_TO_THE_ANNALS_OF_TRUTH) and
                         not player:hasKeyItem(xi.keyItem.ANNALS_OF_TRUTH) and
-                        npcUtil.popFromQM(player, npc, denOfRancorID.mob.MOKUMOKUREN, {hide = 0})
+                        npcUtil.popFromQM(player, npc, denOfRancorID.mob.MOKUMOKUREN, { hide = 0 })
                     then
                         return quest:messageSpecial(denOfRancorID.text.SENSE_OMINOUS_PRESENCE)
                     end
                 end,
             },
 
-            ['Mokumokuren'] = {
-                onMobDeath = function(mob, player, isKiller, firstCall)
+            ['Mokumokuren'] =
+            {
+                onMobDeath = function(mob, player, optParams)
                     player:setLocalVar('killed_wsnm', 1)
                 end,
             },

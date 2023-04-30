@@ -7,28 +7,28 @@
 --  Range: Self
 --  Notes: Only used when standing
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/settings")
 require("scripts/globals/status")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
-    if (mob:getAnimationSub() ~=0) then
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
+    if mob:getAnimationSub() ~= 4 then
         return 1
     else
         return 0
     end
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local power = 15
     local duration = 90
     local typeEffect = xi.effect.ATTACK_BOOST
 
-    skill:setMsg(MobBuffMove(mob, typeEffect, power, 0, duration))
+    skill:setMsg(xi.mobskills.mobBuffMove(mob, typeEffect, power, 0, duration))
 
     return typeEffect
 end
 
-return mobskill_object
+return mobskillObject

@@ -1,17 +1,17 @@
 -----------------------------------
 -- ID: 17957
 -- Item: Navy Axe
--- Item Effect: TP +100
+-- Item Effect: TP +1000
 -- Duration: Instant
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     return 0
 end
 
-item_object.onItemUse = function(target)
+itemObject.onItemUse = function(target)
     target:addTP(1000)
 end
 
-return item_object
+return itemObject

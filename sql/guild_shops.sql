@@ -23,7 +23,7 @@ CREATE TABLE `guild_shops` (
   `daily_increase` smallint(5) unsigned NOT NULL DEFAULT '0',
   `initial_quantity` smallint(5) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`guildid`,`itemid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -510,7 +510,6 @@ INSERT INTO `guild_shops` VALUES (524,17399,2394,2394,20,6,12);
 INSERT INTO `guild_shops` VALUES (524,17400,691,691,20,6,12);
 INSERT INTO `guild_shops` VALUES (524,17407,270,270,20,6,12);
 
-
 -- Yahliq (Silver Sea route to Al Zahbi) Fishing Guild
 INSERT INTO `guild_shops` VALUES (525,2177,36,224,8910,1782,3564);
 INSERT INTO `guild_shops` VALUES (525,2180,36,224,8910,1782,3564);
@@ -590,7 +589,7 @@ INSERT INTO `guild_shops` VALUES (5272,663,20240,45600,80,16,32);    -- mythril_
 INSERT INTO `guild_shops` VALUES (5272,673,210,1108,255,48,100);     -- brass_scales
 INSERT INTO `guild_shops` VALUES (5272,681,10500,30800,30,6,12);     -- mythril_chain
 INSERT INTO `guild_shops` VALUES (5272,736,315,1260,255,48,100);     -- silver_ore
-INSERT INTO `guild_shops` VALUES (5272,738,58032,116245,30,0,12);    -- platinum_ore
+INSERT INTO `guild_shops` VALUES (5272,738,1000,6000,30,0,12);       -- platinum_ore
 INSERT INTO `guild_shops` VALUES (5272,744,4095,9996,80,0,32);       -- silver_ingot
 INSERT INTO `guild_shops` VALUES (5272,760,29172,74880,55,0,22);     -- silver_chain
 INSERT INTO `guild_shops` VALUES (5272,769,1288,7000,165,33,65);     -- red_rock
@@ -1062,7 +1061,6 @@ INSERT INTO `guild_shops` VALUES (60422,4943,1561,1747,30,6,12);
 INSERT INTO `guild_shops` VALUES (60422,4877,39270,41370,15,3,6);
 INSERT INTO `guild_shops` VALUES (60422,4878,37800,41370,30,6,12);
 
-
 -- Jirokichi (Norg) Tenshodo Merchant
 INSERT INTO `guild_shops` VALUES (60423,16406,14428,34214,20,5,10);
 INSERT INTO `guild_shops` VALUES (60423,16411,11746,21322,20,5,10);
@@ -1324,7 +1322,6 @@ INSERT INTO `guild_shops` VALUES (60431,1475,579,1188,255,48,100);
 INSERT INTO `guild_shops` VALUES (60431,5164,1945,2854,255,48,100);
 INSERT INTO `guild_shops` VALUES (60431,1652,233,250,255,48,100);
 INSERT INTO `guild_shops` VALUES (60431,5235,1284,1350,255,48,100);
-
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

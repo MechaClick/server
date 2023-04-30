@@ -22,7 +22,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #ifndef _LUAITEM_H
 #define _LUAITEM_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 #include "luautils.h"
 
 class CItem;
@@ -38,6 +38,8 @@ public:
         return m_PLuaItem;
     }
 
+    friend std::ostream& operator<<(std::ostream& out, const CLuaItem& item);
+
     uint16 getID();    // get the item's id
     uint16 getSubID(); // get the item's subid
 
@@ -50,13 +52,13 @@ public:
     uint8  getSlotID();     // get the slot id
     uint16 getTrialNumber();
     auto   getMatchingTrials() -> sol::table; // returns a table of trial #'s which match this item precisely
-    uint8  getWornItem();  // check if the item has been used
-    uint32 getBasePrice(); // get the base sell price
+    uint8  getWornUses();                     // check if the item has been used
+    uint32 getBasePrice();                    // get the base sell price
 
     bool isType(uint8 type);       // check the item type
     bool isSubType(uint8 subtype); // check the item's sub type
 
-    auto   getName() -> const char*; // get the item's name
+    auto   getName() -> std::string; // get the item's name
     uint16 getILvl();                // get the item's ilvl
     uint16 getReqLvl();              // get the item's level
 
@@ -67,8 +69,8 @@ public:
     auto getAugment(uint8 slot) -> std::tuple<uint16, uint8>; // get the augment id and power in slot
     // int32 setAugment(lua_State*);           // set the augment id and power in slot
 
-    uint8  getSkillType(); // get skill type
-    uint16 getWeaponskillPoints();   // get current ws points
+    uint8  getSkillType();         // get skill type
+    uint16 getWeaponskillPoints(); // get current ws points
 
     bool isTwoHanded();  // is a two handed weapon
     bool isHandToHand(); // is a hand to hand weapon (or unarmed H2H)
@@ -76,7 +78,13 @@ public:
 
     auto getSignature() -> std::string;
 
+    uint8 getAppraisalID();         // get an appraisal ID
+    void  setAppraisalID(uint8 id); // set an appraisal ID
+
     bool isInstalled();
+
+    void setSoulPlateData(std::string const& name, uint16 mobFamily, uint8 zeni, uint16 skillIndex, uint8 fp);
+    auto getSoulPlateData() -> sol::table;
 
     static void Register();
 };

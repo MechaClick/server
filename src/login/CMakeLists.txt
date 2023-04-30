@@ -1,16 +1,16 @@
 set(SOURCES
-    account.cpp
-    account.h
+    ${COMMON_SOURCES}
     lobby.cpp
     lobby.h
     login_auth.cpp
     login_auth.h
+    login_conf.cpp
+    login_conf.h
     login_session.cpp
     login_session.h
     login.cpp
     login.h
-    message_server.cpp
-    message_server.h)
+)
 
 if(UNIX)
     set(resource "")
@@ -18,25 +18,35 @@ else()
     set(resource "${CMAKE_SOURCE_DIR}/res/connectserver.rc")
 endif()
 
-add_executable(topaz_connect ${SOURCES} ${resource})
+add_executable(xi_connect ${SOURCES} ${resource})
+
+if (APPLE)
+    disable_lto(xi_connect)
+endif()
 
 if(WIN32)
-    set_target_properties(topaz_connect PROPERTIES OUTPUT_NAME topaz_connect${spacer}${platform_suffix})
+    set_target_properties(xi_connect PROPERTIES OUTPUT_NAME xi_connect)
 endif()
 
 target_compile_definitions(
-    topaz_connect
+    xi_connect
     PUBLIC
     -DdsTCPSERV
     -DDEBUGLOGLOGIN
 )
 
-target_link_libraries(topaz_connect
+target_link_libraries(xi_connect
     PUBLIC
-    common
-    project_options
+        ${EXTERNAL_LIBS}
+        project_options
     PRIVATE
-    project_warnings
+        project_warnings
 )
 
-set_target_output_directory(topaz_connect)
+target_include_directories(xi_connect
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+set_target_output_directory(xi_connect)

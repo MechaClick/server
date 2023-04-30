@@ -17,26 +17,31 @@ local quest = Quest:new(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.ATELLOUNE
 quest.reward =
 {
     fame = 30,
+    fameArea = xi.quest.fame_area.SANDORIA,
     item = xi.items.TRAINEE_GLOVES,
 }
 
-quest.sections = {
+quest.sections =
+{
     -- Speak to Atelloune in Southern San d'Oria at (L-6) for a cutscene to start the quest.
     {
         check = function(player, status, vars)
             return status == QUEST_AVAILABLE and
-                   player:getFameLevel(SANDORIA) >= 2 and
-                   player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SEEING_SPOTS) == QUEST_COMPLETED
+                player:getFameLevel(xi.quest.fame_area.SANDORIA) >= 2 and
+                player:getQuestStatus(xi.quest.log_id.CRYSTAL_WAR, xi.quest.id.crystalWar.SEEING_SPOTS) == QUEST_COMPLETED
         end,
 
-        [xi.zone.SOUTHERN_SAN_DORIA] = {
-            ['Atelloune'] = {
+        [xi.zone.SOUTHERN_SAN_DORIA] =
+        {
+            ['Atelloune'] =
+            {
                 onTrigger = function(player, npc)
                     return quest:progressEvent(890)
                 end,
             },
 
-            onEventFinish = {
+            onEventFinish =
+            {
                 [890] = function(player, csid, option, npc)
                     quest:begin(player)
                 end,
@@ -50,8 +55,10 @@ quest.sections = {
             return status == QUEST_ACCEPTED
         end,
 
-        [xi.zone.SOUTHERN_SAN_DORIA] = {
-            ['Atelloune'] = {
+        [xi.zone.SOUTHERN_SAN_DORIA] =
+        {
+            ['Atelloune'] =
+            {
                 onTrigger = function(player, npc)
                     return quest:progressEvent(892)
                 end,
@@ -63,16 +70,16 @@ quest.sections = {
                 end,
             },
 
-            onEventFinish = {
+            onEventFinish =
+            {
                 [891] = function(player, csid, option, npc)
-                    player:confirmTrade()
-                    quest:complete(player)
+                    if quest:complete(player) then
+                        player:confirmTrade()
+                    end
                 end,
             },
         },
     },
-
-    -- Return to default action
 }
 
 return quest

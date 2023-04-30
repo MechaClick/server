@@ -33,15 +33,16 @@ along with this program.  If not, see http://www.gnu.org/licenses/
  *                                                                       *
  ************************************************************************/
 
-CZoneInstance::CZoneInstance(ZONEID ZoneID, REGION_TYPE RegionID, CONTINENT_TYPE ContinentID)
-: CZone(ZoneID, RegionID, ContinentID)
+CZoneInstance::CZoneInstance(ZONEID ZoneID, REGION_TYPE RegionID, CONTINENT_TYPE ContinentID, uint8 levelRestriction)
+: CZone(ZoneID, RegionID, ContinentID, levelRestriction)
 {
 }
 
 CZoneInstance::~CZoneInstance() = default;
 
-CCharEntity* CZoneInstance::GetCharByName(int8* name)
+CCharEntity* CZoneInstance::GetCharByName(std::string name)
 {
+    TracyZoneScoped;
     CCharEntity* PEntity = nullptr;
     for (const auto& instance : instanceList)
     {
@@ -56,6 +57,7 @@ CCharEntity* CZoneInstance::GetCharByName(int8* name)
 
 CCharEntity* CZoneInstance::GetCharByID(uint32 id)
 {
+    TracyZoneScoped;
     CCharEntity* PEntity = nullptr;
     for (const auto& instance : instanceList)
     {
@@ -70,6 +72,7 @@ CCharEntity* CZoneInstance::GetCharByID(uint32 id)
 
 CBaseEntity* CZoneInstance::GetEntity(uint16 targid, uint8 filter)
 {
+    TracyZoneScoped;
     CBaseEntity* PEntity = nullptr;
     if (filter & TYPE_PC)
     {
@@ -151,8 +154,8 @@ void CZoneInstance::TransportDepart(uint16 boundary, uint16 zone)
 
 void CZoneInstance::DecreaseZoneCounter(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     CInstance* instance = PChar->PInstance;
-
     if (instance)
     {
         instance->DecreaseZoneCounter(PChar);
@@ -165,7 +168,14 @@ void CZoneInstance::DecreaseZoneCounter(CCharEntity* PChar)
         {
             if (instance->Failed() || instance->Completed())
             {
-                instanceList.erase(std::find_if(instanceList.begin(), instanceList.end(), [&instance](const auto& el) { return el.get() == instance; }));
+                ShowDebug("[CZoneInstance]DecreaseZoneCounter cleaned up Instance %s", instance->GetName());
+
+                // clang-format off
+                instanceList.erase(std::find_if(instanceList.begin(), instanceList.end(), [&instance](const auto& el)
+                {
+                    return el.get() == instance;
+                }));
+                // clang-format on
             }
             else
             {
@@ -177,6 +187,7 @@ void CZoneInstance::DecreaseZoneCounter(CCharEntity* PChar)
 
 void CZoneInstance::IncreaseZoneCounter(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     XI_DEBUG_BREAK_IF(PChar == nullptr);
     XI_DEBUG_BREAK_IF(PChar->loc.zone != nullptr);
     XI_DEBUG_BREAK_IF(PChar->PTreasurePool != nullptr);
@@ -191,23 +202,20 @@ void CZoneInstance::IncreaseZoneCounter(CCharEntity* PChar)
                 PChar->PInstance = instance.get();
             }
         }
-        if (!PChar->PInstance && PChar->m_GMlevel > 0)
-        {
-            PChar->PInstance = new CInstance(this, 0);
-        }
     }
 
     if (PChar->PInstance)
     {
         if (!ZoneTimer)
         {
-            createZoneTimer();
+            createZoneTimers();
         }
-        PChar->targid = PChar->PInstance->GetNewTargID();
+
+        PChar->targid = PChar->PInstance->GetNewCharTargID();
 
         if (PChar->targid >= 0x700)
         {
-            ShowError(CL_RED "CZone::InsertChar : targid is high (03hX)\n" CL_RESET, PChar->targid);
+            ShowError("CZone::InsertChar : targid is high (03hX), update packets will be ignored", PChar->targid);
             return;
         }
 
@@ -215,18 +223,10 @@ void CZoneInstance::IncreaseZoneCounter(CCharEntity* PChar)
         luautils::OnInstanceZoneIn(PChar, PChar->PInstance);
         CharZoneIn(PChar);
 
-        /* disabled until invalid packet error can be worked around (not sending all
-           level related stuff twice (before and after level sync)
         if (PChar->PInstance->GetLevelCap() > 0)
         {
-            PChar->StatusEffectContainer->DelStatusEffectsByFlag(EFFECTFLAG_DISPELABLE | EFFECTFLAG_ON_ZONE);
-            PChar->StatusEffectContainer->AddStatusEffect(new CStatusEffect(
-                EFFECT_LEVEL_RESTRICTION,
-                EFFECT_LEVEL_RESTRICTION,
-                PChar->PInstance->GetLevelCap(),
-                0, 0)
-            );
-        }*/
+            PChar->StatusEffectContainer->AddStatusEffect(new CStatusEffect(EFFECT_LEVEL_RESTRICTION, EFFECT_LEVEL_RESTRICTION, PChar->PInstance->GetLevelCap(), 0, 0));
+        }
 
         if (PChar->PInstance->CheckFirstEntry(PChar->id))
         {
@@ -236,6 +236,10 @@ void CZoneInstance::IncreaseZoneCounter(CCharEntity* PChar)
     }
     else
     {
+        ShowWarning(fmt::format("Failed to place {} in {} ({}). Placing them in that zone's instance exit area.",
+                                PChar->name, this->GetName(), this->GetID())
+                        .c_str());
+
         // instance no longer exists: put them outside (at exit)
         PChar->loc.prevzone = GetID();
 
@@ -247,6 +251,7 @@ void CZoneInstance::IncreaseZoneCounter(CCharEntity* PChar)
 
 void CZoneInstance::SpawnMOBs(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnMOBs(PChar);
@@ -255,6 +260,7 @@ void CZoneInstance::SpawnMOBs(CCharEntity* PChar)
 
 void CZoneInstance::SpawnPETs(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnPETs(PChar);
@@ -263,6 +269,7 @@ void CZoneInstance::SpawnPETs(CCharEntity* PChar)
 
 void CZoneInstance::SpawnTRUSTs(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnTRUSTs(PChar);
@@ -271,6 +278,7 @@ void CZoneInstance::SpawnTRUSTs(CCharEntity* PChar)
 
 void CZoneInstance::SpawnNPCs(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnNPCs(PChar);
@@ -279,6 +287,7 @@ void CZoneInstance::SpawnNPCs(CCharEntity* PChar)
 
 void CZoneInstance::SpawnPCs(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnPCs(PChar);
@@ -287,6 +296,7 @@ void CZoneInstance::SpawnPCs(CCharEntity* PChar)
 
 void CZoneInstance::SpawnMoogle(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnMoogle(PChar);
@@ -295,6 +305,7 @@ void CZoneInstance::SpawnMoogle(CCharEntity* PChar)
 
 void CZoneInstance::SpawnTransport(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->SpawnTransport(PChar);
@@ -303,6 +314,7 @@ void CZoneInstance::SpawnTransport(CCharEntity* PChar)
 
 void CZoneInstance::TOTDChange(TIMETYPE TOTD)
 {
+    TracyZoneScoped;
     for (const auto& instance : instanceList)
     {
         instance->TOTDChange(TOTD);
@@ -311,6 +323,7 @@ void CZoneInstance::TOTDChange(TIMETYPE TOTD)
 
 void CZoneInstance::PushPacket(CBaseEntity* PEntity, GLOBAL_MESSAGE_TYPE message_type, CBasicPacket* packet)
 {
+    TracyZoneScoped;
     if (PEntity)
     {
         if (PEntity->PInstance)
@@ -327,26 +340,65 @@ void CZoneInstance::PushPacket(CBaseEntity* PEntity, GLOBAL_MESSAGE_TYPE message
     }
 }
 
+void CZoneInstance::UpdateCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask)
+{
+    if (PChar)
+    {
+        if (PChar->PInstance)
+        {
+            PChar->PInstance->UpdateCharPacket(PChar, type, updatemask);
+        }
+    }
+    else
+    {
+        for (auto const& instance : instanceList)
+        {
+            instance->UpdateCharPacket(PChar, type, updatemask);
+        }
+    }
+}
+
+void CZoneInstance::UpdateEntityPacket(CBaseEntity* PEntity, ENTITYUPDATE type, uint8 updatemask, bool alwaysInclude)
+{
+    if (PEntity)
+    {
+        if (PEntity->PInstance)
+        {
+            PEntity->PInstance->UpdateEntityPacket(PEntity, type, updatemask, alwaysInclude);
+        }
+    }
+    else
+    {
+        for (auto const& instance : instanceList)
+        {
+            instance->UpdateEntityPacket(PEntity, type, updatemask, alwaysInclude);
+        }
+    }
+}
+
 void CZoneInstance::WideScan(CCharEntity* PChar, uint16 radius)
 {
+    TracyZoneScoped;
     if (PChar->PInstance)
     {
         PChar->PInstance->WideScan(PChar, radius);
     }
 }
 
-void CZoneInstance::ZoneServer(time_point tick, bool check_regions)
+void CZoneInstance::ZoneServer(time_point tick)
 {
+    TracyZoneScoped;
     auto it = instanceList.begin();
     while (it != instanceList.end())
     {
         auto& instance = *it;
 
-        instance->ZoneServer(tick, check_regions);
+        instance->ZoneServer(tick);
         instance->CheckTime(tick);
 
         if ((instance->Failed() || instance->Completed()) && instance->CharListEmpty())
         {
+            ShowDebug("[CZoneInstance]ZoneServer cleaned up Instance %s", instance->GetName());
             it = instanceList.erase(it);
             continue;
         }
@@ -356,6 +408,7 @@ void CZoneInstance::ZoneServer(time_point tick, bool check_regions)
 
 void CZoneInstance::ForEachChar(std::function<void(CCharEntity*)> func)
 {
+    TracyZoneScoped;
     for (const auto& instance : instanceList)
     {
         for (auto PChar : instance->GetCharList())
@@ -367,6 +420,7 @@ void CZoneInstance::ForEachChar(std::function<void(CCharEntity*)> func)
 
 void CZoneInstance::ForEachCharInstance(CBaseEntity* PEntity, std::function<void(CCharEntity*)> func)
 {
+    TracyZoneScoped;
     for (auto PChar : PEntity->PInstance->GetCharList())
     {
         func((CCharEntity*)PChar.second);
@@ -375,14 +429,16 @@ void CZoneInstance::ForEachCharInstance(CBaseEntity* PEntity, std::function<void
 
 void CZoneInstance::ForEachMobInstance(CBaseEntity* PEntity, std::function<void(CMobEntity*)> func)
 {
+    TracyZoneScoped;
     for (auto PMob : PEntity->PInstance->m_mobList)
     {
         func((CMobEntity*)PMob.second);
     }
 }
 
-CInstance* CZoneInstance::CreateInstance(uint8 instanceid)
+CInstance* CZoneInstance::CreateInstance(uint16 instanceid)
 {
+    TracyZoneScoped;
     instanceList.push_back(std::make_unique<CInstance>(this, instanceid));
     return instanceList.back().get();
 }

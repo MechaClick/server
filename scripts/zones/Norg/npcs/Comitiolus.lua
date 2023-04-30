@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Norg
 --  NPC: Comitiolus
--- Standard Info NPC
 -- !pos 100 -7 -13 252
 -----------------------------------
 require("scripts/globals/missions")
@@ -10,8 +9,9 @@ require("scripts/globals/npc_util")
 local entity = {}
 
 entity.onTrade = function(player, npc, trade)
-    if npcUtil.tradeHasExactly(trade, { 1695, 4297, 4506 }) -- Habaneros, Black Curry, Mutton Tortilla
-        and player:getCharVar("TuningOut_Progress") == 6
+    if
+        npcUtil.tradeHasExactly(trade, { 1695, 4297, 4506 }) and -- Habaneros, Black Curry, Mutton Tortilla
+        player:getCharVar("TuningOut_Progress") == 6
     then
         player:startEvent(207, 0, 1695) -- Receives spicy food, mentions only one of them
     end
@@ -24,10 +24,6 @@ entity.onTrigger = function(player, npc)
         player:startEvent(206) -- Declines request to speak to Kamui
     elseif tuningOutProgress == 7 then
         player:startEvent(208) -- Repeat hint for player to go to Beaucedine Glacier
-    elseif player:getCurrentMission(ROV) == xi.mission.id.rov.THE_BEGINNING then
-        player:startEvent(6)
-    else
-        player:startEvent(72)
     end
 end
 

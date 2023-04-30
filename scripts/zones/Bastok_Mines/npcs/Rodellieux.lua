@@ -18,13 +18,13 @@ entity.onTrigger = function(player, npc)
     else
         local stock =
         {
-            4571,    90,    -- Beaugreens
-            4363,    39,    -- Faerie Apple
-            691,     54,     -- Maple Log
+            4571, 90, -- Beaugreens
+            4363, 39, -- Faerie Apple
+            691,  54, -- Maple Log
         }
 
         player:showText(npc, ID.text.RODELLIEUX_OPEN_DIALOG)
-        xi.shop.general(player, stock, BASTOK)
+        xi.shop.general(player, stock, xi.quest.fame_area.BASTOK)
     end
 end
 

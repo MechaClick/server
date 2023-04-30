@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
@@ -31,24 +31,47 @@
 
 CCharPacket::CCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask)
 {
-    this->type = 0x0D;
-    this->size = 0x3A;
+    this->setType(0x0D);
+    this->setSize(0x74);
 
     ref<uint32>(0x04) = PChar->id;
-    ref<uint16>(0x08) = PChar->targid;
+    updateWith(PChar, type, updatemask);
+}
+
+void CCharPacket::updateWith(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask)
+{
+    uint32 currentId = ref<uint32>(0x04);
+    if (currentId != PChar->id)
+    {
+        // Should only be able to update packets about the same character.
+        ShowError("Unable to update char packet for %d with data from %d", currentId, PChar->id);
+        return;
+    }
+
+    ref<uint16>(0x08) = PChar->targid; // 0x0D entity updates are valid for 1024 to 1791
+
+    if (type == ENTITY_SPAWN)
+    {
+        updatemask = 0x1F; // override mask to spawn mask
+    }
 
     switch (type)
     {
         case ENTITY_DESPAWN:
         {
-            ref<uint8>(0x0A) = 0x20;
+            ref<uint8>(0x0A) = UPDATE_DESPAWN;
         }
         break;
+        // clang-format off
         case ENTITY_SPAWN:
-            updatemask = 0x1F;
+        {
+            updatemask = UPDATE_ALL_CHAR;
+        }
+        [[fallthrough]];
+        // clang-format on
         case ENTITY_UPDATE:
         {
-            ref<uint8>(0x0A) = updatemask;
+            ref<uint8>(0x0A) |= updatemask;
 
             if (updatemask & UPDATE_POS)
             {
@@ -69,10 +92,10 @@ CCharPacket::CCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask
                 ref<uint32>(0x20) = PChar->nameflags.flags;
                 ref<uint8>(0x21) |= PChar->GetGender() * 128 + (1 << PChar->look.size);
 
-                // if (PChar->StatusEffectContainer->HasStatusEffect(EFFECT_SNEAK))
-                //{
-                //	ref<uint8>(data,(0x22)) = 0x20;
-                //}
+                if (PChar->StatusEffectContainer->HasStatusEffect(EFFECT_SNEAK))
+                {
+                    ref<uint8>(0x2A) |= 0x20;
+                }
 
                 if (PChar->StatusEffectContainer->HasStatusEffectByFlag(EFFECTFLAG_INVISIBLE))
                 {
@@ -113,13 +136,14 @@ CCharPacket::CCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask
                     ref<uint8>(0x2A) |= 0x80;
                 }
 
-                ref<uint32>(0x34) = 0x010CA248; // black chocobo
-
-                if (PChar->animation == ANIMATION_MOUNT)
+                if (PChar->StatusEffectContainer->HasStatusEffect(EFFECT_MOUNTED))
                 {
+                    ref<uint8>(0x20) |= static_cast<uint8>(PChar->StatusEffectContainer->GetStatusEffect(EFFECT_MOUNTED)->GetSubPower());
+                    ref<uint32>(0x34) = PChar->m_FieldChocobo;
                     ref<uint16>(0x44) = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_MOUNTED)->GetPower() << 4;
                 }
             }
+
             if (PChar->PPet != nullptr)
             {
                 ref<uint16>(0x3C) = PChar->PPet->targid;
@@ -133,7 +157,13 @@ CCharPacket::CCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask
                 ref<uint8>(0x33) = 0x40;
             }
 
-            ref<uint8>(0x43)  = 0x04;
+            // Geomancer (GEO) Indi spell effect on the char.
+            if (PChar->StatusEffectContainer->HasStatusEffect(EFFECT_COLURE_ACTIVE))
+            {
+                ref<uint8>(0x42) = 0x50 + PChar->StatusEffectContainer->GetStatusEffect(EFFECT_COLURE_ACTIVE)->GetPower();
+            }
+
+            ref<uint8>(0x43) = 0x04;
 
             if (updatemask & UPDATE_LOOK)
             {
@@ -158,7 +188,7 @@ CCharPacket::CCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask
 
             if (updatemask & UPDATE_NAME)
             {
-                memcpy(data + (0x5A), PChar->GetName(), PChar->name.size());
+                memcpy(data + (0x5A), PChar->GetName().c_str(), PChar->GetName().size());
             }
         }
         break;
@@ -169,4 +199,4 @@ CCharPacket::CCharPacket(CCharEntity* PChar, ENTITYUPDATE type, uint8 updatemask
     }
 }
 
-// некоторые манипуляции с пакетом приводят к интересному результату (количество голов в какой-то игре)
+// Some manipulations with a package lead to an interesting result (the number of goals in some game)

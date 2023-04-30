@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Aht Urhgan Whitegate
 --  NPC: Abquhbah
--- Standard Info NPC
 -----------------------------------
 local entity = {}
 
@@ -11,6 +10,8 @@ end
 entity.onTrigger = function(player, npc)
     local promotion = player:getCharVar("AssaultPromotion")
     local rank = 0
+
+    -- 3152 on Nashmiera's Plea (oncePerZone)
 
     if promotion <= 7 then
         rank = 1

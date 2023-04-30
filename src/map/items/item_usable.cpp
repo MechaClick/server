@@ -19,12 +19,12 @@
 ===========================================================================
 */
 
-#include "../../common/utils.h"
-
 #include "item_usable.h"
 
-#include "../map.h"
-#include "../vana_time.h"
+#include "common/utils.h"
+#include "common/vana_time.h"
+
+#include "map.h"
 
 CItemUsable::CItemUsable(uint16 id)
 : CItem(id)
@@ -129,12 +129,12 @@ uint16 CItemUsable::getActivationTime() const
     return m_ActivationTime;
 }
 
-void CItemUsable::setValidTarget(uint8 ValidTarget)
+void CItemUsable::setValidTarget(uint16 ValidTarget)
 {
     m_ValidTarget = ValidTarget;
 }
 
-uint8 CItemUsable::getValidTarget() const
+uint16 CItemUsable::getValidTarget() const
 {
     return m_ValidTarget;
 }
@@ -150,9 +150,9 @@ void CItemUsable::setAoE(uint16 AoE)
 }
 
 /************************************************************************
- *																		*
+ *                                                                        *
  *  Время экипировки предмета (VanaTime)                                 *
- *																		*
+ *                                                                        *
  ************************************************************************/
 
 void CItemUsable::setAssignTime(uint32 VanaTime)
@@ -161,9 +161,9 @@ void CItemUsable::setAssignTime(uint32 VanaTime)
 }
 
 /************************************************************************
- *																		*
+ *                                                                        *
  *  Оставшееся время до следующего использования предмета                *
- *																		*
+ *                                                                        *
  ************************************************************************/
 
 uint32 CItemUsable::getReuseTime()

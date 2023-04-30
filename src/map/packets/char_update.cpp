@@ -19,24 +19,24 @@
 ===========================================================================
 */
 
-#include "../../common/showmsg.h"
-#include "../../common/socket.h"
+#include "char_update.h"
+
+#include "common/logging.h"
+#include "common/socket.h"
+#include "common/vana_time.h"
 
 #include <cstring>
 
-#include "char_update.h"
-
-#include "../ai/ai_container.h"
-#include "../ai/states/death_state.h"
-#include "../entities/charentity.h"
-#include "../status_effect_container.h"
-#include "../utils/itemutils.h"
-#include "../vana_time.h"
+#include "ai/ai_container.h"
+#include "ai/states/death_state.h"
+#include "entities/charentity.h"
+#include "status_effect_container.h"
+#include "utils/itemutils.h"
 
 CCharUpdatePacket::CCharUpdatePacket(CCharEntity* PChar)
 {
-    this->type = 0x37;
-    this->size = 0x30;
+    this->setType(0x37);
+    this->setSize(0x60);
 
     memcpy(data + (0x04), PChar->StatusEffectContainer->m_StatusIcons, 32);
 
@@ -69,7 +69,7 @@ CCharUpdatePacket::CCharUpdatePacket(CCharEntity* PChar)
     ref<uint8>(0x29) = PChar->GetGender() + (PChar->look.size > 0 ? PChar->look.size * 8 : 2); // + model sizing : 0x02 - 0; 0x08 - 1; 0x10 - 2;
     ref<uint8>(0x2C) = PChar->GetSpeed();
     ref<uint16>(0x2E) |= PChar->speedsub << 1; // Not sure about this, it was a work around when we set speedsub incorrectly..
-    ref<uint8>(0x30) = PChar->m_event.EventID != -1 ? ANIMATION_EVENT : PChar->animation;
+    ref<uint8>(0x30) = PChar->isInEvent() ? (uint8)ANIMATION_EVENT : PChar->animation;
 
     CItemLinkshell* linkshell = (CItemLinkshell*)PChar->getEquip(SLOT_LINK1);
 
@@ -105,7 +105,7 @@ CCharUpdatePacket::CCharUpdatePacket(CCharEntity* PChar)
 
     if (PChar->animation == ANIMATION_FISHING_START)
     {
-        ref<uint8>(0x4A) = 0x0D; // was 0x10
+        ref<uint16>(0x4A) = PChar->hookDelay;
     }
     ref<uint64>(0x4C) = PChar->StatusEffectContainer->m_Flags;
 
@@ -120,8 +120,9 @@ CCharUpdatePacket::CCharUpdatePacket(CCharEntity* PChar)
         ref<uint8>(0x58) += 0x80;
     }
 
-    if (PChar->animation == ANIMATION_MOUNT)
+    if (PChar->StatusEffectContainer->HasStatusEffect(EFFECT_MOUNTED))
     {
+        ref<uint8>(0x29) |= static_cast<uint8>(PChar->StatusEffectContainer->GetStatusEffect(EFFECT_MOUNTED)->GetSubPower());
         ref<uint16>(0x5B) = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_MOUNTED)->GetPower();
     }
 }

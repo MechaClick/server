@@ -10,35 +10,44 @@ zones[xi.zone.QUFIM_ISLAND] =
 {
     text =
     {
-        ITEM_CANNOT_BE_OBTAINED        = 6383,  -- You cannot obtain the <item>. Come back after sorting your inventory.
-        ITEM_OBTAINED                  = 6389,  -- Obtained: <item>.
-        GIL_OBTAINED                   = 6390,  -- Obtained <number> gil.
-        KEYITEM_OBTAINED               = 6392,  -- Obtained key item: <keyitem>.
-        KEYITEM_LOST                   = 6393,  -- Lost key item: <keyitem>.
-        NOTHING_OUT_OF_ORDINARY        = 6403,  -- There is nothing out of the ordinary here.
-        FELLOW_MESSAGE_OFFSET          = 6418,  -- I'm ready. I suppose.
-        CARRIED_OVER_POINTS            = 7000, -- You have carried over <number> login point[/s].
-        LOGIN_CAMPAIGN_UNDERWAY        = 7001, -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!<space>
-        LOGIN_NUMBER                   = 7002, -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
-        CONQUEST_BASE                  = 7050,  -- Tallying conquest results...
-        BEASTMEN_BANNER                = 7131,  -- There is a beastmen's banner.
-        FISHING_MESSAGE_OFFSET         = 7209,  -- You can't fish here.
-        THESE_WITHERED_FLOWERS         = 7329,  -- These withered flowers seem unable to bloom.
-        NOW_THAT_NIGHT_HAS_FALLEN      = 7330,  -- Now that night has fallen, the flowers bloom with a strange glow.
-        CONQUEST                       = 7378,  -- You've earned conquest points!
-        AN_EMPTY_LIGHT_SWIRLS          = 7755,  -- An empty light swirls about the cave, eating away at the surroundings...
-        GIGANTIC_FOOTPRINT             = 7839,  -- There is a gigantic footprint here.
-        DYNA_NPC_DEFAULT_MESSAGE       = 7853,  -- You hear a mysterious, floating voice: Bring forth the <item>...
-        YOU_CANNOT_ENTER_DYNAMIS       = 7865,  -- You cannot enter Dynamis - [Dummy/San d'Oria/Bastok/Windurst/Jeuno/Beaucedine/Xarcabard/Valkurm/Buburimu/Qufim/Tavnazia] for <number> [day/days] (Vana'diel time).
-        PLAYERS_HAVE_NOT_REACHED_LEVEL = 7867,  -- Players who have not reached level <number> are prohibited from entering Dynamis.
-        PLAYER_OBTAINS_ITEM            = 8063,  -- <name> obtains <item>!
-        UNABLE_TO_OBTAIN_ITEM          = 8064,  -- You were unable to obtain the item.
-        PLAYER_OBTAINS_TEMP_ITEM       = 8065,  -- <name> obtains the temporary item: <item>!
-        ALREADY_POSSESS_TEMP           = 8066,  -- You already possess that temporary item.
-        NO_COMBINATION                 = 8071,  -- You were unable to enter a combination.
-        REGIME_REGISTERED              = 10347, -- New training regime registered!
-        COMMON_SENSE_SURVIVAL          = 12672, -- It appears that you have arrived at a new survival guide provided by the Adventurers' Mutual Aid Network. Common sense dictates that you should now be able to teleport here from similar tomes throughout the world.
-        HOMEPOINT_SET                  = 12714, -- Home point set!
+        ITEM_CANNOT_BE_OBTAINED        = 6384,  -- You cannot obtain the <item>. Come back after sorting your inventory.
+        ITEM_OBTAINED                  = 6390,  -- Obtained: <item>.
+        GIL_OBTAINED                   = 6391,  -- Obtained <number> gil.
+        KEYITEM_OBTAINED               = 6393,  -- Obtained key item: <keyitem>.
+        KEYITEM_LOST                   = 6394,  -- Lost key item: <keyitem>.
+        NOTHING_OUT_OF_ORDINARY        = 6404,  -- There is nothing out of the ordinary here.
+        SENSE_OF_FOREBODING            = 6405,  -- You are suddenly overcome with a sense of foreboding...
+        NOW_IS_NOT_THE_TIME            = 6406,  -- Now is not the time for that!
+        WAIT_A_BIT_LONGER              = 6407,  -- It seems that you will have to wait a bit longer...
+        FELLOW_MESSAGE_OFFSET          = 6419,  -- I'm ready. I suppose.
+        CARRIED_OVER_POINTS            = 7001,  -- You have carried over <number> login point[/s].
+        LOGIN_CAMPAIGN_UNDERWAY        = 7002,  -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
+        LOGIN_NUMBER                   = 7003,  -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
+        MEMBERS_LEVELS_ARE_RESTRICTED  = 7023,  -- Your party is unable to participate because certain members' levels are restricted.
+        CONQUEST_BASE                  = 7060,  -- Tallying conquest results...
+        BEASTMEN_BANNER                = 7141,  -- There is a beastmen's banner.
+        FISHING_MESSAGE_OFFSET         = 7219,  -- You can't fish here.
+        THESE_WITHERED_FLOWERS         = 7339,  -- These withered flowers seem unable to bloom.
+        NOW_THAT_NIGHT_HAS_FALLEN      = 7340,  -- Now that night has fallen, the flowers bloom with a strange glow.
+        CONQUEST                       = 7388,  -- You've earned conquest points!
+        AN_EMPTY_LIGHT_SWIRLS          = 7746,  -- An empty light swirls about the cave, eating away at the surroundings...
+        GARRISON_BASE                  = 7751,  -- Hm? What is this? %? How do I know this is not some [San d'Orian/Bastokan/Windurstian] trick?
+        GIGANTIC_FOOTPRINT             = 7830,  -- There is a gigantic footprint here.
+        ASA_SNOW                       = 7843,  -- You see the following words scrawled into the snow: Shantotto Empire Provisional Headquarters.
+        YOU_CANNOT_ENTER_DYNAMIS       = 7856,  -- You cannot enter Dynamis - [Dummy/San d'Oria/Bastok/Windurst/Jeuno/Beaucedine/Xarcabard/Valkurm/Buburimu/Qufim/Tavnazia] for <number> [day/days] (Vana'diel time).
+        PLAYERS_HAVE_NOT_REACHED_LEVEL = 7858,  -- Players who have not reached level <number> are prohibited from entering Dynamis.
+        DYNA_NPC_DEFAULT_MESSAGE       = 7980,  -- There is a strange symbol drawn here. A haunting chill sweeps through you as you gaze upon it...
+        PLAYER_OBTAINS_ITEM            = 8054,  -- <name> obtains <item>!
+        UNABLE_TO_OBTAIN_ITEM          = 8055,  -- You were unable to obtain the item.
+        PLAYER_OBTAINS_TEMP_ITEM       = 8056,  -- <name> obtains the temporary item: <item>!
+        ALREADY_POSSESS_TEMP           = 8057,  -- You already possess that temporary item.
+        NO_COMBINATION                 = 8062,  -- You were unable to enter a combination.
+        UNITY_WANTED_BATTLE_INTERACT   = 8124,  -- Those who have accepted % must pay # Unity accolades to participate. The content for this Wanted battle is #. [Ready to begin?/You do not have the appropriate object set, so your rewards will be limited.]
+        REGIME_REGISTERED              = 10338, -- New training regime registered!
+        LEARNS_SPELL                   = 12656, -- <name> learns <spell>!
+        UNCANNY_SENSATION              = 12658, -- You are assaulted by an uncanny sensation.
+        COMMON_SENSE_SURVIVAL          = 12665, -- It appears that you have arrived at a new survival guide provided by the Adventurers' Mutual Aid Network. Common sense dictates that you should now be able to teleport here from similar tomes throughout the world.
+        HOMEPOINT_SET                  = 12707, -- Home point set!
     },
     mob =
     {
@@ -60,8 +69,6 @@ zones[xi.zone.QUFIM_ISLAND] =
     },
     npc =
     {
-        CASKET_BASE   = 17293677,
-        OVERSEER_BASE = 17293715, -- Pitoire_RK in npc_list
     },
 }
 

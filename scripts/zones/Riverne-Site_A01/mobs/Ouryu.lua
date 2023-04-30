@@ -1,12 +1,17 @@
 -----------------------------------
--- Area: Riverne - Site A01
---  Mob: Ouryu
+-- Ouryu Cometh
+-- Riverne Site A, Cloud Evokers
+-- !pos 184 0 344 30
 -----------------------------------
 require("scripts/globals/titles")
 -----------------------------------
 local entity = {}
 
-entity.onMobDeath = function(mob, player, isKiller)
+entity.onMobSpawn = function(mob, player, optParams)
+    mob:setMobMod(xi.mobMod.WEAPON_BONUS, 60) -- Level 85 + 60 = 145 Base Weapon Damage
+end
+
+entity.onMobDeath = function(mob, player, optParams)
     player:addTitle(xi.title.OURYU_OVERWHELMER)
 end
 

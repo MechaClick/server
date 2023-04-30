@@ -1,7 +1,6 @@
 -----------------------------------
--- Area: Ru'Lud Gardens
+-- Area: Ru'Lude Gardens
 --  NPC: Macchi Gazlitah
--- Standard Mechant NPC
 -- TODO: Add support for occasional stock.
 -----------------------------------
 local ID = require("scripts/zones/RuLude_Gardens/IDs")
@@ -35,7 +34,7 @@ entity.onTrigger = function(player, npc)
     }
 
     player:showText(npc, ID.text.MACCHI_GAZLITAH_SHOP_DIALOG1)
-    xi.shop.general(player, stock, JEUNO)
+    xi.shop.general(player, stock, xi.quest.fame_area.JEUNO)
 end
 
 entity.onEventUpdate = function(player, csid, option)

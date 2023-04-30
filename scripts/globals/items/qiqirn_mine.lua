@@ -6,40 +6,44 @@
 require("scripts/globals/zone")
 require("scripts/globals/status")
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     local result = 0
     if target:getZoneID() ~= xi.zone.LEBROS_CAVERN then
         result = 55
     end
+
     return result
 end
 
-item_object.onItemUse = function(target)
+itemObject.onItemUse = function(target)
     local instance = target:getInstance()
-    local bomb = instance:insertAlly(10633)
-    local X = target:getXPos()
-    local Z = target:getZPos()
+    local bomb = instance:insertAlly(100)
+    local xPos = target:getXPos()
+    local zPos = target:getZPos()
+    local targ = target:getTarget()
 
-    if (X > 161 and X < 184) and (Z > 359 and Z < 378)then
+    if (xPos > 160 and xPos < 186) and (zPos > 359 and zPos < 380) then
         bomb:setSpawn(178, -40, 376, 196)
         bomb:spawn()
-    elseif (X > 254 and X < 264) and (Z > 192 and Z < 218)then
+    elseif (xPos > 250 and xPos < 264) and (zPos > 192 and zPos < 220) then
         bomb:setSpawn(258, -30, 213, 190)
         bomb:spawn()
-    elseif (X > 327 and X < 343) and (Z > 278 and Z < 298)then
+    elseif (xPos > 327 and xPos < 343) and (zPos > 278 and zPos < 300) then
         bomb:setSpawn(338, -30, 296, 197)
         bomb:spawn()
-    elseif (X > 300 and X < 320) and (Z > 335 and Z < 343)then
+    elseif (xPos > 298 and xPos < 320) and (zPos > 330 and zPos < 345) then
         bomb:setSpawn(303, -30, 341, 167)
         bomb:spawn()
     else
-        bomb:setSpawn(X + math.random(-2, 2), target:getYPos() , Z + math.random(-2, 2))
+        bomb:setSpawn(xPos + math.random(-2, 2), target:getYPos() , zPos + math.random(-2, 2))
         bomb:spawn()
     end
 
-    bomb:updateEnmity(target)
+    if targ ~= nil then
+        bomb:updateEnmity(targ)
+    end
 end
 
-return item_object
+return itemObject

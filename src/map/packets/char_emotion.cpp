@@ -26,8 +26,8 @@
 
 CCharEmotionPacket::CCharEmotionPacket(CCharEntity* PChar, uint32 TargetID, uint16 TargetIndex, Emote EmoteID, EmoteMode emoteMode, uint16 extra)
 {
-    this->id(0x5A);
-    this->length(56);
+    this->setType(0x5A);
+    this->setSize(0x70);
 
     ref<uint32>(0x04) = PChar->id;
     ref<uint32>(0x08) = TargetID;
@@ -49,7 +49,7 @@ CCharEmotionPacket::CCharEmotionPacket(CCharEntity* PChar, uint32 TargetID, uint
     }
     else if (EmoteID == Emote::AIM)
     {
-        ref<uint16>(0x12) = 65535;
+        ref<uint16>(0x12)    = 65535;
         CItemWeapon* PWeapon = static_cast<CItemWeapon*>(PChar->getStorage(PChar->equipLoc[SLOT_RANGED])->GetItem(PChar->equip[SLOT_RANGED]));
         if (PWeapon && PWeapon->getID() != 65535)
         {
@@ -66,6 +66,13 @@ CCharEmotionPacket::CCharEmotionPacket(CCharEntity* PChar, uint32 TargetID, uint
                 }
             }
         }
+    }
+    else if (EmoteID == Emote::BELL)
+    {
+        // No emote text for /bell
+        emoteMode = EmoteMode::MOTION;
+
+        ref<uint8>(0x12) = (extra - 0x06);
     }
     else if (EmoteID == Emote::JOB)
     {

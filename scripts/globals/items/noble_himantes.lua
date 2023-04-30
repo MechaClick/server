@@ -1,17 +1,17 @@
 -----------------------------------
 -- ID: 18755
 -- Item: Noble Himantes
--- Item Effect: TP +10
+-- Item Effect: TP +100
 -- Durration: Instant
 -----------------------------------
-local item_object = {}
+local itemObject = {}
 
-item_object.onItemCheck = function(target)
+itemObject.onItemCheck = function(target)
     return 0
 end
 
-item_object.onItemUse = function(target)
+itemObject.onItemUse = function(target)
     target:addTP(100)
 end
 
-return item_object
+return itemObject

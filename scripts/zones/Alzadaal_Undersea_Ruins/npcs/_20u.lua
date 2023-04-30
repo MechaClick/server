@@ -14,12 +14,15 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
+    -- TODO: Fix, implement & balance Remnants
+    --[[
     if player:hasKeyItem(xi.ki.REMNANTS_PERMIT) then
         local mask = -2
         -- salvage2 NYI
-        --[[if player:getMainLvl() >= 96 then
-            mask = -14
-        else]]if player:getMainLvl() >= 65 then
+        --if player:getMainLvl() >= 96 then
+        --    mask = -14
+        --elseif
+        if player:getMainLvl() >= 65 then
             mask = -6
         end
 
@@ -27,6 +30,8 @@ entity.onTrigger = function(player, npc)
     else
         player:messageSpecial(ID.text.NOTHING_HAPPENS)
     end
+    ]]
+    player:messageSpecial(ID.text.NOTHING_HAPPENS)
 end
 
 entity.onEventUpdate = function(player, csid, option, target)
@@ -53,8 +58,7 @@ entity.onEventUpdate = function(player, csid, option, target)
         end
     end
 
-    player:createInstance(instanceid, 74)
-
+    player:createInstance(instanceid)
 end
 
 entity.onEventFinish = function(player, csid, option, target)
@@ -64,7 +68,7 @@ entity.onEventFinish = function(player, csid, option, target)
 end
 
 entity.onInstanceCreated = function(player, target, instance)
-    if (instance) then
+    if instance then
         player:setInstance(instance)
         player:instanceEntry(target, 4)
         player:delKeyItem(xi.ki.REMNANTS_PERMIT)

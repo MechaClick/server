@@ -22,7 +22,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #ifndef _CSEARCHLISTPACKET_H_
 #define _CSEARCHLISTPACKET_H_
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 
 enum SEARCHTYPE
 {
@@ -41,8 +41,9 @@ enum SEARCHTYPE
     SEARCH_UNK0x0E       = 0x0E, // 01110
     SEARCH_RANK          = 0x10, // 10000
     SEARCH_COMMENT       = 0x11, // 10001
-    SEARCH_FLAGS2        = 0x14, // 10100
-    SEARCH_LANGUAGE      = 0x15, // 10101
+    SEARCH_LINKSHELL2    = 0x13, // 10011
+    SEARCH_FLAGS2        = 0x16, // 10110
+    SEARCH_LANGUAGE      = 0x17, // 10111
 };
 
 class CSearchListPacket
@@ -50,13 +51,13 @@ class CSearchListPacket
 public:
     CSearchListPacket(uint32 Total);
 
-    void AddPlayer(SearchEntity* PPlayer);
+    bool AddPlayer(SearchEntity* PPlayer);
+    void SetFinal();
 
     uint8* GetData();
     uint16 GetSize() const;
 
 private:
-    uint8  m_count;
     uint32 m_offset;
     uint8  m_data[1024];
 };

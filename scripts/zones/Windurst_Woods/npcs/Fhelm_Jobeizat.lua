@@ -2,6 +2,7 @@
 -- Area: Windurst Woods
 --  NPC: Fhelm Jobeizat
 -- Records of Eminence NPC
+-- !pos 89.049 -4.108 -46.195 241
 -----------------------------------
 local ID = require("scripts/zones/Windurst_Woods/IDs")
 require("scripts/globals/sparkshop")
@@ -18,7 +19,7 @@ end
 entity.onTrigger = function(player, npc)
     if player:getEminenceProgress(1) then
         player:startEvent(848, 0, player:getGil())
-    elseif player:hasKeyItem(xi.ki.MEMORANDOLL) == false then
+    elseif not player:hasKeyItem(xi.ki.MEMORANDOLL) then
         player:startEvent(849)
     else
         player:triggerRoeEvent(xi.roe.triggers.talkToRoeNpc)

@@ -7,32 +7,32 @@
 -- Range: 30' radial
 -- Notes:
 -----------------------------------
-require("scripts/globals/monstertpmoves")
+require("scripts/globals/mobskills")
 require("scripts/globals/settings")
 require("scripts/globals/status")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local typeEffect = xi.effect.POISON
     local duration = 60
     local power = mob:getMainLvl() / 3
 
-    if (math.random() <= 0.5) then
+    if math.random() <= 0.5 then
         -- stun
         typeEffect = xi.effect.STUN
         duration = 10
         power = 1
     end
 
-    skill:setMsg(MobStatusEffectMove(mob, target, typeEffect, power, 0, duration))
+    skill:setMsg(xi.mobskills.mobStatusEffectMove(mob, target, typeEffect, power, 0, duration))
 
     mob:resetEnmity(target)
     return typeEffect
 end
 
-return mobskill_object
+return mobskillObject

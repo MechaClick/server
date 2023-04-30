@@ -21,27 +21,40 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 
 #include <thread>
 
-#include "../common/blowfish.h"
-#include "../common/cbasetypes.h"
-#include "../common/md52.h"
-#include "../common/mmo.h"
-#include "../common/showmsg.h"
-#include "../common/socket.h"
-#include "../common/sql.h"
-#include "../common/taskmgr.h"
-#include "../common/timer.h"
-#include "../common/utils.h"
+#include "common/blowfish.h"
+#include "common/cbasetypes.h"
+#include "common/console_service.h"
+#include "common/logging.h"
+#include "common/lua.h"
+#include "common/md52.h"
+#include "common/mmo.h"
+#include "common/settings.h"
+#include "common/socket.h"
+#include "common/sql.h"
+#include "common/taskmgr.h"
+#include "common/timer.h"
+#include "common/utils.h"
 
 #ifdef WIN32
+#include "../ext/wepoll/wepoll.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
 #include <cerrno>
 #include <netdb.h>
 #include <netinet/in.h>
+
+// MacOS has no epoll
+#ifdef __APPLE__
+#include <sys/ioctl.h>
+#else
+#include <sys/epoll.h>
+#endif
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+typedef int   HANDLE;
 typedef u_int SOCKET;
 #define INVALID_SOCKET (SOCKET)(~0)
 #define SOCKET_ERROR   (-1)
@@ -60,6 +73,7 @@ typedef u_int SOCKET;
 #include "packets/auction_list.h"
 #include "packets/linkshell_list.h"
 #include "packets/party_list.h"
+#include "packets/search_comment.h"
 #include "packets/search_list.h"
 
 #define DEFAULT_BUFLEN 1024
@@ -75,33 +89,20 @@ struct SearchCommInfo
     uint16 port;
 };
 
-void TaskManagerThread();
+void TaskManagerThread(const bool& requestExit);
 
 int32 ah_cleanup(time_point tick, CTaskMgr::CTask* PTask);
 
-const char* SEARCH_CONF_FILENAME = "./conf/search_server.conf";
-const char* LOGIN_CONF_FILENAME  = "./conf/login.conf";
-
 void TCPComm(SOCKET socket);
 
-extern void        HandleSearchRequest(CTCPRequestPacket& PTCPRequest);
-extern void        HandleSearchComment(CTCPRequestPacket& PTCPRequest);
-extern void        HandleGroupListRequest(CTCPRequestPacket& PTCPRequest);
-extern void        HandleAuctionHouseHistory(CTCPRequestPacket& PTCPRequest);
-extern void        HandleAuctionHouseRequest(CTCPRequestPacket& PTCPRequest);
-extern search_req  _HandleSearchRequest(CTCPRequestPacket& PTCPRequest);
-extern std::string toStr(int number);
+extern void       HandleSearchRequest(CTCPRequestPacket& PTCPRequest);
+extern void       HandleSearchComment(CTCPRequestPacket& PTCPRequest);
+extern void       HandleGroupListRequest(CTCPRequestPacket& PTCPRequest);
+extern void       HandleAuctionHouseHistory(CTCPRequestPacket& PTCPRequest);
+extern void       HandleAuctionHouseRequest(CTCPRequestPacket& PTCPRequest);
+extern search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest);
 
-search_config_t search_config;
-login_config_t  login_config;
-
-void search_config_default();
-void search_config_read(const int8* file);
-void search_config_read_from_env();
-
-void login_config_default();
-void login_config_read(const int8* file); // We only need the search server port defined here
-void login_config_read_from_env();
+extern std::unique_ptr<ConsoleService> gConsoleService;
 
 /************************************************************************
  *                                                                       *
@@ -111,34 +112,23 @@ void login_config_read_from_env();
 
 void PrintPacket(char* data, int size)
 {
-    char message[50];
-    memset(&message, 0, 50);
-
-    printf("\n");
+    std::printf("\n");
 
     for (int32 y = 0; y < size; y++)
     {
-        char msgtmp[50];
-        memset(&msgtmp, 0, 50);
-        std::snprintf(msgtmp, sizeof(msgtmp), "%s %02x", message, (uint8)data[y]);
-        strncpy(message, msgtmp, 50);
+        std::printf("%02x ", (uint8)data[y]);
         if (((y + 1) % 16) == 0)
         {
-            message[48] = '\n';
-            fputs(message, stdout);
-            memset(&message, 0, 50);
+            printf("\n");
         }
-    }
-    if (strlen(message) > 0)
-    {
-        message[strlen(message)] = '\n';
-        fputs(message, stdout);
     }
     printf("\n");
 }
 
 int32 main(int32 argc, char** argv)
 {
+    bool appendDate{};
+    bool requestExit = false;
 #ifdef WIN32
     WSADATA wsaData;
 #endif
@@ -157,9 +147,19 @@ int32 main(int32 argc, char** argv)
         {
             logFile = argv[i + 1];
         }
+
+        if (strcmp(argv[i], "--append-date") == 0)
+        {
+            appendDate = true;
+        }
     }
 
-    InitializeLog(logFile);
+    logging::InitializeLog("search", logFile, appendDate);
+
+    lua_init();
+    settings::init();
+
+    auto expireDays = settings::get<uint16>("search.EXPIRE_DAYS");
 
     int iResult;
 
@@ -169,18 +169,12 @@ int32 main(int32 argc, char** argv)
     struct addrinfo* result = nullptr;
     struct addrinfo  hints;
 
-    search_config_default();
-    search_config_read((const int8*)SEARCH_CONF_FILENAME);
-    search_config_read_from_env();
-    login_config_read((const int8*)LOGIN_CONF_FILENAME);
-    login_config_read_from_env();
-
 #ifdef WIN32
     // Initialize Winsock
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0)
     {
-        ShowError("WSAStartup failed with error: %d\n", iResult);
+        ShowError("WSAStartup failed with error: %d", iResult);
         return 1;
     }
 
@@ -195,10 +189,10 @@ int32 main(int32 argc, char** argv)
     hints.ai_flags    = AI_PASSIVE;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(nullptr, login_config.search_server_port.c_str(), &hints, &result);
+    iResult = getaddrinfo(nullptr, settings::get<std::string>("network.SEARCH_PORT").c_str(), &hints, &result);
     if (iResult != 0)
     {
-        ShowError("getaddrinfo failed with error: %d\n", iResult);
+        ShowError("getaddrinfo failed with error: %d", iResult);
 #ifdef WIN32
         WSACleanup();
 #endif
@@ -210,27 +204,39 @@ int32 main(int32 argc, char** argv)
     if (ListenSocket == INVALID_SOCKET)
     {
 #ifdef WIN32
-        ShowError("socket failed with error: %ld\n", WSAGetLastError());
+        ShowError("socket failed with error: %ld", WSAGetLastError());
         freeaddrinfo(result);
         WSACleanup();
 #else
-        ShowError("socket failed with error: %ld\n", errno);
+        ShowError("socket failed with error: %ld", errno);
         freeaddrinfo(result);
 #endif
         return 1;
     }
 
+    // https://stackoverflow.com/questions/3229860/what-is-the-meaning-of-so-reuseaddr-setsockopt-option-linux
+    // Avoid hangs in TIME_WAIT state of TCP
+#ifdef WIN32
+    // Windows doesn't seem to have this problem, but apparently this would be the right way to explicitly mimic SO_REUSEADDR unix's behavior.
+    setsockopt(ListenSocket, SOL_SOCKET, SO_DONTLINGER, "\x00\x00\x00\x00", 4);
+#else
+    int enable = 1;
+    if (setsockopt(ListenSocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+    {
+        ShowError("setsockopt SO_REUSEADDR failed!");
+    }
+#endif
     // Setup the TCP listening socket
     iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR)
     {
 #ifdef WIN32
-        ShowError("bind failed with error: %d\n", WSAGetLastError());
+        ShowError("bind failed with error: %d", WSAGetLastError());
         freeaddrinfo(result);
         closesocket(ListenSocket);
         WSACleanup();
 #else
-        ShowError("bind failed with error: %d\n", errno);
+        ShowError("bind failed with error: %d", errno);
         freeaddrinfo(result);
         close(ListenSocket);
 #endif
@@ -243,65 +249,176 @@ int32 main(int32 argc, char** argv)
     if (iResult == SOCKET_ERROR)
     {
 #ifdef WIN32
-        ShowError("listen failed with error: %d\n", WSAGetLastError());
+        ShowError("listen failed with error: %d", WSAGetLastError());
         closesocket(ListenSocket);
         WSACleanup();
 #else
-        ShowError("listen failed with error: %d\n", errno);
+        ShowError("listen failed with error: %d", errno);
         close(ListenSocket);
 #endif
         return 1;
     }
 
-    ShowMessage(CL_WHITE "========================================================\n\n" CL_RESET);
-    ShowMessage(CL_WHITE "topaz_search\n\n");
-    ShowMessage(CL_WHITE "========================================================\n\n" CL_RESET);
-    if (search_config.expire_auctions == 1)
+#ifdef _WIN32
+    // Disable Quick Edit Mode (Mark) in Windows Console to prevent users from accidentially
+    // causing the server to freeze.
+    HANDLE hInput;
+    DWORD  prev_mode;
+    hInput = GetStdHandle(STD_INPUT_HANDLE);
+    GetConsoleMode(hInput, &prev_mode);
+    SetConsoleMode(hInput, ENABLE_EXTENDED_FLAGS | (prev_mode & ~ENABLE_QUICK_EDIT_MODE));
+#endif // _WIN32
+
+    ShowInfo("========================================================");
+    ShowInfo("search and auction server");
+    ShowInfo("========================================================");
+
+    if (settings::get<bool>("search.EXPIRE_AUCTIONS"))
     {
-        ShowMessage(CL_GREEN "AH task to return items older than %u days is running\n" CL_RESET, search_config.expire_days);
+        ShowInfo("AH task to return items older than %u days is running", expireDays);
         CTaskMgr::getInstance()->AddTask("ah_cleanup", server_clock::now(), nullptr, CTaskMgr::TASK_INTERVAL, ah_cleanup,
-                                         std::chrono::seconds(search_config.expire_interval));
+                                         std::chrono::seconds(settings::get<uint32>("search.EXPIRE_INTERVAL")));
     }
-    //  ShowMessage(CL_CYAN"[TASKMGR] Starting task manager thread..\n" CL_RESET);
 
-    std::thread(TaskManagerThread).detach();
+    std::thread taskManagerThread(TaskManagerThread, std::ref(requestExit));
 
-    while (true)
+    // clang-format off
+    gConsoleService = std::make_unique<ConsoleService>();
+    gConsoleService->RegisterCommand(
+    "ah_cleanup", fmt::format("AH task to return items older than {} days.", expireDays),
+    [](std::vector<std::string> inputs)
     {
+        ah_cleanup(server_clock::now(), nullptr);
+    });
+    gConsoleService->RegisterCommand(
+    "expire_all", "Force-expire all items on the AH, returning to sender.",
+    [](std::vector<std::string> inputs)
+    {
+        CDataLoader data;
+        data.ExpireAHItems(0);
+    });
+
+    gConsoleService->RegisterCommand("exit", "Terminate the program.",
+    [&](std::vector<std::string> inputs)
+    {
+        fmt::print("> Goodbye!\n");
+        gConsoleService->stop();
+        requestExit = true;
+    });
+    // clang-format on
+
+    ShowInfo("========================================================");
+#ifndef __APPLE__
+    epoll_event epollEvent  = { EPOLLIN };
+    HANDLE      epollHandle = epoll_create1(0);
+    epoll_ctl(epollHandle, EPOLL_CTL_ADD, ListenSocket, &epollEvent);
+    int ret = 0;
+
+    while (!requestExit)
+    {
+        ret = epoll_wait(epollHandle, &epollEvent, 1, 100);
+        if (ret == SOCKET_ERROR)
+        {
+            if (sErrno != S_EINTR)
+            {
+                ShowCritical("do_sockets: select() failed, error code %d!", sErrno);
+                exit(EXIT_FAILURE);
+            }
+            continue; // interrupted by a signal, just loop and try again
+        }
+        else if (ret == 0 || requestExit)
+        {
+            continue;
+        }
+
         // Accept a client socket
         ClientSocket = accept(ListenSocket, nullptr, nullptr);
         if (ClientSocket == INVALID_SOCKET)
         {
-#ifdef WIN32
-            ShowError("accept failed with error: %d\n", WSAGetLastError());
-#else
-            ShowError("accept failed with error: %d\n", errno);
-#endif
+            ShowError("accept failed with error: %d", sErrno);
             continue;
         }
 
         std::thread(TCPComm, ClientSocket).detach();
     }
-    // TODO: The code below this line will never be reached.
 
-    // shutdown the connection since we're done
-#ifdef WIN32
-    iResult = shutdown(ClientSocket, SD_SEND);
+    gConsoleService = nullptr;
+
+    // close the connection since we're done
+    epoll_ctl(epollHandle, EPOLL_CTL_DEL, ListenSocket, &epollEvent);
+
+    // __APPLE__ has no epoll, use Select
 #else
-    iResult = shutdown(ClientSocket, SHUT_WR);
+    fd_set fdSet        = {};
+    fd_set workingFdSet = {};
+
+    struct timeval timeout = {};
+
+    FD_ZERO(&fdSet);
+    FD_SET(ListenSocket, &fdSet);
+
+    int usecTimeout = std::chrono::duration_cast<std::chrono::microseconds>(100ms).count();
+
+    int ret = 0;
+    while (!requestExit)
+    {
+        // timeout can be updated by select, set it back every iteration.
+        timeout.tv_sec  = 0;
+        timeout.tv_usec = usecTimeout;
+
+        memcpy(&workingFdSet, &fdSet, sizeof(fdSet));
+        ret = sSelect(ListenSocket + 1, &workingFdSet, nullptr, nullptr, &timeout);
+
+        if (ret == SOCKET_ERROR)
+        {
+            if (sErrno != S_EINTR)
+            {
+                ShowCritical("select() failed, error code %d!", sErrno);
+                exit(EXIT_FAILURE);
+            }
+            continue;
+        }
+
+        if (ret > 0)
+        {
+            // Accept a client socket
+            ClientSocket = accept(ListenSocket, nullptr, nullptr);
+            if (ClientSocket == INVALID_SOCKET)
+            {
+                ShowError("accept failed with error: %d", sErrno);
+                continue;
+            }
+
+            std::thread(TCPComm, ClientSocket).detach();
+        }
+    }
+#endif
+
+#ifdef WIN32
+    epoll_close(epollHandle);
+    iResult = shutdown(ListenSocket, SD_SEND);
+#else
+    iResult = shutdown(ListenSocket, SHUT_WR);
 #endif
     if (iResult == SOCKET_ERROR)
     {
 #ifdef WIN32
-        ShowError("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(ClientSocket);
-        WSACleanup();
+        if (sErrno != WSAENOTCONN) // If the socket isn't connected we throw an error if we try to close it if it's not connected.
+        {
+            ShowError("shutdown failed with error: %d", WSAGetLastError());
+            closesocket(ListenSocket);
+            WSACleanup();
+            return 1;
+        }
 #else
-        ShowError("shutdown failed with error: %d\n", errno);
-        close(ClientSocket);
-#endif
+        ShowError("shutdown failed with error: %d", errno);
+        close(ListenSocket);
         return 1;
+#endif
     }
+
+    logging::ShutDown();
+    taskManagerThread.join();
 
     // cleanup
 #ifdef WIN32
@@ -313,212 +430,35 @@ int32 main(int32 argc, char** argv)
     return 0;
 }
 
-/************************************************************************
- *                                                                       *
- *  topaz_search default config                                          *
- *                                                                       *
- ************************************************************************/
-
-void search_config_default()
-{
-    search_config.mysql_host      = "127.0.0.1";
-    search_config.mysql_login     = "root";
-    search_config.mysql_password  = "root";
-    search_config.mysql_database  = "xidb";
-    search_config.mysql_port      = 3306;
-    search_config.expire_auctions = true;
-    search_config.expire_days     = 3;
-    search_config.expire_interval = 3600;
-}
-
-/************************************************************************
- *                                                                       *
- *  topaz_search config                                                  *
- *                                                                       *
- ************************************************************************/
-
-void search_config_read(const int8* file)
-{
-    char  line[1024];
-    char  w1[1024];
-    char  w2[1024];
-    FILE* fp;
-
-    fp = fopen((const char*)file, "r");
-    if (fp == nullptr)
-    {
-        ShowError("configuration file not found at: %s\n", file);
-        return;
-    }
-
-    while (fgets(line, sizeof(line), fp))
-    {
-        char* ptr;
-
-        if (line[0] == '#')
-        {
-            continue;
-        }
-        if (sscanf(line, "%[^:]: %[^\t\r\n]", w1, w2) < 2)
-        {
-            continue;
-        }
-
-        // Strip trailing spaces
-        ptr = w2 + strlen(w2);
-        while (--ptr >= w2 && *ptr == ' ')
-        {
-            ;
-        }
-        ptr++;
-        *ptr = '\0';
-
-        if (strcmp(w1, "mysql_host") == 0)
-        {
-            search_config.mysql_host = std::string(w2);
-        }
-        else if (strcmp(w1, "mysql_login") == 0)
-        {
-            search_config.mysql_login = std::string(w2);
-        }
-        else if (strcmp(w1, "mysql_password") == 0)
-        {
-            search_config.mysql_password = std::string(w2);
-        }
-        else if (strcmp(w1, "mysql_port") == 0)
-        {
-            search_config.mysql_port = atoi(w2);
-        }
-        else if (strcmp(w1, "mysql_database") == 0)
-        {
-            search_config.mysql_database = std::string(w2);
-        }
-        else if (strcmp(w1, "expire_auctions") == 0)
-        {
-            search_config.expire_auctions = atoi(w2);
-        }
-        else if (strcmp(w1, "expire_days") == 0)
-        {
-            search_config.expire_days = atoi(w2);
-        }
-        else if (strcmp(w1, "expire_interval") == 0)
-        {
-            search_config.expire_interval = atoi(w2);
-        }
-        else
-        {
-            ShowWarning(CL_YELLOW "Unknown setting '%s' in file %s\n" CL_RESET, w1, file);
-        }
-    }
-    fclose(fp);
-}
-
-void search_config_read_from_env()
-{
-    search_config.mysql_login    = std::getenv("XI_DB_USER") ? std::getenv("XI_DB_USER") : search_config.mysql_login;
-    search_config.mysql_password = std::getenv("XI_DB_USER_PASSWD") ? std::getenv("XI_DB_USER_PASSWD") : search_config.mysql_password;
-    search_config.mysql_host     = std::getenv("XI_DB_HOST") ? std::getenv("XI_DB_HOST") : search_config.mysql_host;
-    search_config.mysql_port     = std::getenv("XI_DB_PORT") ? std::stoi(std::getenv("XI_DB_PORT")) : search_config.mysql_port;
-    search_config.mysql_database = std::getenv("XI_DB_NAME") ? std::getenv("XI_DB_NAME") : search_config.mysql_database;
-}
-
-/************************************************************************
- *                                                                       *
- *  login_topaz                                                          *
- *                                                                       *
- ************************************************************************/
-
-void login_config_default()
-{
-    login_config.search_server_port = "54002";
-}
-
-/************************************************************************
- *                                                                       *
- *  login_topaz                                                          *
- *                                                                       *
- ************************************************************************/
-
-void login_config_read(const int8* file)
-{
-    char  line[1024];
-    char  w1[1024];
-    char  w2[1024];
-    FILE* fp;
-
-    fp = fopen((const char*)file, "r");
-    if (fp == nullptr)
-    {
-        ShowError("configuration file not found at: %s\n", file);
-        return;
-    }
-
-    while (fgets(line, sizeof(line), fp))
-    {
-        char* ptr;
-
-        if (line[0] == '#')
-        {
-            continue;
-        }
-        if (sscanf(line, "%[^:]: %[^\t\r\n]", w1, w2) < 2)
-        {
-            continue;
-        }
-
-        // Strip trailing spaces
-        ptr = w2 + strlen(w2);
-        while (--ptr >= w2 && *ptr == ' ')
-        {
-            ;
-        }
-        ptr++;
-        *ptr = '\0';
-
-        if (strcmp(w1, "search_server_port") == 0)
-        {
-            login_config.search_server_port = std::string(w2);
-        }
-    }
-    fclose(fp);
-}
-
-void login_config_read_from_env()
-{
-    login_config.search_server_port = std::getenv("XI_SEARCH_PORT") ? std::getenv("XI_SEARCH_PORT") : login_config.search_server_port;
-}
-
 void TCPComm(SOCKET socket)
 {
-    // ShowMessage("TCP connection from client with port: %u\n", htons(CommInfo.port));
-
     CTCPRequestPacket PTCPRequest(&socket);
 
     if (PTCPRequest.ReceiveFromSocket() == 0)
     {
         return;
     }
-    // PrintPacket((int8*)PTCPRequest->GetData(), PTCPRequest->GetSize());
-    ShowMessage("= = = = = = = \nType: %u Size: %u \n", PTCPRequest.GetPacketType(), PTCPRequest.GetSize());
+
+    ShowInfo("= = = = = = = Type: %u Size: %u ", PTCPRequest.GetPacketType(), PTCPRequest.GetSize());
 
     switch (PTCPRequest.GetPacketType())
     {
         case TCP_SEARCH:
         case TCP_SEARCH_ALL:
         {
-            ShowMessage("Search \n");
+            ShowInfo("Search ");
             HandleSearchRequest(PTCPRequest);
         }
         break;
         case TCP_SEARCH_COMMENT:
         {
-            ShowMessage("Search comment \n");
+            ShowInfo("Search comment ");
             HandleSearchComment(PTCPRequest);
         }
         break;
         case TCP_GROUP_LIST:
         {
-            ShowMessage("Search group\n");
+            ShowInfo("Search group");
             HandleGroupListRequest(PTCPRequest);
         }
         break;
@@ -545,15 +485,15 @@ void TCPComm(SOCKET socket)
 
 void HandleGroupListRequest(CTCPRequestPacket& PTCPRequest)
 {
-    uint8* data = (uint8*)PTCPRequest.GetData();
+    uint8* data = PTCPRequest.GetData();
 
-    uint16 partyid      = ref<uint16>(data, 0x10);
-    uint16 allianceid   = ref<uint16>(data, 0x14);
+    uint32 partyid      = ref<uint32>(data, 0x10);
+    uint32 allianceid   = ref<uint32>(data, 0x14);
     uint32 linkshellid1 = ref<uint32>(data, 0x18);
     uint32 linkshellid2 = ref<uint32>(data, 0x1C);
 
-    ShowMessage("SEARCH::PartyID = %u\n", partyid);
-    ShowMessage("SEARCH::LinkshellIDs = %u, %u\n", linkshellid1, linkshellid2);
+    ShowInfo("SEARCH::PartyID = %u", partyid);
+    ShowInfo("SEARCH::LinkshellIDs = %u, %u", linkshellid1, linkshellid2);
 
     CDataLoader PDataLoader;
 
@@ -576,30 +516,51 @@ void HandleGroupListRequest(CTCPRequestPacket& PTCPRequest)
         uint32                   linkshellid   = linkshellid1 == 0 ? linkshellid2 : linkshellid1;
         std::list<SearchEntity*> LinkshellList = PDataLoader.GetLinkshellList(linkshellid);
 
-        CLinkshellListPacket PLinkshellPacket(linkshellid, (uint32)LinkshellList.size());
+        uint32 totalResults  = (uint32)LinkshellList.size();
+        uint32 currentResult = 0;
 
-        for (auto& it : LinkshellList)
+        // Iterate through the linkshell list, splitting up the results into
+        // smaller chunks.
+        std::list<SearchEntity*>::iterator it = LinkshellList.begin();
+
+        do
         {
-            PLinkshellPacket.AddPlayer(it);
-        }
+            CLinkshellListPacket PLinkshellPacket(linkshellid, totalResults);
 
-        PrintPacket((char*)PLinkshellPacket.GetData(), PLinkshellPacket.GetSize());
-        PTCPRequest.SendToSocket(PLinkshellPacket.GetData(), PLinkshellPacket.GetSize());
+            while (currentResult < totalResults)
+            {
+                bool success = PLinkshellPacket.AddPlayer(*it);
+                if (!success)
+                    break;
+
+                currentResult++;
+                ++it;
+            }
+
+            if (currentResult == totalResults)
+                PLinkshellPacket.SetFinal();
+
+            auto ret = PTCPRequest.SendToSocket(PLinkshellPacket.GetData(), PLinkshellPacket.GetSize());
+            if (ret <= 0)
+                break;
+        } while (currentResult < totalResults);
     }
 }
 
 void HandleSearchComment(CTCPRequestPacket& PTCPRequest)
 {
-    uint8 packet[] = { 0xCC, 0x00, 0x00, 0x00, 0x49, 0x58, 0x46, 0x46, 0x20, 0x9B, 0x16, 0xC8, 0x4C, 0x76, 0x07, 0x02, 0x17, 0x71, 0xB9, 0xA8, 0xF5, 0xB6, 0xCF,
-                       0xED, 0xF1, 0xFF, 0x70, 0x52, 0xA9, 0xAE, 0x81, 0xB6, 0x1B, 0x2B, 0x7B, 0xA0, 0xC1, 0xD2, 0xD1, 0xFD, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74,
-                       0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08,
-                       0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37,
-                       0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80,
-                       0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43,
-                       0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x61, 0x43, 0x80, 0x37, 0x08, 0x74, 0xC5, 0x8D, 0x0C, 0x04, 0x13, 0xC0, 0x89, 0x17, 0x8F, 0x72, 0x93,
-                       0xD6, 0x90, 0xF1, 0x21, 0x7A, 0xA5, 0xAC, 0x93, 0xD6, 0x90, 0xF1, 0x21, 0x7A, 0xA5, 0xAC, 0x93, 0xD6, 0x90, 0xF1, 0x21, 0x7A, 0xA5, 0xAC,
-                       0x38, 0x25, 0x69, 0x79, 0x00, 0xC6, 0x7E, 0xDC, 0x80, 0x3D, 0x99, 0x85, 0xF4, 0xDF, 0xCF, 0xFC, 0x1A, 0x72, 0xE2, 0x0D };
-    PTCPRequest.SendRawToSocket(packet, sizeof(packet));
+    uint8* data     = PTCPRequest.GetData();
+    uint32 playerId = ref<uint32>(data, 0x10);
+
+    CDataLoader PDataLoader;
+    std::string comment = PDataLoader.GetSearchComment(playerId);
+    if (comment.empty())
+    {
+        return;
+    }
+
+    SearchCommentPacket commentPacket(playerId, comment);
+    PTCPRequest.SendToSocket(commentPacket.GetData(), commentPacket.GetSize());
 }
 
 void HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
@@ -609,21 +570,40 @@ void HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
 
     CDataLoader              PDataLoader;
     std::list<SearchEntity*> SearchList = PDataLoader.GetPlayersList(sr, &totalCount);
-    // PDataLoader->GetPlayersCount(sr)
-    CSearchListPacket PSearchPacket(totalCount);
 
-    for (auto& it : SearchList)
+    uint32 totalResults  = (uint32)SearchList.size();
+    uint32 currentResult = 0;
+
+    // Iterate through the search list, splitting up the results into
+    // smaller chunks.
+    std::list<SearchEntity*>::iterator it = SearchList.begin();
+
+    do
     {
-        PSearchPacket.AddPlayer(it);
-    }
+        CSearchListPacket PSearchPacket(totalCount);
 
-    // PrintPacket((int8*)PSearchPacket->GetData(), PSearchPacket->GetSize());
-    PTCPRequest.SendToSocket(PSearchPacket.GetData(), PSearchPacket.GetSize());
+        while (currentResult < totalResults)
+        {
+            bool success = PSearchPacket.AddPlayer(*it);
+            if (!success)
+                break;
+
+            currentResult++;
+            ++it;
+        }
+
+        if (currentResult == totalResults)
+            PSearchPacket.SetFinal();
+
+        auto ret = PTCPRequest.SendToSocket(PSearchPacket.GetData(), PSearchPacket.GetSize());
+        if (ret <= 0)
+            break;
+    } while (currentResult < totalResults);
 }
 
 void HandleAuctionHouseRequest(CTCPRequestPacket& PTCPRequest)
 {
-    uint8* data    = (uint8*)PTCPRequest.GetData();
+    uint8* data    = PTCPRequest.GetData();
     uint8  AHCatID = ref<uint8>(data, 0x16);
 
     // 2 - level
@@ -634,22 +614,26 @@ void HandleAuctionHouseRequest(CTCPRequestPacket& PTCPRequest)
     // 7 - defense
     // 8 - resistance
     // 9 - name
-    string_t OrderByString = "ORDER BY";
-    uint8    paramCount    = ref<uint8>(data, 0x12);
+    std::string OrderByString = "ORDER BY";
+    uint8       paramCount    = ref<uint8>(data, 0x12);
     for (uint8 i = 0; i < paramCount; ++i) // параметры сортировки предметов
     {
         uint8 param = ref<uint32>(data, 0x18 + 8 * i);
-        ShowMessage(" Param%u: %u\n", i, param);
+        ShowInfo(" Param%u: %u", i, param);
         switch (param)
         {
             case 2:
                 OrderByString.append(" item_equipment.level DESC,");
+                break;
             case 5:
                 OrderByString.append(" item_weapon.dmg DESC,");
+                break;
             case 6:
                 OrderByString.append(" item_weapon.delay DESC,");
+                break;
             case 9:
                 OrderByString.append(" item_basic.sortname,");
+                break;
         }
     }
 
@@ -664,10 +648,11 @@ void HandleAuctionHouseRequest(CTCPRequestPacket& PTCPRequest)
     for (uint8 i = 0; i < PacketsCount; ++i)
     {
         CAHItemsListPacket PAHPacket(20 * i);
+        uint16             itemListSize = static_cast<uint16>(ItemList.size());
 
-        PAHPacket.SetItemCount((uint16)ItemList.size());
+        PAHPacket.SetItemCount(itemListSize);
 
-        for (uint16 y = 20 * i; (y != 20 * (i + 1)) && (y < ItemList.size()); ++y)
+        for (uint16 y = 20 * i; (y != 20 * (i + 1)) && (y < itemListSize); ++y)
         {
             PAHPacket.AddItem(ItemList.at(y));
         }
@@ -678,14 +663,15 @@ void HandleAuctionHouseRequest(CTCPRequestPacket& PTCPRequest)
 
 void HandleAuctionHouseHistory(CTCPRequestPacket& PTCPRequest)
 {
-    uint8* data   = (uint8*)PTCPRequest.GetData();
+    uint8* data   = PTCPRequest.GetData();
     uint16 ItemID = ref<uint16>(data, 0x12);
     uint8  stack  = ref<uint8>(data, 0x15);
 
-    CAHHistoryPacket PAHPacket(ItemID);
-
     CDataLoader             PDataLoader;
     std::vector<ahHistory*> HistoryList = PDataLoader.GetAHItemHystory(ItemID, stack != 0);
+    ahItem                  item        = PDataLoader.GetAHItemFromItemID(ItemID);
+
+    CAHHistoryPacket PAHPacket = CAHHistoryPacket(item, stack);
 
     for (auto& i : HistoryList)
     {
@@ -706,8 +692,8 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
     unsigned char isPresent      = 0;
     unsigned char areaCount      = 0;
 
-    char  name[16];
-    uint8 nameLen = 0;
+    char  name[16] = {};
+    uint8 nameLen  = 0;
 
     uint8 minLvl = 0;
     uint8 maxLvl = 0;
@@ -719,17 +705,16 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
     uint8 minRank = 0;
     uint8 maxRank = 0;
 
-    uint16 areas[10];
+    uint16 areas[15] = {};
 
     uint32 flags = 0;
 
-    uint8* data = (uint8*)PTCPRequest.GetData();
+    uint8* data = PTCPRequest.GetData();
     uint8  size = ref<uint8>(data, 0x10);
 
     uint16 workloadBits = size * 8;
 
-    memset(areas, 0, sizeof(areas));
-    // ShowMessage("Received a search packet with size %u byte\n", size);
+    uint8 commentType = 0;
 
     while (bitOffset < workloadBits)
     {
@@ -744,7 +729,7 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
 
         if ((EntryType != SEARCH_FRIEND) && (EntryType != SEARCH_LINKSHELL) && (EntryType != SEARCH_COMMENT) && (EntryType != SEARCH_FLAGS2))
         {
-            if ((bitOffset + 3) >= workloadBits) // so 0000000 at the end does not get interpretet as name entry ...
+            if ((bitOffset + 3) >= workloadBits) // so 0000000 at the end does not get interpret as name entry
             {
                 bitOffset = workloadBits;
                 break;
@@ -777,24 +762,20 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                         name[i] = (char)unpackBitsLE(&data[0x11], bitOffset, 7);
                         bitOffset += 7;
                     }
-                    // printf("SEARCH::Name Entry Found. (%s).\n",name);
                 }
-                // printf("SEARCH::SortByName: %s.\n",(sortDescending == 0 ? "ascending" : "descending"));
-                // packetData.sortDescendingByName=sortDescending;
                 break;
             }
             case SEARCH_AREA: // Area Code Entry - 10 bit
             {
                 if (isPresent == 0) // no more Area entries
                 {
-                    // printf("SEARCH::Area List End found.\n");
+                    ShowTrace("Area List End found.");
                 }
                 else // 8 Bit = 1 Byte per Area Code
                 {
                     areas[areaCount] = (uint16)unpackBitsLE(&data[0x11], bitOffset, 10);
                     areaCount++;
                     bitOffset += 10;
-                    //  printf("SEARCH::Area List Entry found(%2X)!\n",areas[areaCount-1]);
                 }
                 break;
             }
@@ -806,7 +787,7 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                     bitOffset += 2;
                     nationid = country;
 
-                    printf("SEARCH::Nationality Entry found. (%2X) Sorting: (%s).\n", country, (sortDescending == 0x00) ? "ascending" : "descending");
+                    ShowInfo("Nationality Entry found. (%2X) Sorting: (%s).\n", country, (sortDescending == 0x00) ? "ascending" : "descending");
                 }
                 break;
             }
@@ -817,10 +798,7 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                     unsigned char job = (unsigned char)unpackBitsLE(&data[0x11], bitOffset, 5);
                     bitOffset += 5;
                     jobid = job;
-                    // printf("SEARCH::Job Entry found. (%2X) Sorting: (%s).\n",job,(sortDescending==0x00)?"ascending":"descending");
                 }
-                // packetData.sortDescendingByJob=sortDescending;
-                // printf("SEARCH::SortByJob: %s.\n",(sortDescending==0x00)?"ascending":"descending");
                 break;
             }
             case SEARCH_LEVEL: // Level- 16 bit
@@ -833,10 +811,7 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                     bitOffset += 8;
                     minLvl = fromLvl;
                     maxLvl = toLvl;
-                    // printf("SEARCH::Level Entry found. (%d - %d) Sorting: (%s).\n",fromLvl,toLvl,(sortDescending==0x00)?"ascending":"descending");
                 }
-                // packetData.sortDescendingByLevel=sortDescending;
-                // printf("SEARCH::SortByLevel: %s.\n",(sortDescending==0x00)?"ascending":"descending");
                 break;
             }
             case SEARCH_RACE: // Race - 4 bit
@@ -847,10 +822,9 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                     bitOffset += 4;
                     raceid = race;
 
-                    printf("SEARCH::Race Entry found. (%2X) Sorting: (%s).\n", race, (sortDescending == 0x00) ? "ascending" : "descending");
+                    ShowInfo("Race Entry found. (%2X) Sorting: (%s).\n", race, (sortDescending == 0x00) ? "ascending" : "descending");
                 }
-                printf("SEARCH::SortByRace: %s.\n", (sortDescending == 0x00) ? "ascending" : "descending");
-                // packetData.sortDescendingByRace=sortDescending;
+                ShowInfo("SortByRace: %s.\n", (sortDescending == 0x00) ? "ascending" : "descending");
                 break;
             }
             case SEARCH_RANK: // Rank - 2 byte
@@ -864,18 +838,17 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                     bitOffset += 8;
                     maxRank = toRank;
 
-                    printf("SEARCH::Rank Entry found. (%d - %d) Sorting: (%s).\n", fromRank, toRank, (sortDescending == 0x00) ? "ascending" : "descending");
+                    ShowInfo("Rank Entry found. (%d - %d) Sorting: (%s).\n", fromRank, toRank, (sortDescending == 0x00) ? "ascending" : "descending");
                 }
-                printf("SEARCH::SortByRank: %s.\n", (sortDescending == 0x00) ? "ascending" : "descending");
-                // packetData.sortDescendingByRank=sortDescending;
+                ShowInfo("SortByRank: %s.\n", (sortDescending == 0x00) ? "ascending" : "descending");
                 break;
             }
             case SEARCH_COMMENT: // 4 Byte
             {
-                unsigned int comment = (unsigned int)unpackBitsLE(&data[0x11], bitOffset, 32);
+                commentType = (uint8)unpackBitsLE(&data[0x11], bitOffset, 32);
                 bitOffset += 32;
 
-                printf("SEARCH::Comment Entry found. (%8X).\n", comment);
+                ShowInfo("Comment Entry found. (%2X).\n", commentType);
                 break;
             }
             // the following 4 Entries were generated with /sea (ballista|friend|linkshell|away|inv)
@@ -885,12 +858,12 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                 unsigned int lsId = (unsigned int)unpackBitsLE(&data[0x11], bitOffset, 32);
                 bitOffset += 32;
 
-                printf("SEARCH::Linkshell Entry found. Value: %.8X\n", lsId);
+                ShowInfo("Linkshell Entry found. Value: %.8X\n", lsId);
                 break;
             }
             case SEARCH_FRIEND: // Friend Packet, 0 byte
             {
-                printf("SEARCH::Friend Entry found.\n");
+                ShowInfo("Friend Entry found.\n");
                 break;
             }
             case SEARCH_FLAGS1: // Flag Entry #1, 2 byte,
@@ -900,12 +873,11 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
                     unsigned short flags1 = (unsigned short)unpackBitsLE(&data[0x11], bitOffset, 16);
                     bitOffset += 16;
 
-                    printf("SEARCH::Flag Entry #1 (%.4X) found. Sorting: (%s).\n", flags1, (sortDescending == 0x00) ? "ascending" : "descending");
+                    ShowInfo("Flag Entry #1 (%.4X) found. Sorting: (%s).\n", flags1, (sortDescending == 0x00) ? "ascending" : "descending");
 
                     flags = flags1;
                 }
-                printf("SEARCH::SortByFlags: %s\n", (sortDescending == 0 ? "ascending" : "descending"));
-                // packetData.sortDescendingByFlags=sortDescending;
+                ShowInfo("SortByFlags: %s\n", (sortDescending == 0 ? "ascending" : "descending"));
                 break;
             }
             case SEARCH_FLAGS2: // Flag Entry #2 - 4 byte
@@ -914,41 +886,33 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
 
                 bitOffset += 32;
                 flags = flags2;
-                /*
-                if ((flags & 0xFFFF)!=(packetData.flags1))
-                {
-                printf("SEARCH::Flag mismatch: %.8X != %.8X\n",flags,packetData.flags1&0xFFFF);
-                }
-                packetData.flags2=flags;
-                printf("SEARCH::Flag Entry #2 (%.8X) found.\n",packetData.flags2);
-                */
                 break;
             }
             default:
             {
-                printf("SEARCH::Unknown Search Param %.2X!\n", EntryType);
-                // outputPacket=true;
+                ShowInfo("Unknown Search Param %.2X!\n", EntryType);
                 break;
             }
         }
     }
     printf("\n");
 
-    ShowMessage("Name: %s Job: %u Lvls: %u ~ %u \n", (nameLen > 0 ? name : nullptr), jobid, minLvl, maxLvl);
+    ShowInfo("Name: %s Job: %u Lvls: %u ~ %u ", (nameLen > 0 ? name : nullptr), jobid, minLvl, maxLvl);
 
     search_req sr;
     sr.jobid  = jobid;
     sr.maxlvl = maxLvl;
     sr.minlvl = minLvl;
 
-    sr.race    = raceid;
-    sr.nation  = nationid;
-    sr.minRank = minRank;
-    sr.maxRank = maxRank;
-    sr.flags   = flags;
+    sr.race        = raceid;
+    sr.nation      = nationid;
+    sr.minRank     = minRank;
+    sr.maxRank     = maxRank;
+    sr.flags       = flags;
+    sr.commentType = commentType;
 
     sr.nameLen = nameLen;
-    memcpy(sr.zoneid, areas, sizeof(sr.zoneid));
+    memcpy(&sr.zoneid, areas, sizeof(sr.zoneid));
     if (nameLen > 0)
     {
         sr.name.insert(0, name);
@@ -965,10 +929,10 @@ search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest)
  *                                                                       *
  ************************************************************************/
 
-void TaskManagerThread()
+void TaskManagerThread(const bool& requestExit)
 {
     duration next;
-    while (true)
+    while (!requestExit)
     {
         next = CTaskMgr::getInstance()->DoTimer(server_clock::now());
         std::this_thread::sleep_for(next);
@@ -983,10 +947,23 @@ void TaskManagerThread()
 
 int32 ah_cleanup(time_point tick, CTaskMgr::CTask* PTask)
 {
-    // ShowMessage(CL_YELLOW"[TASK] ah_cleanup tick..\n" CL_RESET);
-
     CDataLoader data;
-    data.ExpireAHItems();
+    data.ExpireAHItems(settings::get<uint16>("search.EXPIRE_DAYS"));
 
     return 0;
+}
+
+void do_final(int code)
+{
+    timer_final();
+    socket_final();
+
+    logging::ShutDown();
+
+    exit(code);
+}
+
+void do_abort()
+{
+    do_final(EXIT_FAILURE);
 }

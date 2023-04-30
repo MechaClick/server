@@ -9,7 +9,7 @@ require("scripts/globals/keyitems")
 xi = xi or {}
 xi.armorStorage = xi.armorStorage or {}
 
--- {SetId, SetGroup, SetMask, SetCount, Head, Body, Hands, Legs, Feet, StorageCost, KeyItem}
+-- { SetId, SetGroup, SetMask, SetCount, Head, Body, Hands, Legs, Feet, StorageCost, KeyItem }
 local armorSets =
 {
     1,  4, 0x000001, 5, 12511, 12638, 13961, 14214, 14089, 500,  xi.ki.FIGHTERS_ARMOR_CLAIM_SLIP,
@@ -35,7 +35,7 @@ local armorSets =
     21, 1, 0x000020, 5, 12458, 12586, 12714, 12842, 12970, 400,  xi.ki.SOIL_GI_CLAIM_SLIP,
     22, 1, 0x000040, 5, 15163, 14424, 14856, 14325, 15313, 200,  xi.ki.SEERS_TUNIC_CLAIM_SLIP,
     23, 1, 0x000080, 5, 12442, 12570, 12698, 12826, 12954, 400,  xi.ki.STUDDED_ARMOR_CLAIM_SLIP,
-    24, 1, 0x000100, 5, 12438, 12566, 12694, 12822, 12950, 200,  xi.ki.CENTURION_SCALE_MAIL_CLAIM_SLIP,
+    24, 1, 0x000100, 5, 12438, 12566, 12694, 12822, 12950, 200,  xi.ki.CENTURIONS_SCALE_MAIL_CLAIM_SLIP,
     25, 1, 0x000200, 5, 12470, 12598, 12726, 12854, 12982, 200,  xi.ki.MRCCPT_DOUBLET_CLAIM_SLIP,
     26, 1, 0x000400, 5, 15164, 14425, 14857, 14326, 15314, 400,  xi.ki.GARISH_TUNIC_CLAIM_SLIP,
     27, 1, 0x000800, 5, 15161, 14422, 14854, 14323, 15311, 200,  xi.ki.NOCT_DOUBLET_CLAIM_SLIP,
@@ -62,7 +62,7 @@ local armorSets =
     48, 3, 0x000004, 5, 12426, 12554, 12682, 12810, 12938, 800,  xi.ki.BANDED_MAIL_CLAIM_SLIP,
     49, 3, 0x000008, 5, 12459, 12587, 12715, 12843, 12974, 800,  xi.ki.HARA_ATE_CLAIM_SLIP,
     50, 3, 0x000010, 5, 12444, 12572, 12700, 12828, 12956, 800,  xi.ki.RAPTOR_ARMOR_CLAIM_SLIP,
-    51, 3, 0x000020, 5, 13873, 13785, 14003, 14245, 14120, 800,  xi.ki.STEEL_SCALE_CLAIM_SLIP,
+    51, 3, 0x000020, 5, 13873, 13785, 14003, 14245, 14120, 800,  xi.ki.STEEL_SCALE_ARMOR_CLAIM_SLIP,
     52, 3, 0x000040, 5, 12467, 12595, 12723, 12851, 12979, 800,  xi.ki.WOOL_GAMBISON_CLAIM_SLIP,
     53, 3, 0x000080, 5, 12460, 12588, 12716, 12844, 12972, 800,  xi.ki.SHINOBI_GI_CLAIM_SLIP,
     54, 3, 0x000200, 5, 12422, 12550, 12678, 12806, 12934, 800,  xi.ki.IRNMSK_CUIRASS_CLAIM_SLIP,
@@ -107,17 +107,17 @@ xi.armorStorage.onTrade = function(player, trade, deposit)
     local returnValue = false
 
     for i = 1, #armorSets, 11 do
-        local T1 = trade:hasItemQty(armorSets[i + 5], 1)
+        local t1 = trade:hasItemQty(armorSets[i + 5], 1)
 
-        if T1 then
+        if t1 then
             if not player:hasKeyItem(armorSets[i + 10]) then
                 if trade:getItemCount() == armorSets[i + 3] then
-                    local T2 = trade:hasItemQty(armorSets[i + 4], 1) or armorSets[i + 4] == 0
-                    local T3 = trade:hasItemQty(armorSets[i + 6], 1) or armorSets[i + 6] == 0
-                    local T4 = trade:hasItemQty(armorSets[i + 7], 1) or armorSets[i + 7] == 0
-                    local T5 = trade:hasItemQty(armorSets[i + 8], 1) or armorSets[i + 8] == 0
+                    local t2 = trade:hasItemQty(armorSets[i + 4], 1) or armorSets[i + 4] == 0
+                    local t3 = trade:hasItemQty(armorSets[i + 6], 1) or armorSets[i + 6] == 0
+                    local t4 = trade:hasItemQty(armorSets[i + 7], 1) or armorSets[i + 7] == 0
+                    local t5 = trade:hasItemQty(armorSets[i + 8], 1) or armorSets[i + 8] == 0
 
-                    if T2 and T3 and T4 and T5 then
+                    if t2 and t3 and t4 and t5 then
                         player:startEvent(deposit, 0, 0, 0, 0, 0, armorSets[i + 9])
                         player:addKeyItem(armorSets[i + 10])
                         player:messageSpecial(zones[player:getZoneID()].text.KEYITEM_OBTAINED, armorSets[i + 10])
@@ -133,11 +133,11 @@ xi.armorStorage.onTrade = function(player, trade, deposit)
 end
 
 xi.armorStorage.onTrigger = function(player, withdrawal)
-    local G1 = 0
-    local G2 = 0
-    local G3 = 0
-    local G4 = 0
-    local G5 = 0
+    local g1 = 0
+    local g2 = 0
+    local g3 = 0
+    local g4 = 0
+    local g5 = 0
 
     for i = 11, #armorSets, 11 do
         if player:hasKeyItem(armorSets[i]) then
@@ -145,20 +145,20 @@ xi.armorStorage.onTrigger = function(player, withdrawal)
             local mask  = armorSets[i - 8]
 
             if group == 1 then
-                G1 = G1 + mask
+                g1 = g1 + mask
             elseif group == 2 then
-                G2 = G2 + mask
+                g2 = g2 + mask
             elseif group == 3 then
-                G3 = G3 + mask
+                g3 = g3 + mask
             elseif group == 4 then
-                G4 = G4 + mask
+                g4 = g4 + mask
             elseif group == 6 then
-                G5 = G5 + mask
+                g5 = g5 + mask
             end
         end
     end
 
-    player:startEvent(withdrawal, G1, G2, G3, G4, player:getGil(), G5)
+    player:startEvent(withdrawal, g1, g2, g3, g4, player:getGil(), g5)
 end
 
 xi.armorStorage.onEventUpdate = function(player, csid, option, withdrawal)
@@ -185,7 +185,11 @@ xi.armorStorage.onEventFinish = function(player, csid, option, deposit, withdraw
             local cost  = armorSets[idx + 9]
             local ki    = armorSets[idx + 10]
 
-            if player:hasKeyItem(ki) and player:getFreeSlotsCount() >= count and player:getGil() >= cost then
+            if
+                player:hasKeyItem(ki) and
+                player:getFreeSlotsCount() >= count and
+                player:getGil() >= cost
+            then
                 for i = 4, 8 do
                     local itemId = armorSets[idx + i]
                     if itemId > 0 then
@@ -193,6 +197,7 @@ xi.armorStorage.onEventFinish = function(player, csid, option, deposit, withdraw
                         player:messageSpecial(zones[player:getZoneID()].text.ITEM_OBTAINED, itemId)
                     end
                 end
+
                 player:delKeyItem(ki)
                 player:setGil(player:getGil() - cost)
             else

@@ -5,8 +5,7 @@
 -----------------------------------
 local entity = {}
 
-entity.onMobDeath = function(mob, player, isKiller)
-    player:setCharVar("ForgeYourDestiny_killed", 1)
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

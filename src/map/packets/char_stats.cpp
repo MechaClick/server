@@ -19,8 +19,8 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
-#include "../../common/utils.h"
+#include "common/socket.h"
+#include "common/utils.h"
 
 #include <cstring>
 
@@ -28,12 +28,13 @@
 
 #include "../entities/charentity.h"
 #include "../modifier.h"
+#include "../roe.h"
 #include "../utils/charutils.h"
 
 CCharStatsPacket::CCharStatsPacket(CCharEntity* PChar)
 {
-    this->type = 0x61;
-    this->size = 0x64;
+    this->setType(0x61);
+    this->setSize(0x70);
 
     ref<uint32>(0x04) = PChar->GetMaxHP();
     ref<uint32>(0x08) = PChar->GetMaxMP();
@@ -59,14 +60,14 @@ CCharStatsPacket::CCharStatsPacket(CCharEntity* PChar)
     ref<uint16>(0x30) = PChar->ATT();
     ref<uint16>(0x32) = PChar->DEF();
 
-    ref<uint16>(0x34) = PChar->getMod(Mod::FIRERES);
-    ref<uint16>(0x36) = PChar->getMod(Mod::ICERES);
-    ref<uint16>(0x38) = PChar->getMod(Mod::WINDRES);
-    ref<uint16>(0x3A) = PChar->getMod(Mod::EARTHRES);
-    ref<uint16>(0x3C) = PChar->getMod(Mod::THUNDERRES);
-    ref<uint16>(0x3E) = PChar->getMod(Mod::WATERRES);
-    ref<uint16>(0x40) = PChar->getMod(Mod::LIGHTRES);
-    ref<uint16>(0x42) = PChar->getMod(Mod::DARKRES);
+    ref<uint16>(0x34) = PChar->getMod(Mod::FIRE_MEVA);
+    ref<uint16>(0x36) = PChar->getMod(Mod::ICE_MEVA);
+    ref<uint16>(0x38) = PChar->getMod(Mod::WIND_MEVA);
+    ref<uint16>(0x3A) = PChar->getMod(Mod::EARTH_MEVA);
+    ref<uint16>(0x3C) = PChar->getMod(Mod::THUNDER_MEVA);
+    ref<uint16>(0x3E) = PChar->getMod(Mod::WATER_MEVA);
+    ref<uint16>(0x40) = PChar->getMod(Mod::LIGHT_MEVA);
+    ref<uint16>(0x42) = PChar->getMod(Mod::DARK_MEVA);
 
     ref<uint16>(0x44) = PChar->profile.title;
     ref<uint8>(0x46)  = PChar->profile.rank[PChar->profile.nation];
@@ -76,11 +77,21 @@ CCharStatsPacket::CCharStatsPacket(CCharEntity* PChar)
 
     // 0x51 = 0x01 on fresh player, 0x03 with 99
     ref<uint8>(0x52) = PChar->getMod(Mod::SUPERIOR_LEVEL);
-    // 0x54 = maximum item level
-    // 0x55 = itemlevel over 99
-    // 0x56 = main weapon item level
+    ref<uint8>(0x54) = charutils::getMaxItemLevel(PChar);        // Maximum Item Level
+    ref<uint8>(0x55) = charutils::getItemLevelDifference(PChar); // itemlevel over 99
+    ref<uint8>(0x56) = charutils::getMainhandItemLevel(PChar);   // Item level of Main Hand weapon
+    ref<uint8>(0x57) = charutils::getRangedItemLevel(PChar);     // Item level of Ranged (Ranged priority, ammo if only)
 
-    ref<uint32>(0x58) = (charutils::GetPoints(PChar, "unity_accolades") << 10) | (0x00 << 5 | PChar->profile.unity_leader);
+    uint8 unityRank = PChar->profile.unity_leader > 0 ? roeutils::RoeSystem.unityLeaderRank[PChar->profile.unity_leader - 1] : 0;
+
+    ref<uint32>(0x58) = (charutils::GetPoints(PChar, "unity_accolades") << 10) | (unityRank << 5 | PChar->profile.unity_leader);
+
+    // Note: 0x5C and 0x5E Appear to follow the below format
     ref<uint16>(0x5C) = charutils::GetPoints(PChar, "current_accolades") / 1000; // Partial Personal Eval
     ref<uint16>(0x5E) = charutils::GetPoints(PChar, "prev_accolades") / 1000;    // Personal Eval
+
+    ref<uint8>(0x65)  = 0; // Master Level
+    ref<uint8>(0x66)  = 0; // Bit0 - Master Breaker
+    ref<uint32>(0x68) = 0; // Current Exemplar Points
+    ref<uint32>(0x6C) = 0; // Required Exemplar Points
 }

@@ -6,22 +6,19 @@
 -- Utsusemi/Blink absorb: N/A
 -- Range: Self
 -----------------------------------
-require("scripts/globals/monstertpmoves")
-require("scripts/globals/settings")
+require("scripts/globals/mobskills")
 require("scripts/globals/status")
 -----------------------------------
-local mobskill_object = {}
+local mobskillObject = {}
 
-mobskill_object.onMobSkillCheck = function(target, mob, skill)
+mobskillObject.onMobSkillCheck = function(target, mob, skill)
     return 0
 end
 
-mobskill_object.onMobWeaponSkill = function(target, mob, skill)
-    local typeEffect = xi.effect.ARROW_SHIELD
+mobskillObject.onMobWeaponSkill = function(target, mob, skill)
+    skill:setMsg(xi.mobskills.mobBuffMove(mob, xi.effect.ARROW_SHIELD, 1, 0, 60))
 
-    skill:setMsg(MobBuffMove(mob, typeEffect, 1, 0, 60))
-
-    return typeEffect
+    return xi.effect.ARROW_SHIELD
 end
 
-return mobskill_object
+return mobskillObject

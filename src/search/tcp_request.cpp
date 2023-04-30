@@ -19,12 +19,12 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 ===========================================================================
 */
 
-#include "../common/blowfish.h"
-#include "../common/md52.h"
-#include "../common/mmo.h"
-#include "../common/showmsg.h"
-#include "../common/socket.h"
-#include "../common/utils.h"
+#include "common/blowfish.h"
+#include "common/logging.h"
+#include "common/md52.h"
+#include "common/mmo.h"
+#include "common/socket.h"
+#include "common/utils.h"
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -62,7 +62,8 @@ CTCPRequestPacket::CTCPRequestPacket(SOCKET* socket)
 
 CTCPRequestPacket::~CTCPRequestPacket()
 {
-    delete[] m_data;
+    destroy_arr(m_data);
+    m_data = nullptr;
 
 #ifdef WIN32
     shutdown(*m_socket, SD_SEND);
@@ -85,29 +86,30 @@ int32 CTCPRequestPacket::GetSize() const
 
 int32 CTCPRequestPacket::ReceiveFromSocket()
 {
-    char recvbuf[DEFAULT_BUFLEN];
+    char recvbuf[DEFAULT_BUFLEN] = {};
 
     m_size = recv(*m_socket, recvbuf, DEFAULT_BUFLEN, 0);
     if (m_size == -1)
     {
 #ifdef WIN32
-        ShowError(CL_RED "recv failed with error: %d\n" CL_RESET, WSAGetLastError());
+        ShowError("recv failed with error: %d", WSAGetLastError());
 #else
-        ShowError(CL_RED "recv failed with error: %d\n" CL_RESET, errno);
+        ShowError("recv failed with error: %d", errno);
 #endif
         return 0;
     }
     if (m_size == 0)
     {
-        // ShowError("TCP Connection closing...\n");
         return 0;
     }
     if (m_size != ref<uint16>(recvbuf, (0x00)) || m_size < 28)
     {
-        ShowError(CL_RED "Search packetsize wrong. Size %d should be %d.\n" CL_RESET, m_size, ref<uint16>(recvbuf, (0x00)));
+        ShowError("Search packetsize wrong. Size %d should be %d.", m_size, ref<uint16>(recvbuf, (0x00)));
         return 0;
     }
-    delete[] m_data;
+
+    destroy_arr(m_data);
+
     m_data = new uint8[m_size];
 
     memcpy(&m_data[0], &recvbuf[0], m_size);
@@ -132,9 +134,9 @@ int32 CTCPRequestPacket::SendRawToSocket(uint8* data, uint32 length)
     if (iResult == SOCKET_ERROR)
     {
 #ifdef WIN32
-        ShowError("send failed with error: %d\n", WSAGetLastError());
+        ShowError("send failed with error: %d", WSAGetLastError());
 #else
-        ShowError("send failed with error: %d\n", errno);
+        ShowError("send failed with error: %d", errno);
 #endif
         return 0;
     }
@@ -168,9 +170,9 @@ int32 CTCPRequestPacket::SendToSocket(uint8* data, uint32 length)
     if (iResult == SOCKET_ERROR)
     {
 #ifdef WIN32
-        ShowError("send failed with error: %d\n", WSAGetLastError());
+        ShowError("send failed with error: %d", WSAGetLastError());
 #else
-        ShowError("send failed with error: %d\n", errno);
+        ShowError("send failed with error: %d", errno);
 #endif
         return 0;
     }
@@ -187,13 +189,13 @@ int32 CTCPRequestPacket::CheckPacketHash()
     toHash -= 0x10; // -hashsize
     toHash -= 0x04; // -keysize
 
-    md5((uint8*)(&m_data[8]), PacketHash, toHash);
+    md5((&m_data[8]), PacketHash, toHash);
 
     for (uint8 i = 0; i < 16; ++i)
     {
-        if ((uint8)m_data[m_size - 0x14 + i] != PacketHash[i])
+        if (m_data[m_size - 0x14 + i] != PacketHash[i])
         {
-            ShowError("Search hash wrong byte %d: 0x%.2X should be 0x%.2x\n", i, PacketHash[i], (uint8)m_data[m_size - 0x14 + i]);
+            ShowError("Search hash wrong byte %d: 0x%.2X should be 0x%.2x", i, PacketHash[i], m_data[m_size - 0x14 + i]);
             return 0;
         }
     }

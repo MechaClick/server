@@ -22,7 +22,7 @@
 #ifndef _LUAMOBSKILL_H
 #define _LUAMOBSKILL_H
 
-#include "../../common/cbasetypes.h"
+#include "common/cbasetypes.h"
 #include "luautils.h"
 
 class CMobSkill;
@@ -38,6 +38,9 @@ public:
     {
         return m_PLuaMobSkill;
     }
+
+    friend std::ostream& operator<<(std::ostream& out, const CLuaMobSkill& mobskill);
+
     float  getTP();
     uint8  getMobHPP();
     uint16 getID();

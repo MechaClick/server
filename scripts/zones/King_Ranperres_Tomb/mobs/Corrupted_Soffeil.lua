@@ -10,23 +10,15 @@ local entity = {}
 
 entity.onMobInitialize = function(mob)
     mob:setMobMod(xi.mobMod.IDLE_DESPAWN, 180)
-    mob:setMod(xi.mod.SLEEPRES, 50)
-    mob:setMod(xi.mod.LULLABYRES, 50)
+    mob:setMod(xi.mod.SLEEP_MEVA, 50)
+    mob:setMod(xi.mod.LULLABY_MEVA, 50)
 end
 
 entity.onMobSpawn = function(mob)
     DespawnMob(mob:getID(), 180)
 end
 
-entity.onMobDeath = function(mob, player, isKiller)
-    if
-        player:getCurrentMission(SANDORIA) == xi.mission.id.sandoria.RANPERRE_S_FINAL_REST and
-        player:getMissionStatus(player:getNation()) == 1 and
-        GetMobByID(ID.mob.CORRUPTED_YORGOS):isDead() and
-        GetMobByID(ID.mob.CORRUPTED_ULBRIG):isDead()
-    then
-        player:setMissionStatus(player:getNation(), 2)
-    end
+entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

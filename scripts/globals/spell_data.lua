@@ -43,6 +43,8 @@ xi.magic.spellGroup =
     NINJUTSU  = 4,
     SUMMONING = 5,
     WHITE     = 6,
+    GEOMANCY  = 7,
+    TRUST     = 8,
 }
 
 -----------------------------------
@@ -56,7 +58,7 @@ xi.magic.element =
     ICE       = 2,
     WIND      = 3,
     EARTH     = 4,
-    LIGHTNING = 5,
+    LIGHTNING = 5, -- TODO: Duplicate. Get rid of one.
     THUNDER   = 5,
     WATER     = 6,
     LIGHT     = 7,
@@ -639,8 +641,9 @@ xi.magic.spell =
     DISPELGA              =  360,
     BLINDGA               =  361,
     BINDGA                =  362,
-    SLEEPGA               =  363,
-    SLEEPGA_II            =  364,
+    -- Mentioned in the DATs, but we don't implement in the db
+    -- SLEEPGA            =  363,
+    -- SLEEPGA_II         =  364,
     BREAKGA               =  365,
     GRAVIGA               =  366,
     DEATH                 =  367,

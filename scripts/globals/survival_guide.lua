@@ -8,13 +8,13 @@ xi = xi or {}
 xi.survivalGuide = xi.survivalGuide or {}
 
 -- Determines if the survival guide teleport cost is like if you had a Rhapsody in White key item. Does not affect UI! (Default: 0)
-local SURVIVAL_GUIDE_TELEPORT_COST_GIL = 1000
-local SURVIVAL_GUIDE_TELEPORT_COST_TABS = 50
+local baseTeleportCostGil = 1000
+local baseTeleportCostTabs = 50
 
 -- This is used for the NationTeleport save/get
 local travelType = xi.teleport.type.SURVIVAL
 local cutsceneID = 8500
-xi.survivalGuide.expansions = 3 + (4 * ENABLE_COP) + (8 * ENABLE_TOAU) + (16 * ENABLE_WOTG) + (2048 * ENABLE_SOA)
+xi.survivalGuide.expansions = 3 + (4 * xi.settings.main.ENABLE_COP) + (8 * xi.settings.main.ENABLE_TOAU) + (16 * xi.settings.main.ENABLE_WOTG) + (2048 * xi.settings.main.ENABLE_SOA)
 
 local optionMap =
 {
@@ -32,8 +32,6 @@ local optionMap =
 -----------------------------------
 
 local function checkForRegisteredSurvivalGuide(player, guide)
-    local group = guide.group
-    utils.unused(group)
     local hasRegisteredGuide = player:hasTeleport(travelType, guide.groupIndex - 1, guide.group - 1)
 
     if not hasRegisteredGuide then
@@ -49,12 +47,15 @@ end
 local function teleportMenuUpdate(player, option)
     local choice = bit.band(option, 0xFF)
 
-    if choice >= optionMap.SET_MENU_LAYOUT and choice <= optionMap.TELEPORT_MENU then
+    if
+        choice >= optionMap.SET_MENU_LAYOUT and
+        choice <= optionMap.TELEPORT_MENU
+    then
         local favorites = player:getTeleportMenu(travelType)
 
         local index = bit.rshift(bit.band(option, 0xFF0000), 16)
 
-        if not (choice == optionMap.TELEPORT_MENU) then
+        if choice ~= optionMap.TELEPORT_MENU then
             if choice == optionMap.ADD_FAVORITE then
                 local temp = 0
                 for x = 1, 9 do
@@ -83,11 +84,11 @@ local function teleportMenuUpdate(player, option)
         end
 
         for x = 1, 3 do
-           favorites[1] = favorites[1] + favorites[x + 1] * 256 ^ x
-           favorites[5] = favorites[5] + favorites[x + 5] * 256 ^ x
-         end
+            favorites[1] = favorites[1] + favorites[x + 1] * 256 ^ x
+            favorites[5] = favorites[5] + favorites[x + 5] * 256 ^ x
+        end
 
-         favorites[9] = favorites[9] + favorites[10] * 256
+        favorites[9] = favorites[9] + favorites[10] * 256
 
         player:updateEvent(favorites[1], favorites[5], favorites[9])
     end
@@ -104,8 +105,7 @@ xi.survivalGuide.onTrigger = function(player)
 
     if guide then
         -- If this survival guide hasn't been registered yet (saved to database) do that now.
-        local foundRegisteredGuide = checkForRegisteredSurvivalGuide(player,
-                                                                     guide)
+        local foundRegisteredGuide = checkForRegisteredSurvivalGuide(player, guide)
 
         if foundRegisteredGuide then
             local param = bit.bor(tableIndex, bit.lshift(player:getCurrency("valor_point"), 16))
@@ -124,7 +124,7 @@ xi.survivalGuide.onTrigger = function(player)
                 param = bit.bor(param, 0x2000)
             end
 
-            local G1, G2, G3, G4 = unpack(player:getTeleportTable(travelType))
+            local g1, g2, g3, g4 = unpack(player:getTeleportTable(travelType))
 
             -- param 1 = Does nothing.
             -- param 2 = current area, player amount of tabs, fee reducer(s) and menu layout (region/content).
@@ -134,7 +134,7 @@ xi.survivalGuide.onTrigger = function(player)
             -- param 6 = Zones unlocked (group 3), set to -1 to enable all zones in the group.
             -- param 7 = zones unlocked (Zehrun mines and Eastern Adoulin), set to -1 to enable all zones in the group.
             -- param 8 = expansions available.
-            player:startEvent(cutsceneID, 0, param, player:getGil(), G1, G2, G3, G4, xi.survivalGuide.expansions)
+            player:startEvent(cutsceneID, 0, param, player:getGil(), g1, g2, g3, g4, xi.survivalGuide.expansions)
         end
     else
         player:PrintToPlayer('Survival guides are not enabled!')
@@ -153,16 +153,16 @@ xi.survivalGuide.onEventFinish = function(player, eventId, option)
             local guide = survival.survivalGuides[selectedMenuId]
             local currentZoneId = player:getZoneID()
 
-            if guide and not (guide.zoneId == currentZoneId) then
-                local teleportCostGil = SURVIVAL_GUIDE_TELEPORT_COST_GIL
-                local teleportCostTabs = SURVIVAL_GUIDE_TELEPORT_COST_TABS
+            if guide and guide.zoneId ~= currentZoneId then
+                local teleportCostGil = baseTeleportCostGil
+                local teleportCostTabs = baseTeleportCostTabs
 
-                -- If the player has the rhapsody in white, the cost is 10% of original gil or 20% of original tabs.
-                -- GIL: 1000 -> 200
-                -- TABS: 100 -> 10
+                -- If the player has the "Rhapsody in White" KI, the cost is 10% of original gil or 20% of original tabs.
+                -- GIL: 1000 -> 100
+                -- TABS: 50 -> 10
                 if player:hasKeyItem(xi.ki.RHAPSODY_IN_WHITE) then
-                    teleportCostGil = teleportCostGil * .2
-                    teleportCostTabs = teleportCostTabs * .2
+                    teleportCostGil = teleportCostGil / 10
+                    teleportCostTabs = teleportCostTabs / 5
                 end
 
                 local canTeleport = false

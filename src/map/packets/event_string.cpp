@@ -19,39 +19,62 @@
 ===========================================================================
 */
 
-#include "../../common/socket.h"
+#include "common/socket.h"
 
 #include <cstring>
 
 #include "../entities/charentity.h"
 #include "event_string.h"
 
-CEventStringPacket::CEventStringPacket(CCharEntity* PChar, uint16 EventID, const std::string& string0, const std::string& string1, const std::string& string2,
-                                       const std::string& string3, uint32 param0, uint32 param1, uint32 param2, uint32 param3, uint32 param4, uint32 param5,
-                                       uint32 param6, uint32 param7)
+CEventStringPacket::CEventStringPacket(CCharEntity* PChar, EventInfo* eventInfo)
 {
-    this->type = 0x33;
-    this->size = 0x38;
+    this->setType(0x33);
+    this->setSize(0x70);
 
-    ref<uint32>(0x04) = PChar->id;
-    ref<uint16>(0x08) = PChar->m_TargID;
+    uint32       npcServerID = 0;
+    uint32       npcLocalID  = 0;
+    CBaseEntity* PNpc        = eventInfo->targetEntity;
+
+    if (PNpc)
+    {
+        npcServerID = PNpc->id;
+        npcLocalID  = PNpc->targid;
+    }
+    else
+    {
+        // Fallback to our own CharID because giving a value
+        // of zero makes the game hang.
+        npcServerID = PChar->id;
+        npcLocalID  = PChar->targid;
+    }
+
+    ref<uint32>(0x04) = npcServerID;
+    ref<uint16>(0x08) = npcLocalID;
     ref<uint16>(0x0A) = PChar->getZone();
-    ref<uint16>(0x0C) = EventID;
-    ref<uint8>(0x0E)  = 8; // camera "jumps" behind the character if < 8 params
+    ref<uint16>(0x0C) = eventInfo->eventId;
 
-    memcpy(data + (0x10), string0.c_str(), string0.size());
-    memcpy(data + (0x20), string1.c_str(), string1.size());
-    memcpy(data + (0x30), string2.c_str(), string2.size());
-    memcpy(data + (0x40), string3.c_str(), string3.size());
+    if (eventInfo->eventFlags != 0)
+    {
+        // Note that only the first 16 bits are supported by this packet type.
+        ref<uint16>(0x0E) = eventInfo->eventFlags & 0xFFFF;
+    }
+    else
+    {
+        // Backwards compatibility
+        ref<uint16>(0x0E) = 8; // if the parameter is less than 8, then after the event is over the camera will "jump" behind the character
+    }
 
-    ref<uint32>(0x50) = param0;
-    ref<uint32>(0x54) = param1;
-    ref<uint32>(0x58) = param2;
-    ref<uint32>(0x5C) = param3;
-    ref<uint32>(0x60) = param4;
-    ref<uint32>(0x64) = param5;
-    ref<uint32>(0x68) = param6;
-    ref<uint32>(0x6C) = param7;
+    for (auto stringPair : eventInfo->strings)
+    {
+        memcpy(data + 0x10 + 0x10 * stringPair.first, stringPair.second.c_str(), stringPair.second.size());
+    }
 
-    PChar->m_event.EventID = EventID;
+    for (auto paramPair : eventInfo->params)
+    {
+        // Only params 0 through 7 are valid
+        if (paramPair.first <= 7)
+        {
+            ref<uint32>(0x50 + paramPair.first * 4) = paramPair.second;
+        }
+    }
 }

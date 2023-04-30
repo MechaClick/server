@@ -19,7 +19,7 @@
 ===========================================================================
 */
 
-#include "../common/showmsg.h"
+#include "../common/logging.h"
 #include "../common/timer.h"
 
 #include "alliance.h"
@@ -51,38 +51,39 @@
 // should have brace-or-equal initializers when MSVC supports it
 struct CParty::partyInfo_t
 {
-    uint32      id;
-    uint32      partyid;
-    uint32      allianceid;
-    std::string name;
-    uint16      flags;
-    uint16      zone;
-    uint16      prev_zone;
+    uint32      id         = {};
+    uint32      partyid    = {};
+    uint32      allianceid = {};
+    std::string name       = {};
+    uint16      flags      = {};
+    uint16      zone       = {};
+    uint16      prev_zone  = {};
 };
 
-/************************************************************************
- *																		*
- *  Конструктор   														*
- *																		*
- ************************************************************************/
-
+// Constructor
 CParty::CParty(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(PEntity == nullptr);
-    XI_DEBUG_BREAK_IF(PEntity->PParty != nullptr);
-
-    m_PartyID     = PEntity->id;
-    m_PartyType   = PEntity->objtype == TYPE_PC ? PARTY_PCS : PARTY_MOBS;
-    m_PartyNumber = 0;
-
-    m_PLeader       = nullptr;
-    m_PAlliance     = nullptr;
-    m_PSyncTarget   = nullptr;
-    m_PQuaterMaster = nullptr;
-
+    m_PLeader        = nullptr;
+    m_PAlliance      = nullptr;
+    m_PSyncTarget    = nullptr;
+    m_PQuarterMaster = nullptr;
     m_EffectsChanged = false;
-    AddMember(PEntity);
-    SetLeader((char*)PEntity->name.c_str());
+    m_PartyID        = 0;
+    m_PartyType      = PARTY_MOBS;
+    m_PartyNumber    = 0;
+
+    if (PEntity != nullptr && PEntity->PParty == nullptr)
+    {
+        m_PartyID   = PEntity->id;
+        m_PartyType = PEntity->objtype == TYPE_PC ? PARTY_PCS : PARTY_MOBS;
+
+        AddMember(PEntity);
+        SetLeader(PEntity->name);
+    }
+    else
+    {
+        ShowWarning("CParty::CParty() - PEntity was null, or party was not null.")
+    }
 }
 
 CParty::CParty(uint32 id)
@@ -93,18 +94,12 @@ CParty::CParty(uint32 id)
     m_PartyType   = PARTY_PCS;
     m_PartyNumber = 0;
 
-    m_PLeader       = nullptr;
-    m_PSyncTarget   = nullptr;
-    m_PQuaterMaster = nullptr;
+    m_PLeader        = nullptr;
+    m_PSyncTarget    = nullptr;
+    m_PQuarterMaster = nullptr;
 
     m_EffectsChanged = false;
 }
-
-/************************************************************************
- *																		*
- *  Распускаем группу													*
- *																		*
- ************************************************************************/
 
 void CParty::DisbandParty(bool playerInitiated)
 {
@@ -113,7 +108,7 @@ void CParty::DisbandParty(bool playerInitiated)
         m_PAlliance->removeParty(this);
     }
     m_PSyncTarget = nullptr;
-    SetQuarterMaster(nullptr);
+    SetQuarterMaster("");
 
     m_PLeader   = nullptr;
     m_PAlliance = nullptr;
@@ -133,7 +128,7 @@ void CParty::DisbandParty(bool playerInitiated)
             PChar->PLatentEffectContainer->CheckLatentsPartyAvatar();
             PChar->pushPacket(new CPartyMemberUpdatePacket(PChar, 0, 0, PChar->getZone()));
 
-            // TODO: TreasurePool должен оставаться у последнего персонажа, но сейчас это не критично
+            // TODO: TreasurePool should stay with the last character, but now it is not critical
 
             if (PChar->PTreasurePool != nullptr && PChar->PTreasurePool->GetPoolType() != TREASUREPOOL_ZONE)
             {
@@ -149,7 +144,7 @@ void CParty::DisbandParty(bool playerInitiated)
                 sync->SetStartTime(server_clock::now());
                 sync->SetDuration(30000);
             }
-            Sql_Query(SqlHandle, "DELETE FROM accounts_parties WHERE charid = %u;", PChar->id);
+            sql->Query("DELETE FROM accounts_parties WHERE charid = %u;", PChar->id);
         }
 
         // make sure chat server isn't notified of a disband if this came from the chat server already
@@ -161,35 +156,50 @@ void CParty::DisbandParty(bool playerInitiated)
             message::send(MSG_PT_DISBAND, data, sizeof data, nullptr);
         }
     }
-    delete this;
+    else if (m_PartyType == PARTY_MOBS)
+    {
+        for (auto& member : members) // this should really only trigger when a dynamic entity dies and nothing else qualifies for it's party anymore (such as !fafnir in zones without dragons)
+        {
+            member->PParty = nullptr;
+        }
+    }
+
+    // TODO: This entire system needs rewriting to both:
+    //     : - Make it stable
+    //     : - Get rid of `delete this` and manage memory nicely
+    delete this; // cpp.sh allow
 }
 
-/************************************************************************
- *                                                                       *
- *  Назначаем роли участникам группы	(только для персонажей)             *
- *                                                                       *
- ************************************************************************/
-
-void CParty::AssignPartyRole(int8* MemberName, uint8 role)
+// Assign roles to group members (players only)
+void CParty::AssignPartyRole(const std::string& MemberName, uint8 role)
 {
     XI_DEBUG_BREAK_IF(m_PartyType != PARTY_PCS);
+
+    // Make sure that the the character is actually a part of this party
+    int ret = sql->Query("SELECT chars.charid FROM chars \
+                          JOIN accounts_parties ON accounts_parties.charid = chars.charid WHERE charname = '%s' AND partyid = %u;",
+                         MemberName, m_PartyID);
+    if (ret == SQL_ERROR || sql->NumRows() == 0)
+    {
+        return;
+    }
 
     switch (role)
     {
         case 0:
-            SetLeader((const char*)MemberName);
+            SetLeader(MemberName);
             break;
         case 4:
-            SetQuarterMaster((const char*)MemberName);
+            SetQuarterMaster(MemberName);
             break;
         case 5:
-            SetQuarterMaster(nullptr);
+            SetQuarterMaster("");
             break;
         case 6:
             SetSyncTarget(MemberName, 238);
             break;
         case 7:
-            SetSyncTarget(nullptr, 553);
+            SetSyncTarget("", 553);
             break;
     }
     uint8 data[4]{};
@@ -197,12 +207,7 @@ void CParty::AssignPartyRole(int8* MemberName, uint8 role)
     message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
 }
 
-/************************************************************************
- *																		*
- *  Узнаем количество участников группы в указанной зоне					*
- *																		*
- ************************************************************************/
-
+// get number of members in specified zone
 uint8 CParty::MemberCount(uint16 ZoneID)
 {
     uint8 count = 0;
@@ -215,26 +220,31 @@ uint8 CParty::MemberCount(uint16 ZoneID)
         }
         if (member->objtype == TYPE_PC)
         {
+            // clang-format off
             auto* charMember = static_cast<CCharEntity*>(member);
-            std::for_each(charMember->PTrusts.begin(), charMember->PTrusts.end(), [&](CTrustEntity* trust) { count++; });
+            std::for_each(charMember->PTrusts.begin(), charMember->PTrusts.end(), [&](CTrustEntity* trust)
+            {
+                count++;
+            });
+            // clang-format on
         }
     }
     return count;
 }
 
-/************************************************************************
- *                                                                       *
- *  Returns Entity Pointer to Party Member by Name (used for kick)       *
- *                                                                       *
- ************************************************************************/
-
-CBattleEntity* CParty::GetMemberByName(const int8* MemberName)
+// Returns entity pointer to party member by name (used for /pcmd kick or otherwise)
+CBattleEntity* CParty::GetMemberByName(const std::string& memberName)
 {
     XI_DEBUG_BREAK_IF(m_PartyType != PARTY_PCS);
 
+    if (memberName == "")
+    {
+        return nullptr;
+    }
+
     for (auto& member : members)
     {
-        if (strcmp((const char*)MemberName, (const char*)member->GetName()) == 0)
+        if (strcmpi(memberName.c_str(), member->GetName().c_str()) == 0)
         {
             return member;
         }
@@ -243,24 +253,24 @@ CBattleEntity* CParty::GetMemberByName(const int8* MemberName)
     return nullptr;
 }
 
-/************************************************************************
- *																		*
- *  Удаляем персонажа из группы				  							*
- *																		*
- ************************************************************************/
-
 void CParty::RemoveMember(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(PEntity == nullptr);
-    XI_DEBUG_BREAK_IF(PEntity->PParty != this);
+    if (PEntity == nullptr || PEntity->PParty != this)
+    {
+        ShowWarning("CParty::RemoveMember() - PEntity was null, or PParty mismatch.");
+        return;
+    }
 
     if (m_PLeader == PEntity)
     {
         RemovePartyLeader(PEntity);
 
         // Remove their trusts
-        CCharEntity* PChar = (CCharEntity*)PEntity;
-        PChar->ClearTrusts();
+        CCharEntity* PChar = dynamic_cast<CCharEntity*>(PEntity);
+        if (PChar)
+        {
+            PChar->ClearTrusts();
+        }
     }
     else
     {
@@ -272,28 +282,16 @@ void CParty::RemoveMember(CBattleEntity* PEntity)
 
                 if (m_PartyType == PARTY_PCS)
                 {
-                    CCharEntity* PChar = (CCharEntity*)PEntity;
-
-                    if (m_PQuaterMaster == PChar)
+                    CCharEntity* PChar = dynamic_cast<CCharEntity*>(PEntity);
+                    if (PChar)
                     {
-                        SetQuarterMaster(nullptr);
-                    }
-                    if (m_PSyncTarget == PChar)
-                    {
-                        SetSyncTarget(nullptr, 553);
-                        CStatusEffect* sync = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_LEVEL_SYNC);
-                        if (sync && sync->GetDuration() == 0)
+                        if (m_PQuarterMaster == PChar)
                         {
-                            PChar->pushPacket(new CMessageBasicPacket(PChar, PChar, 0, 30, 553));
-                            sync->SetStartTime(server_clock::now());
-                            sync->SetDuration(30000);
+                            SetQuarterMaster("");
                         }
-                        DisableSync();
-                    }
-                    if (m_PSyncTarget != nullptr && m_PSyncTarget != PChar)
-                    {
-                        if (PChar->status != STATUS_TYPE::DISAPPEAR)
+                        if (m_PSyncTarget == PChar)
                         {
+                            SetSyncTarget("", 553);
                             CStatusEffect* sync = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_LEVEL_SYNC);
                             if (sync && sync->GetDuration() == 0)
                             {
@@ -301,27 +299,41 @@ void CParty::RemoveMember(CBattleEntity* PEntity)
                                 sync->SetStartTime(server_clock::now());
                                 sync->SetDuration(30000);
                             }
+                            DisableSync();
                         }
-                    }
-                    PChar->PLatentEffectContainer->CheckLatentsPartyMembers(members.size());
+                        if (m_PSyncTarget != nullptr && m_PSyncTarget != PChar)
+                        {
+                            if (PChar->status != STATUS_TYPE::DISAPPEAR)
+                            {
+                                CStatusEffect* sync = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_LEVEL_SYNC);
+                                if (sync && sync->GetDuration() == 0)
+                                {
+                                    PChar->pushPacket(new CMessageBasicPacket(PChar, PChar, 0, 30, 553));
+                                    sync->SetStartTime(server_clock::now());
+                                    sync->SetDuration(30000);
+                                }
+                            }
+                        }
+                        PChar->PLatentEffectContainer->CheckLatentsPartyMembers(members.size());
 
-                    PChar->pushPacket(new CPartyDefinePacket(nullptr));
-                    PChar->pushPacket(new CPartyMemberUpdatePacket(PChar, 0, 0, PChar->getZone()));
-                    PChar->pushPacket(new CCharUpdatePacket(PChar));
-                    PChar->PParty = nullptr;
+                        PChar->pushPacket(new CPartyDefinePacket(nullptr));
+                        PChar->pushPacket(new CPartyMemberUpdatePacket(PChar, 0, 0, PChar->getZone()));
+                        PChar->pushPacket(new CCharUpdatePacket(PChar));
+                        PChar->PParty = nullptr;
 
-                    Sql_Query(SqlHandle, "DELETE FROM accounts_parties WHERE charid = %u;", PChar->id);
+                        sql->Query("DELETE FROM accounts_parties WHERE charid = %u;", PChar->id);
 
-                    uint8 data[4]{};
-                    ref<uint32>(data, 0) = m_PartyID;
-                    message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+                        uint8 data[4]{};
+                        ref<uint32>(data, 0) = m_PartyID;
+                        message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
 
-                    if (PChar->PTreasurePool != nullptr && PChar->PTreasurePool->GetPoolType() != TREASUREPOOL_ZONE)
-                    {
-                        PChar->PTreasurePool->DelMember(PChar);
-                        PChar->PTreasurePool = new CTreasurePool(TREASUREPOOL_SOLO);
-                        PChar->PTreasurePool->AddMember(PChar);
-                        PChar->PTreasurePool->UpdatePool(PChar);
+                        if (PChar->PTreasurePool != nullptr && PChar->PTreasurePool->GetPoolType() != TREASUREPOOL_ZONE)
+                        {
+                            PChar->PTreasurePool->DelMember(PChar);
+                            PChar->PTreasurePool = new CTreasurePool(TREASUREPOOL_SOLO);
+                            PChar->PTreasurePool->AddMember(PChar);
+                            PChar->PTreasurePool->UpdatePool(PChar);
+                        }
                     }
                 }
                 break;
@@ -332,12 +344,18 @@ void CParty::RemoveMember(CBattleEntity* PEntity)
 
 void CParty::DelMember(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(PEntity == nullptr);
-    XI_DEBUG_BREAK_IF(PEntity->PParty != this);
+    if (PEntity == nullptr || PEntity->PParty != this)
+    {
+        ShowWarning("CParty::DelMember() - PEntity was null, or PParty mismatch.");
+        return;
+    }
 
     if (m_PLeader == PEntity)
     {
-        RemovePartyLeader(PEntity);
+        if (RemovePartyLeader(PEntity)) // Only reload party if party has not disbanded
+        {
+            this->ReloadParty();
+        }
     }
     else
     {
@@ -351,13 +369,13 @@ void CParty::DelMember(CBattleEntity* PEntity)
                 {
                     CCharEntity* PChar = (CCharEntity*)PEntity;
 
-                    if (m_PQuaterMaster == PChar)
+                    if (m_PQuarterMaster == PChar)
                     {
-                        SetQuarterMaster(nullptr);
+                        SetQuarterMaster("");
                     }
                     if (m_PSyncTarget == PChar)
                     {
-                        SetSyncTarget(nullptr, 553);
+                        SetSyncTarget("", 553);
                         CStatusEffect* sync = PChar->StatusEffectContainer->GetStatusEffect(EFFECT_LEVEL_SYNC);
                         if (sync && sync->GetDuration() == 0)
                         {
@@ -395,11 +413,15 @@ void CParty::DelMember(CBattleEntity* PEntity)
                         PChar->PTreasurePool->UpdatePool(PChar);
                     }
                 }
+                else
+                {
+                    PEntity->PParty = nullptr;
+                }
                 break;
             }
         }
+        this->ReloadParty();
     }
-    this->ReloadParty();
 }
 
 void CParty::PopMember(CBattleEntity* PEntity)
@@ -420,7 +442,7 @@ void CParty::PopMember(CBattleEntity* PEntity)
             {
                 m_PAlliance->setMainParty(nullptr);
             }
-            for (uint8 i = 0; i < m_PAlliance->partyList.size(); ++i)
+            for (std::size_t i = 0; i < m_PAlliance->partyList.size(); ++i)
             {
                 if (this == m_PAlliance->partyList.at(i))
                 {
@@ -428,77 +450,94 @@ void CParty::PopMember(CBattleEntity* PEntity)
                 }
             }
         }
-        delete this;
+        delete this; // cpp.sh allow
     }
     PEntity->PParty = nullptr;
 }
 
-/************************************************************************
- *																		*
- *  Лидер покидает группу												*
- *																		*
- ************************************************************************/
-
-void CParty::RemovePartyLeader(CBattleEntity* PEntity)
+bool CParty::RemovePartyLeader(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(members.empty());
+    if (members.empty())
+    {
+        ShowWarning("CParty::RemovePartyLeader - called when \"member\" list was empty");
+        return false;
+    }
 
-    int ret = Sql_Query(SqlHandle, "SELECT charname FROM accounts_sessions JOIN chars ON accounts_sessions.charid = chars.charid \
+    int ret = sql->Query("SELECT charname FROM accounts_sessions JOIN chars ON accounts_sessions.charid = chars.charid \
                                     JOIN accounts_parties ON accounts_parties.charid = chars.charid WHERE partyid = %u AND NOT partyflag & %d \
                                     ORDER BY timestamp ASC LIMIT 1;",
-                        m_PartyID, PARTY_LEADER);
-    if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+                         m_PartyID, PARTY_LEADER);
+    if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
     {
-        std::string newLeader((const char*)Sql_GetData(SqlHandle, 0));
-        SetLeader(newLeader.c_str());
+        std::string newLeader((const char*)sql->GetData(0));
+        SetLeader(newLeader);
     }
+
+    if (m_PartyType == PARTYTYPE::PARTY_MOBS) // mob party, mob destructor being called and is leader of a party
+    {
+        for (auto member : members)
+        {
+            if (member != PEntity) // assign leader to next party member
+            {
+                m_PLeader = member;
+                DelMember(PEntity);
+
+                return true;
+            }
+        }
+    }
+
     if (m_PLeader == PEntity)
     {
         DisbandParty();
+        return false;
     }
     else
     {
         RemoveMember(PEntity);
     }
+    return true;
 }
 
 std::vector<CParty::partyInfo_t> CParty::GetPartyInfo() const
 {
     std::vector<CParty::partyInfo_t> memberinfo;
-    int ret = Sql_Query(SqlHandle, "SELECT chars.charid, partyid, allianceid, charname, partyflag, pos_zone, pos_prevzone FROM accounts_parties \
+    int                              ret = sql->Query("SELECT chars.charid, partyid, allianceid, charname, partyflag, pos_zone, pos_prevzone FROM accounts_parties \
                                     LEFT JOIN chars ON accounts_parties.charid = chars.charid WHERE \
                                     (allianceid <> 0 AND allianceid = %d) OR partyid = %d ORDER BY partyflag & %u, timestamp;",
-                        m_PAlliance ? m_PAlliance->m_AllianceID : 0, m_PartyID, PARTY_SECOND | PARTY_THIRD);
+                         m_PAlliance ? m_PAlliance->m_AllianceID : 0, m_PartyID, PARTY_SECOND | PARTY_THIRD);
 
-    if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0)
+    if (ret != SQL_ERROR && sql->NumRows() != 0)
     {
-        while (Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+        while (sql->NextRow() == SQL_SUCCESS)
         {
-            memberinfo.push_back({ Sql_GetUIntData(SqlHandle, 0), Sql_GetUIntData(SqlHandle, 1), Sql_GetUIntData(SqlHandle, 2),
-                                   std::string((const char*)Sql_GetData(SqlHandle, 3)), static_cast<uint16>(Sql_GetUIntData(SqlHandle, 4)),
-                                   static_cast<uint16>(Sql_GetUIntData(SqlHandle, 5)), static_cast<uint16>(Sql_GetUIntData(SqlHandle, 6)) });
+            memberinfo.push_back({ sql->GetUIntData(0), sql->GetUIntData(1), sql->GetUIntData(2),
+                                   std::string((const char*)sql->GetData(3)), static_cast<uint16>(sql->GetUIntData(4)),
+                                   static_cast<uint16>(sql->GetUIntData(5)), static_cast<uint16>(sql->GetUIntData(6)) });
         }
     }
     return memberinfo;
 }
 
-/************************************************************************
- *																		*
- *  Добавляем персонажа в группу											*
- *																		*
- ************************************************************************/
-
 void CParty::AddMember(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(PEntity == nullptr);
-    XI_DEBUG_BREAK_IF(PEntity->PParty != nullptr);
+    if (PEntity == nullptr || PEntity->PParty != nullptr)
+    {
+        ShowWarning("CParty::AddMember() - PEntity was null, or PParty not null.");
+        return;
+    }
 
     PEntity->PParty = this;
     members.push_back(PEntity);
 
     if (PEntity->objtype == TYPE_PC && this->members.size() > 1)
     {
-        this->m_TimeLastMemberJoined = server_clock::now();
+        auto* PLeader = dynamic_cast<CCharEntity*>(CParty::GetLeader());
+
+        if (PLeader)
+        {
+            PLeader->m_LeaderCreatedPartyTime = server_clock::now();
+        }
     }
 
     if (m_PartyType == PARTY_PCS)
@@ -513,8 +552,8 @@ void CParty::AddMember(CBattleEntity* PEntity)
             allianceid = m_PAlliance->m_AllianceID;
         }
 
-        Sql_Query(SqlHandle, "INSERT INTO accounts_parties (charid, partyid, allianceid, partyflag) VALUES (%u, %u, %u, %u);", PChar->id, m_PartyID, allianceid,
-                  GetMemberFlags(PChar));
+        sql->Query("INSERT INTO accounts_parties (charid, partyid, allianceid, partyflag) VALUES (%u, %u, %u, %u);", PChar->id, m_PartyID, allianceid,
+                   GetMemberFlags(PChar));
         uint8 data[4]{};
         ref<uint32>(data, 0) = m_PartyID;
         message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
@@ -522,7 +561,7 @@ void CParty::AddMember(CBattleEntity* PEntity)
 
         if (PChar->nameflags.flags & FLAG_INVITE)
         {
-            PChar->nameflags.flags ^= FLAG_INVITE;
+            PChar->nameflags.flags &= ~FLAG_INVITE;
             PChar->updatemask |= UPDATE_HP;
 
             charutils::SaveCharStats(PChar);
@@ -570,8 +609,8 @@ void CParty::AddMember(uint32 id)
                 Flags = PARTY_THIRD;
             }
         }
-        Sql_Query(SqlHandle, "INSERT INTO accounts_parties (charid, partyid, allianceid, partyflag) VALUES (%u, %u, %u, %u);", id, m_PartyID, allianceid,
-                  Flags);
+        sql->Query("INSERT INTO accounts_parties (charid, partyid, allianceid, partyflag) VALUES (%u, %u, %u, %u);", id, m_PartyID, allianceid,
+                   Flags);
         uint8 data[8]{};
         ref<uint32>(data, 0) = m_PartyID;
         ref<uint32>(data, 4) = id;
@@ -595,8 +634,11 @@ void CParty::AddMember(uint32 id)
 
 void CParty::PushMember(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(PEntity == nullptr);
-    XI_DEBUG_BREAK_IF(PEntity->PParty != nullptr);
+    if (PEntity == nullptr || PEntity->PParty != nullptr)
+    {
+        ShowWarning("CParty::PushMember() - PEntity was null, or PParty not null.");
+        return;
+    }
 
     PEntity->PParty = this;
     members.push_back(PEntity);
@@ -613,7 +655,7 @@ void CParty::PushMember(CBattleEntity* PEntity)
             }
             if (memberinfo.flags & PARTY_QM)
             {
-                m_PQuaterMaster = PEntity;
+                m_PQuarterMaster = PEntity;
             }
             if (memberinfo.flags & PARTY_SYNC)
             {
@@ -630,60 +672,33 @@ void CParty::SetPartyID(uint32 id)
     m_PartyID = id;
 }
 
-/************************************************************************
- *																		*
- *  Получаем уникальный ID группы										*
- *																		*
- ************************************************************************/
-
 uint32 CParty::GetPartyID() const
 {
     return m_PartyID;
 }
-
-/************************************************************************
- *																		*
- *  Получаем указатель на лидера группы									*
- *																		*
- ************************************************************************/
 
 CBattleEntity* CParty::GetLeader()
 {
     return m_PLeader;
 }
 
-/************************************************************************
- *																		*
- *  Получаем указатель на цель синхронизации уровней						*
- *																		*
- ************************************************************************/
-
 CBattleEntity* CParty::GetSyncTarget()
 {
     return m_PSyncTarget;
 }
 
-/************************************************************************
- *																		*
- *  Получаем указатель на владельца сокровищ								*
- *																		*
- ************************************************************************/
-
 CBattleEntity* CParty::GetQuaterMaster()
 {
-    return m_PQuaterMaster;
+    return m_PQuarterMaster;
 }
-
-/************************************************************************
- *                                                                       *
- *  Получаем список флагов персонажа                                     *
- *                                                                       *
- ************************************************************************/
 
 uint16 CParty::GetMemberFlags(CBattleEntity* PEntity)
 {
-    XI_DEBUG_BREAK_IF(PEntity == nullptr);
-    XI_DEBUG_BREAK_IF(PEntity->PParty != this);
+    if (PEntity == nullptr || PEntity->PParty != this)
+    {
+        ShowWarning("CParty::GetMemberFlags() - PEntity was null, or PParty mismatch.");
+        return 0;
+    }
 
     uint16 Flags = 0;
 
@@ -708,7 +723,7 @@ uint16 CParty::GetMemberFlags(CBattleEntity* PEntity)
     {
         Flags |= PARTY_LEADER;
     }
-    if (PEntity == m_PQuaterMaster)
+    if (PEntity == m_PQuarterMaster)
     {
         Flags |= PARTY_QM;
     }
@@ -720,14 +735,14 @@ uint16 CParty::GetMemberFlags(CBattleEntity* PEntity)
     return Flags;
 }
 
-/************************************************************************
- *                                                                       *
- *  Обновляем карту группы для всех членов группы                        *
- *                                                                       *
- ************************************************************************/
-
+// update the party for all members
 void CParty::ReloadParty()
 {
+    if (m_PartyType == PARTYTYPE::PARTY_MOBS) // Mob parties don't need to send packets
+    {
+        return;
+    }
+
     auto info = GetPartyInfo();
 
     // alliance
@@ -761,7 +776,7 @@ void CParty::ReloadParty()
                     else
                     {
                         uint16 zoneid = memberinfo.zone == 0 ? memberinfo.prev_zone : memberinfo.zone;
-                        PChar->pushPacket(new CPartyMemberUpdatePacket(memberinfo.id, (const int8*)memberinfo.name.c_str(), memberinfo.flags, j, zoneid));
+                        PChar->pushPacket(new CPartyMemberUpdatePacket(memberinfo.id, memberinfo.name, memberinfo.flags, j, zoneid));
                     }
                     j++;
                 }
@@ -809,7 +824,7 @@ void CParty::ReloadParty()
                 else
                 {
                     uint16 zoneid = memberinfo.zone == 0 ? memberinfo.prev_zone : memberinfo.zone;
-                    PChar->pushPacket(new CPartyMemberUpdatePacket(memberinfo.id, (const int8*)memberinfo.name.c_str(), memberinfo.flags, j, zoneid));
+                    PChar->pushPacket(new CPartyMemberUpdatePacket(memberinfo.id, memberinfo.name, memberinfo.flags, j, zoneid));
                 }
                 j++;
             }
@@ -817,13 +832,7 @@ void CParty::ReloadParty()
     }
 }
 
-/************************************************************************
- *																		*
- *  Обновляем статусы членов группы для выбранного персонажа				*
- *  Возвращаем номер персонажа в группе									*
- *																		*
- ************************************************************************/
-
+// update party info for PChar
 void CParty::ReloadPartyMembers(CCharEntity* PChar)
 {
     PChar->ReloadPartyDec();
@@ -831,8 +840,9 @@ void CParty::ReloadPartyMembers(CCharEntity* PChar)
 
     int alliance = 0;
 
-    auto  info = GetPartyInfo();
-    uint8 j    = 0;
+    auto info = GetPartyInfo();
+    RefreshFlags(info);
+    uint8 j = 0;
     for (auto&& memberinfo : info)
     {
         if ((memberinfo.flags & (PARTY_SECOND | PARTY_THIRD)) != alliance)
@@ -840,7 +850,7 @@ void CParty::ReloadPartyMembers(CCharEntity* PChar)
             alliance = memberinfo.flags & (PARTY_SECOND | PARTY_THIRD);
             j        = 0;
         }
-        CCharEntity* PPartyMember = zoneutils::GetChar(memberinfo.zone);
+        CCharEntity* PPartyMember = zoneutils::GetChar(memberinfo.id);
         if (PPartyMember)
         {
             PChar->pushPacket(new CPartyMemberUpdatePacket(PPartyMember, j, memberinfo.flags, PChar->getZone()));
@@ -848,21 +858,20 @@ void CParty::ReloadPartyMembers(CCharEntity* PChar)
         else
         {
             uint16 zoneid = memberinfo.zone == 0 ? memberinfo.prev_zone : memberinfo.zone;
-            PChar->pushPacket(new CPartyMemberUpdatePacket(memberinfo.id, (const int8*)memberinfo.name.c_str(), memberinfo.flags, j, zoneid));
+            PChar->pushPacket(new CPartyMemberUpdatePacket(memberinfo.id, memberinfo.name, memberinfo.flags, j, zoneid));
         }
         j++;
     }
 }
 
-/************************************************************************
- *																		*
- *  Обновляем TreasurePool для указанного персонажа						*
- *																		*
- ************************************************************************/
-
+// update treasure pool for specified character
 void CParty::ReloadTreasurePool(CCharEntity* PChar)
 {
-    XI_DEBUG_BREAK_IF(PChar == nullptr);
+    if (PChar == nullptr)
+    {
+        ShowWarning("CParty::ReloadTreasurePool() - PChar was null.");
+        return;
+    }
 
     if (PChar->PTreasurePool != nullptr && PChar->PTreasurePool->GetPoolType() == TREASUREPOOL_ZONE)
     {
@@ -874,9 +883,9 @@ void CParty::ReloadTreasurePool(CCharEntity* PChar)
     {
         if (PChar->PParty->m_PAlliance != nullptr)
         {
-            for (uint8 a = 0; a < PChar->PParty->m_PAlliance->partyList.size(); ++a)
+            for (std::size_t a = 0; a < PChar->PParty->m_PAlliance->partyList.size(); ++a)
             {
-                for (uint8 i = 0; i < PChar->PParty->m_PAlliance->partyList.at(a)->members.size(); ++i)
+                for (std::size_t i = 0; i < PChar->PParty->m_PAlliance->partyList.at(a)->members.size(); ++i)
                 {
                     CCharEntity* PPartyMember = (CCharEntity*)PChar->PParty->m_PAlliance->partyList.at(a)->members.at(i);
 
@@ -921,43 +930,37 @@ void CParty::ReloadTreasurePool(CCharEntity* PChar)
     }
 }
 
-/************************************************************************
- *																		*
- *  Устанавливаем лидера группы											*
- *																		*
- ************************************************************************/
-
-void CParty::SetLeader(const char* MemberName)
+void CParty::SetLeader(const std::string& MemberName)
 {
     if (m_PartyType == PARTY_PCS)
     {
         uint32 newId = 0;
-        int    ret   = Sql_Query(
-            SqlHandle, "SELECT chars.charid from accounts_sessions JOIN chars ON chars.charid = accounts_sessions.charid WHERE charname = ('%s')", MemberName);
+        int    ret   = sql->Query(
+                 "SELECT chars.charid from accounts_sessions JOIN chars ON chars.charid = accounts_sessions.charid WHERE charname = ('%s')", MemberName);
 
-        if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+        if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
         {
-            newId = Sql_GetUIntData(SqlHandle, 0);
+            newId = sql->GetUIntData(0);
         }
         else
         {
             return;
         }
 
-        Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", ALLIANCE_LEADER | PARTY_LEADER,
-                  m_PartyID, PARTY_LEADER);
-        Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyid = %u WHERE partyid = %u", newId, m_PartyID);
-        Sql_Query(SqlHandle, "UPDATE accounts_parties SET allianceid = %u WHERE allianceid = %u", newId, m_PartyID);
+        sql->Query("UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", ALLIANCE_LEADER | PARTY_LEADER,
+                   m_PartyID, PARTY_LEADER);
+        sql->Query("UPDATE accounts_parties SET partyid = %u WHERE partyid = %u", newId, m_PartyID);
+        sql->Query("UPDATE accounts_parties SET allianceid = %u WHERE allianceid = %u", newId, m_PartyID);
 
-        m_PLeader = GetMemberByName((const int8*)MemberName);
+        m_PLeader = GetMemberByName(MemberName);
         if (this->m_PAlliance && this->m_PAlliance->m_AllianceID == m_PartyID)
         {
             m_PAlliance->m_AllianceID = newId;
         }
 
         m_PartyID = newId;
-        Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyflag = partyflag | IF(allianceid = partyid, %d, %d) WHERE charid = %u",
-                  ALLIANCE_LEADER | PARTY_LEADER, PARTY_LEADER, newId);
+        sql->Query("UPDATE accounts_parties SET partyflag = partyflag | IF(allianceid = partyid, %d, %d) WHERE charid = %u",
+                   ALLIANCE_LEADER | PARTY_LEADER, PARTY_LEADER, newId);
 
         // Passing leader dismisses trusts
         for (auto* PMemberEntity : members)
@@ -974,21 +977,11 @@ void CParty::SetLeader(const char* MemberName)
     }
 }
 
-/************************************************************************
- *																		*
- *  Устанавливаем цель синхронизации уровней								*
- *																		*
- ************************************************************************/
-
-void CParty::SetSyncTarget(int8* MemberName, uint16 message)
+void CParty::SetSyncTarget(const std::string& MemberName, uint16 message)
 {
-    CBattleEntity* PEntity = nullptr;
-    if (MemberName)
-    {
-        PEntity = GetMemberByName(MemberName);
-    }
+    CBattleEntity* PEntity = GetMemberByName(MemberName);
 
-    if (map_config.level_sync_enable)
+    if (settings::get<bool>("map.LEVEL_SYNC_ENABLE"))
     {
         if (PEntity && PEntity->objtype == TYPE_PC)
         {
@@ -1008,7 +1001,7 @@ void CParty::SetSyncTarget(int8* MemberName, uint16 message)
             {
                 for (auto& member : members)
                 {
-                    if (member->StatusEffectContainer->HasStatusEffect({ EFFECT_LEVEL_RESTRICTION, EFFECT_LEVEL_SYNC }))
+                    if (member->StatusEffectContainer->HasStatusEffect({ EFFECT_LEVEL_RESTRICTION, EFFECT_LEVEL_SYNC, EFFECT_SJ_RESTRICTION, EFFECT_CONFRONTATION, EFFECT_BATTLEFIELD }))
                     {
                         ((CCharEntity*)GetLeader())->pushPacket(new CMessageBasicPacket((CCharEntity*)GetLeader(), (CCharEntity*)GetLeader(), 0, 0, 543));
                         return;
@@ -1032,10 +1025,10 @@ void CParty::SetSyncTarget(int8* MemberName, uint16 message)
                         member->loc.zone->PushPacket(member, CHAR_INRANGE, new CCharSyncPacket(member));
                     }
                 }
-                Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", PARTY_SYNC, m_PartyID,
-                          PARTY_SYNC);
-                Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyflag = partyflag | %d WHERE partyid = %u AND charid = '%u';", PARTY_SYNC, m_PartyID,
-                          PChar->id);
+                sql->Query("UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", PARTY_SYNC, m_PartyID,
+                           PARTY_SYNC);
+                sql->Query("UPDATE accounts_parties SET partyflag = partyflag | %d WHERE partyid = %u AND charid = '%u';", PARTY_SYNC, m_PartyID,
+                           PChar->id);
             }
         }
         else
@@ -1065,39 +1058,28 @@ void CParty::SetSyncTarget(int8* MemberName, uint16 message)
                 }
             }
             m_PSyncTarget = nullptr;
-            Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", PARTY_SYNC, m_PartyID,
-                      PARTY_SYNC);
+            sql->Query("UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", PARTY_SYNC, m_PartyID,
+                       PARTY_SYNC);
         }
     }
 }
 
-/************************************************************************
- *																		*
- *  Усранавливаем владельца сокровищ										*
- *																		*
- ************************************************************************/
-
-void CParty::SetQuarterMaster(const char* MemberName)
+void CParty::SetQuarterMaster(const std::string& MemberName)
 {
-    CBattleEntity* PEntity = MemberName ? GetMemberByName((const int8*)MemberName) : nullptr;
-    m_PQuaterMaster        = PEntity;
-    Sql_Query(SqlHandle, "UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", PARTY_QM, m_PartyID, PARTY_QM);
-    if (MemberName != nullptr)
+    CBattleEntity* PEntity = GetMemberByName(MemberName);
+    m_PQuarterMaster       = PEntity;
+    sql->Query("UPDATE accounts_parties SET partyflag = partyflag & ~%d WHERE partyid = %u AND partyflag & %d", PARTY_QM, m_PartyID, PARTY_QM);
+    if (PEntity != nullptr)
     {
-        Sql_Query(SqlHandle, "UPDATE accounts_parties JOIN chars ON accounts_parties.charid = chars.charid \
+        sql->Query("UPDATE accounts_parties JOIN chars ON accounts_parties.charid = chars.charid \
                               SET partyflag = partyflag | %d WHERE partyid = %u AND charname = '%s';",
-                  PARTY_QM, m_PartyID, MemberName);
+                   PARTY_QM, m_PartyID, MemberName);
     }
 }
 
-/************************************************************************
- *																		*
- *  Отправляем пакет всем членам группы, если зона указана как 0 или		*
- *  членам группы в указанной зоне.										*
- *  Пакет для PPartyMember не отправляется в обоих случаях.				*
- *																		*
- ************************************************************************/
-
+// Send a packet to all members of the group if the zone is specified as 0
+// or to the party members in the specified zone.
+// Packet for PPartyMember is not sent in both cases
 void CParty::PushPacket(uint32 senderID, uint16 ZoneID, CBasicPacket* packet)
 {
     for (auto& i : members)
@@ -1117,7 +1099,7 @@ void CParty::PushPacket(uint32 senderID, uint16 ZoneID, CBasicPacket* packet)
             }
         }
     }
-    delete packet;
+    destroy(packet);
 }
 
 void CParty::PushEffectsPacket()
@@ -1164,7 +1146,7 @@ void CParty::RefreshSync()
     uint8        syncLevel = sync->jobs.job[sync->GetMJob()];
     if (syncLevel < 10)
     {
-        SetSyncTarget(nullptr, 554);
+        SetSyncTarget("", 554);
     }
     for (auto& i : members)
     {
@@ -1212,9 +1194,49 @@ void CParty::SetPartyNumber(uint8 number)
     m_PartyNumber = number;
 }
 
+bool CParty::HasOnlyOneMember() const
+{
+    if (members.size() != 1)
+    {
+        return false;
+    }
+
+    // Load party size to make sure that there is only one member in the party across all servers
+    return LoadPartySize() == 1;
+}
+
+bool CParty::IsFull() const
+{
+    if (members.size() > 5)
+    {
+        return true;
+    }
+
+    // Load party size to make sure that that all members are accounted for across all servers
+    return LoadPartySize() > 5;
+}
+
+uint32 CParty::LoadPartySize() const
+{
+    int ret = sql->Query("SELECT COUNT(*) FROM accounts_parties WHERE partyid = %d;", m_PartyID);
+    if (ret != SQL_ERROR && sql->NextRow() == SQL_SUCCESS)
+    {
+        return sql->GetUIntData(0);
+    }
+    return 0;
+}
+
 uint32 CParty::GetTimeLastMemberJoined()
 {
-    return (uint32)std::chrono::time_point_cast<std::chrono::seconds>(m_TimeLastMemberJoined).time_since_epoch().count();
+    auto* PLeader                    = dynamic_cast<CCharEntity*>(CParty::GetLeader());
+    auto  LeaderMemberLastJoinedTime = server_clock::now();
+
+    if (PLeader)
+    {
+        LeaderMemberLastJoinedTime = PLeader->m_LeaderCreatedPartyTime;
+    }
+
+    return (uint32)std::chrono::time_point_cast<std::chrono::seconds>(LeaderMemberLastJoinedTime).time_since_epoch().count();
 }
 
 bool CParty::HasTrusts()
@@ -1261,13 +1283,13 @@ void CParty::RefreshFlags(std::vector<partyInfo_t>& info)
                 {
                     if (member->id == memberinfo.id)
                     {
-                        m_PQuaterMaster = member;
-                        found           = true;
+                        m_PQuarterMaster = member;
+                        found            = true;
                     }
                 }
                 if (!found)
                 {
-                    m_PQuaterMaster = nullptr;
+                    m_PQuarterMaster = nullptr;
                 }
             }
             if (memberinfo.flags & PARTY_SYNC)
@@ -1304,4 +1326,12 @@ void CParty::RefreshFlags(std::vector<partyInfo_t>& info)
             }
         }
     }
+}
+
+std::size_t CParty::GetMemberCountAcrossAllProcesses()
+{
+    // TODO: We should detect whether or not we're a multi-process
+    // setup. So we can avoid asking the database for more information
+    // than we need to.
+    return GetPartyInfo().size();
 }

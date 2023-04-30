@@ -1,7 +1,6 @@
 -----------------------------------
 -- Area: Port Jeuno
---  NPC: Falax
--- Standard Info NPC
+--  NPC: Falak
 -----------------------------------
 local entity = {}
 
@@ -9,7 +8,6 @@ entity.onTrade = function(player, npc, trade)
 end
 
 entity.onTrigger = function(player, npc)
-    player:startEvent(28)
 end
 
 entity.onEventUpdate = function(player, csid, option)
